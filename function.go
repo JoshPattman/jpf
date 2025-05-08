@@ -42,7 +42,7 @@ func RunOneShot[T, U any](model Model, f Function[T, U], input T) (U, Usage, err
 	if err != nil {
 		return u, Usage{}, err
 	}
-	resp, usage, err := model.Respond(msgs)
+	_, resp, usage, err := model.Respond(msgs)
 	if err != nil {
 		return u, usage, err
 	}
@@ -64,9 +64,8 @@ func RunWithRetries[T, U any](model Model, f RetryFunction[T, U], maxRetries int
 	totalUsage := Usage{}
 	var lastErr *ParseError
 	for range maxRetries {
-		resp, usage, err := model.Respond(history)
-		totalUsage.InputTokens += usage.InputTokens
-		totalUsage.OutputTokens += usage.OutputTokens
+		_, resp, usage, err := model.Respond(history)
+		totalUsage = totalUsage.Add(usage)
 		if err != nil {
 			return u, totalUsage, err
 		}

@@ -16,16 +16,19 @@ func NewRetryModel(model Model, tries int, delay time.Duration) Model {
 	}
 }
 
-func (m *retryModel) Respond(msgs []Message) (Message, Usage, error) {
+func (m *retryModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+	var aux []Message
 	var msg Message
+	var usgTotal Usage
 	var usg Usage
 	var err error
 	for range m.tries {
-		msg, usg, err = m.Model.Respond(msgs)
+		aux, msg, usg, err = m.Model.Respond(msgs)
+		usgTotal = usgTotal.Add(usg)
 		if err == nil {
 			break
 		}
 		time.Sleep(m.delay)
 	}
-	return msg, usg, err
+	return aux, msg, usgTotal, err
 }

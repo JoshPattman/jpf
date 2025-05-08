@@ -6,6 +6,7 @@ const (
 	SystemRole Role = iota
 	UserRole
 	AssistantRole
+	ReasoningRole
 )
 
 type Message struct {
