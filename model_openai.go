@@ -9,20 +9,31 @@ import (
 )
 
 type openAIModel struct {
-	key         string
-	model       string
-	maxInput    int
-	maxOutput   int
-	temperature float64
+	key             string
+	model           string
+	maxInput        int
+	maxOutput       int
+	temperature     *float64
+	reasoningEffort *ReasoningEffort
 }
 
-func NewOpenAIModel(key, model string, temperature float64, maxInput, maxOutput int) Model {
+func NewReasoningOpenAIModel(key, modelName string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
+	return &openAIModel{
+		key:             key,
+		model:           modelName,
+		maxInput:        maxInput,
+		maxOutput:       maxOutput,
+		reasoningEffort: &reasoningEffort,
+	}
+}
+
+func NewStandardOpenAIModel(key, modelName string, maxInput, maxOutput int, temperature float64) Model {
 	return &openAIModel{
 		key:         key,
-		model:       model,
+		model:       modelName,
 		maxInput:    maxInput,
 		maxOutput:   maxOutput,
-		temperature: temperature,
+		temperature: &temperature,
 	}
 }
 
@@ -60,11 +71,29 @@ func messagesToOpenAI(msgs []Message) any {
 	return jsonMessages
 }
 
+func reasoningEffortToOpenAI(re ReasoningEffort) string {
+	switch re {
+	case LowReasoning:
+		return "low"
+	case MediumReasoning:
+		return "medium"
+	case HighReasoning:
+		return "high"
+	default:
+		panic("not possible")
+	}
+}
+
 func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
 	bodyMap := map[string]any{
-		"model":       c.model,
-		"temperature": c.temperature,
-		"messages":    messagesToOpenAI(msgs),
+		"model":    c.model,
+		"messages": messagesToOpenAI(msgs),
+	}
+	if c.temperature != nil {
+		bodyMap["temperature"] = *c.temperature
+	}
+	if c.reasoningEffort != nil {
+		bodyMap["reasoning_effort"] = reasoningEffortToOpenAI(*c.reasoningEffort)
 	}
 	body, err := json.Marshal(bodyMap)
 	if err != nil {

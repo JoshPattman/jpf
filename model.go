@@ -21,3 +21,11 @@ type Model interface {
 	// There may be no auxilliary messages, or things like tool calls, function calls, and reasoning may go in the auxilliary messages,
 	Respond([]Message) ([]Message, Message, Usage, error)
 }
+
+type ReasoningEffort uint8
+
+const (
+	LowReasoning ReasoningEffort = iota
+	MediumReasoning
+	HighReasoning
+)
