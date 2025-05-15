@@ -8,6 +8,8 @@ type retryModel struct {
 	delay time.Duration
 }
 
+// NewRetryModel wraps a model such that it will retry calling it if an error occurs,
+// with intermediate delays.
 func NewRetryModel(model Model, tries int, delay time.Duration) Model {
 	return &retryModel{
 		Model: model,

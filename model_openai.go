@@ -17,6 +17,7 @@ type openAIModel struct {
 	reasoningEffort *ReasoningEffort
 }
 
+// NewReasoningOpenAIModel creates a new reasoning model (i.e. o1, o3, ...) from openai.
 func NewReasoningOpenAIModel(key, modelName string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
 	return &openAIModel{
 		key:             key,
@@ -27,6 +28,7 @@ func NewReasoningOpenAIModel(key, modelName string, maxInput, maxOutput int, rea
 	}
 }
 
+// NewStandardOpenAIModel creates a new standard model (i.e. gpt4o, gpt4.1, ...) from openai.
 func NewStandardOpenAIModel(key, modelName string, maxInput, maxOutput int, temperature float64) Model {
 	return &openAIModel{
 		key:         key,

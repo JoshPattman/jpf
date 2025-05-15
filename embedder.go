@@ -5,10 +5,12 @@ import (
 	"math"
 )
 
+// Embedder defines an object that is capable of embedding a string into a vector.
 type Embedder interface {
 	Embed(text string) ([]float64, error)
 }
 
+// CosineSimilarity takes the cosine similarity between two vectors.
 func CosineSimilarity(vec1, vec2 []float64) (float64, error) {
 	if len(vec1) != len(vec2) {
 		return 0, errors.New("vectors must be of the same length")

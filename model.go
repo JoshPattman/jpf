@@ -13,7 +13,7 @@ func (u Usage) Add(u2 Usage) Usage {
 	}
 }
 
-// Model defines an interface to an LLM
+// Model defines an interface to an LLM.
 type Model interface {
 	// Tokens specifies how many tokens are allowed to be sent.
 	Tokens() (int, int)
@@ -22,6 +22,7 @@ type Model interface {
 	Respond([]Message) ([]Message, Message, Usage, error)
 }
 
+// ReasoningEffort defines how hard a reasoning model should think.
 type ReasoningEffort uint8
 
 const (

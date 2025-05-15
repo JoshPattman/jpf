@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-// A function is a short-lived task-specific LLM configuration.
+// Function[input, output] is a short-lived task-specific LLM configuration.
 // They are intended to be used to perform single tasks, and should not be used for long-running conversations.
 type Function[T, U any] interface {
 	// Create the input messages from the input value
@@ -55,7 +55,7 @@ func RunOneShot[T, U any](model Model, f Function[T, U], input T) (U, Usage, err
 
 // Runs a function with a number of retries, providing feedback at each parse fail,
 // i.e. asks the llm the inital messages at the start of the conversation and continues to provide feedback until the answer is parseable.
-func RunWithRetries[T, U any](model Model, f RetryFunction[T, U], maxRetries int, input T) (U, Usage, error) {
+func RunWithRetries[T, U any](model Model, f RetryFunction[T, U], maxRetries int, feedbackRole Role, input T) (U, Usage, error) {
 	var u U
 	history, err := f.BuildInputMessages(input)
 	if err != nil {
@@ -82,7 +82,7 @@ func RunWithRetries[T, U any](model Model, f RetryFunction[T, U], maxRetries int
 				Content: parseErr.Response,
 			})
 			history = append(history, Message{
-				Role:    UserRole,
+				Role:    feedbackRole,
 				Content: feedback,
 			})
 		} else {

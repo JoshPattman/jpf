@@ -8,6 +8,7 @@ import (
 	"net/http"
 )
 
+// NewOpenAIEmbedder creates a new embedding model that uses the openai API.
 func NewOpenAIEmbedder(key string, model string) Embedder {
 	return &openAIEmbedder{
 		key:   key,
