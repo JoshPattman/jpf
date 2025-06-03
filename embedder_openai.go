@@ -8,17 +8,26 @@ import (
 	"net/http"
 )
 
-// NewOpenAIEmbedder creates a new embedding model that uses the openai API.
-func NewOpenAIEmbedder(key string, model string) Embedder {
+const embeddingOpenAIUrl = "https://api.openai.com/v1/embeddings"
+
+// NewOpenAIEmbedder creates a new embedding model that uses an openai-like API.
+func NewOpenAILikeEmbedder(key string, model string, url string) Embedder {
 	return &openAIEmbedder{
 		key:   key,
 		model: model,
+		url:   url,
 	}
+}
+
+// NewOpenAIEmbedder creates a new embedding model that uses the openai API.
+func NewOpenAIEmbedder(key string, model string) Embedder {
+	return NewOpenAILikeEmbedder(key, model, embeddingOpenAIUrl)
 }
 
 type openAIEmbedder struct {
 	key   string
 	model string
+	url   string
 }
 
 func (o *openAIEmbedder) Embed(text string) ([]float64, error) {
@@ -30,7 +39,7 @@ func (o *openAIEmbedder) Embed(text string) ([]float64, error) {
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/embeddings", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", o.url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err
 	}
