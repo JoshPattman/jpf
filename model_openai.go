@@ -13,30 +13,45 @@ type openAIModel struct {
 	model           string
 	maxInput        int
 	maxOutput       int
+	url             string
 	temperature     *float64
 	reasoningEffort *ReasoningEffort
 }
 
-// NewReasoningOpenAIModel creates a new reasoning model (i.e. o1, o3, ...) from openai.
-func NewReasoningOpenAIModel(key, modelName string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
+const openAIURL = "https://api.openai.com/v1/chat/completions"
+
+// NewReasoningOpenAIModel creates a new reasoning model (i.e. o1, o3, ...) from an openai-like api.
+func NewReasoningOpenAILikeModel(key, modelName, url string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
 	return &openAIModel{
 		key:             key,
 		model:           modelName,
 		maxInput:        maxInput,
 		maxOutput:       maxOutput,
 		reasoningEffort: &reasoningEffort,
+		url:             url,
 	}
 }
 
-// NewStandardOpenAIModel creates a new standard model (i.e. gpt4o, gpt4.1, ...) from openai.
-func NewStandardOpenAIModel(key, modelName string, maxInput, maxOutput int, temperature float64) Model {
+// NewReasoningOpenAIModel creates a new reasoning model (i.e. o1, o3, ...) from openai.
+func NewReasoningOpenAIModel(key, modelName string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
+	return NewReasoningOpenAILikeModel(key, modelName, openAIURL, maxInput, maxOutput, reasoningEffort)
+}
+
+// NewStandardOpenAIModel creates a new standard model (i.e. gpt4o, gpt4.1, ...) from an openai-like api.
+func NewStandardOpenAILikeModel(key, modelName, url string, maxInput, maxOutput int, temperature float64) Model {
 	return &openAIModel{
 		key:         key,
 		model:       modelName,
 		maxInput:    maxInput,
 		maxOutput:   maxOutput,
 		temperature: &temperature,
+		url:         openAIURL,
 	}
+}
+
+// NewStandardOpenAIModel creates a new standard model (i.e. gpt4o, gpt4.1, ...) from an openai-like api.
+func NewStandardOpenAIModel(key, modelName string, maxInput, maxOutput int, temperature float64) Model {
+	return NewStandardOpenAILikeModel(key, modelName, openAIURL, maxInput, maxOutput, temperature)
 }
 
 func (c *openAIModel) Tokens() (int, int) {
@@ -101,7 +116,7 @@ func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	if err != nil {
 		return nil, Message{}, Usage{}, err
 	}
-	req, err := http.NewRequest("POST", "https://api.openai.com/v1/chat/completions", bytes.NewBuffer(body))
+	req, err := http.NewRequest("POST", c.url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, Message{}, Usage{}, err
 	}
