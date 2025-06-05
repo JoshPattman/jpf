@@ -66,26 +66,24 @@ func roleToOpenAI(role Role) string {
 		return "user"
 	case AssistantRole:
 		return "assistant"
-	case ReasoningRole:
-		return "system"
 	default:
 		panic("not a valid role")
 	}
 }
 
-func messagesToOpenAI(msgs []Message) any {
+func messagesToOpenAI(msgs []Message) (any, error) {
 	jsonMessages := make([]map[string]any, 0)
 	for _, msg := range msgs {
 		content := msg.Content
 		if msg.Role == ReasoningRole {
-			content = "The following information outlines some reasoning about the conversation up to this point:\n\n" + content
+			return nil, fmt.Errorf("reasoning role not allowed in openAI format, consider using NewSystemReasonModel")
 		}
 		jsonMessages = append(jsonMessages, map[string]any{
 			"role":    roleToOpenAI(msg.Role),
 			"content": content,
 		})
 	}
-	return jsonMessages
+	return jsonMessages, nil
 }
 
 func reasoningEffortToOpenAI(re ReasoningEffort) string {
@@ -102,9 +100,13 @@ func reasoningEffortToOpenAI(re ReasoningEffort) string {
 }
 
 func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+	openAIMsgs, err := messagesToOpenAI(msgs)
+	if err != nil {
+		return nil, Message{}, Usage{}, err
+	}
 	bodyMap := map[string]any{
 		"model":    c.model,
-		"messages": messagesToOpenAI(msgs),
+		"messages": openAIMsgs,
 	}
 	if c.temperature != nil {
 		bodyMap["temperature"] = *c.temperature
