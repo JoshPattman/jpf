@@ -8,6 +8,65 @@ import (
 	"net/http"
 )
 
+type OpenAIModelBuilder struct {
+	isReasoning bool
+	model       *openAIModel
+}
+
+func BuildOpenAIModel(key, modelName string, isReasoning bool) *OpenAIModelBuilder {
+	model := &OpenAIModelBuilder{
+		model: &openAIModel{
+			key:             key,
+			model:           modelName,
+			maxInput:        0,
+			maxOutput:       0,
+			url:             "https://api.openai.com/v1/chat/completions",
+			temperature:     nil,
+			reasoningEffort: nil,
+		},
+		isReasoning: isReasoning,
+	}
+	if isReasoning {
+		re := LowReasoning
+		model.model.reasoningEffort = &re
+	} else {
+		te := 0.0
+		model.model.temperature = &te
+	}
+	return model
+}
+
+func (b *OpenAIModelBuilder) Validate() (Model, error) {
+	if b.isReasoning && b.model.temperature != nil {
+		return nil, fmt.Errorf("must not set temperature on a reasoning model")
+	}
+	if !b.isReasoning && b.model.reasoningEffort != nil {
+		return nil, fmt.Errorf("must not set reasoning effort on a standard model")
+	}
+	return b.model, nil
+}
+
+func (b *OpenAIModelBuilder) WithTemperature(temp float64) *OpenAIModelBuilder {
+	b.model.temperature = &temp
+	return b
+}
+
+func (b *OpenAIModelBuilder) WithReasoningEffort(re ReasoningEffort) *OpenAIModelBuilder {
+	b.model.reasoningEffort = &re
+	return b
+}
+
+func (b *OpenAIModelBuilder) WithURL(url string) *OpenAIModelBuilder {
+	b.model.url = url
+	return b
+}
+
+func (b *OpenAIModelBuilder) WithTokens(input, output int) *OpenAIModelBuilder {
+	b.model.maxInput = input
+	b.model.maxOutput = output
+	return b
+}
+
 type openAIModel struct {
 	key             string
 	model           string
@@ -16,42 +75,6 @@ type openAIModel struct {
 	url             string
 	temperature     *float64
 	reasoningEffort *ReasoningEffort
-}
-
-const openAIURL = "https://api.openai.com/v1/chat/completions"
-
-// NewReasoningOpenAIModel creates a new reasoning model (i.e. o1, o3, ...) from an openai-like api.
-func NewReasoningOpenAILikeModel(key, modelName, url string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
-	return &openAIModel{
-		key:             key,
-		model:           modelName,
-		maxInput:        maxInput,
-		maxOutput:       maxOutput,
-		reasoningEffort: &reasoningEffort,
-		url:             url,
-	}
-}
-
-// NewReasoningOpenAIModel creates a new reasoning model (i.e. o1, o3, ...) from openai.
-func NewReasoningOpenAIModel(key, modelName string, maxInput, maxOutput int, reasoningEffort ReasoningEffort) Model {
-	return NewReasoningOpenAILikeModel(key, modelName, openAIURL, maxInput, maxOutput, reasoningEffort)
-}
-
-// NewStandardOpenAIModel creates a new standard model (i.e. gpt4o, gpt4.1, ...) from an openai-like api.
-func NewStandardOpenAILikeModel(key, modelName, url string, maxInput, maxOutput int, temperature float64) Model {
-	return &openAIModel{
-		key:         key,
-		model:       modelName,
-		maxInput:    maxInput,
-		maxOutput:   maxOutput,
-		temperature: &temperature,
-		url:         openAIURL,
-	}
-}
-
-// NewStandardOpenAIModel creates a new standard model (i.e. gpt4o, gpt4.1, ...) from an openai-like api.
-func NewStandardOpenAIModel(key, modelName string, maxInput, maxOutput int, temperature float64) Model {
-	return NewStandardOpenAILikeModel(key, modelName, openAIURL, maxInput, maxOutput, temperature)
 }
 
 func (c *openAIModel) Tokens() (int, int) {

@@ -8,21 +8,30 @@ import (
 	"net/http"
 )
 
-const embeddingOpenAIUrl = "https://api.openai.com/v1/embeddings"
+type OpenAIEmbedderBuilder struct {
+	embedder *openAIEmbedder
+}
 
-// NewOpenAIEmbedder creates a new embedding model that uses an openai-like API.
-func NewOpenAILikeEmbedder(key string, model string, url string) Embedder {
-	return &openAIEmbedder{
-		key:   key,
-		model: model,
-		url:   url,
+func BuildOpenAIEmbedder(key, model string) *OpenAIEmbedderBuilder {
+	return &OpenAIEmbedderBuilder{
+		embedder: &openAIEmbedder{
+			key:   key,
+			model: model,
+			url:   embeddingOpenAIUrl,
+		},
 	}
 }
 
-// NewOpenAIEmbedder creates a new embedding model that uses the openai API.
-func NewOpenAIEmbedder(key string, model string) Embedder {
-	return NewOpenAILikeEmbedder(key, model, embeddingOpenAIUrl)
+func (b *OpenAIEmbedderBuilder) Validate() (Embedder, error) {
+	return b.embedder, nil
 }
+
+func (b *OpenAIEmbedderBuilder) WithURL(url string) *OpenAIEmbedderBuilder {
+	b.embedder.url = url
+	return b
+}
+
+const embeddingOpenAIUrl = "https://api.openai.com/v1/embeddings"
 
 type openAIEmbedder struct {
 	key   string

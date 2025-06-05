@@ -1,20 +1,25 @@
 package jpf
 
-// This creates a new model that switches all Reasoning roles to System roles when sending content to the model, and adds a prefix to the reasoning
-func NewSystemReasonModel(model Model, prefix string) Model {
-	return &systemReasonModel{
-		model:  model,
-		prefix: prefix,
+type SystemReasinModelBuilder struct {
+	model *systemReasonModel
+}
+
+func BuildSystemReasonModel(model Model) *SystemReasinModelBuilder {
+	return &SystemReasinModelBuilder{
+		model: &systemReasonModel{
+			model:  model,
+			prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n",
+		},
 	}
 }
 
-// This creates a new model that switches all Reasoning roles to System roles when sending content to the model, and adds a prefix to the reasoning.
-// It uses a default reasoning prefix.
-func NewDefaultSystemReasonModel(model Model) Model {
-	return NewSystemReasonModel(
-		model,
-		"The following information outlines some reasoning about the conversation up to this point:\n\n",
-	)
+func (b *SystemReasinModelBuilder) Validate() (Model, error) {
+	return b.model, nil
+}
+
+func (b *SystemReasinModelBuilder) WithPrefix(prefix string) *SystemReasinModelBuilder {
+	b.model.prefix = prefix
+	return b
 }
 
 type systemReasonModel struct {

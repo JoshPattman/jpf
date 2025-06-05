@@ -1,15 +1,29 @@
 package jpf
 
-// Creates a new model that simulates reasoning by asking one model to reason and the other to answer.
-func NewFakeReasoningModel(reasoner Model, answerer Model, reasoningPrompt string) Model {
-	return &fakeReasoningModel{
-		reasoner:        reasoner,
-		answerer:        answerer,
-		reasoningPrompt: reasoningPrompt,
+type FakeReasoningModelBuilder struct {
+	model *fakeReasoningModel
+}
+
+func BuildFakeReasoningModel(reasoner Model, answerer Model) *FakeReasoningModelBuilder {
+	return &FakeReasoningModelBuilder{
+		model: &fakeReasoningModel{
+			reasoner:        reasoner,
+			answerer:        answerer,
+			reasoningPrompt: defaultFakeReasoningPromptA,
+		},
 	}
 }
 
-const DefaultFakeReasoningPromptA = `
+func (b *FakeReasoningModelBuilder) Validate() (Model, error) {
+	return b.model, nil
+}
+
+func (b *FakeReasoningModelBuilder) WithReasoningPrompt(prompt string) *FakeReasoningModelBuilder {
+	b.model.reasoningPrompt = prompt
+	return b
+}
+
+const defaultFakeReasoningPromptA = `
 - You are a specialised reasoning AI, tasked with reasoning about another AIs task.
 - Your job is to provide prior reasoning another AI model, to assist it in answering its question accurately.
 - You should look at the messages up to then end of the conversation, along with the following system prompt (for the other model), and reason.
