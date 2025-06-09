@@ -23,6 +23,7 @@ func BuildOpenAIModel(key, modelName string, isReasoning bool) *OpenAIModelBuild
 			url:             "https://api.openai.com/v1/chat/completions",
 			temperature:     nil,
 			reasoningEffort: nil,
+			extraHeaders:    make(map[string]string),
 		},
 		isReasoning: isReasoning,
 	}
@@ -67,6 +68,11 @@ func (b *OpenAIModelBuilder) WithTokens(input, output int) *OpenAIModelBuilder {
 	return b
 }
 
+func (b *OpenAIModelBuilder) WithHeader(key, val string) *OpenAIModelBuilder {
+	b.model.extraHeaders[key] = val
+	return b
+}
+
 type openAIModel struct {
 	key             string
 	model           string
@@ -75,6 +81,7 @@ type openAIModel struct {
 	url             string
 	temperature     *float64
 	reasoningEffort *ReasoningEffort
+	extraHeaders    map[string]string
 }
 
 func (c *openAIModel) Tokens() (int, int) {
@@ -147,6 +154,9 @@ func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.key))
 	req.Header.Add("Content-Type", "application/json")
+	for k, v := range c.extraHeaders {
+		req.Header.Add(k, v)
+	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, Message{}, Usage{}, err
