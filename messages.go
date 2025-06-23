@@ -11,6 +11,20 @@ const (
 	ReasoningRole
 )
 
+func (r Role) String() string {
+	switch r {
+	case SystemRole:
+		return "system"
+	case UserRole:
+		return "user"
+	case AssistantRole:
+		return "assistant"
+	case ReasoningRole:
+		return "reasoning"
+	}
+	panic("not a valid role")
+}
+
 // Message defines a text message to/from an LLM.
 type Message struct {
 	Role    Role
