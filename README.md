@@ -13,6 +13,7 @@ jpf is a Go library for building lightweight AI-powered applications. It provide
 - **Embedding Utilities**: Generate and manipulate vector embeddings for tasks like similarity, search, or clustering.
 - **Customizable Models**: Seamlessly integrate LLMs, including reasoning chains and hybrid models.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
+- **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.
 
 ## Installation
 
