@@ -1,11 +1,11 @@
 package jpf
 
-type SystemReasinModelBuilder struct {
+type SystemReasonModelBuilder struct {
 	model *systemReasonModel
 }
 
-func BuildSystemReasonModel(model Model) *SystemReasinModelBuilder {
-	return &SystemReasinModelBuilder{
+func BuildSystemReasonModel(model Model) *SystemReasonModelBuilder {
+	return &SystemReasonModelBuilder{
 		model: &systemReasonModel{
 			model:  model,
 			prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n",
@@ -13,11 +13,11 @@ func BuildSystemReasonModel(model Model) *SystemReasinModelBuilder {
 	}
 }
 
-func (b *SystemReasinModelBuilder) Validate() (Model, error) {
+func (b *SystemReasonModelBuilder) Validate() (Model, error) {
 	return b.model, nil
 }
 
-func (b *SystemReasinModelBuilder) WithPrefix(prefix string) *SystemReasinModelBuilder {
+func (b *SystemReasonModelBuilder) WithPrefix(prefix string) *SystemReasonModelBuilder {
 	b.model.prefix = prefix
 	return b
 }

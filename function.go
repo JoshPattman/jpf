@@ -1,88 +1,118 @@
 package jpf
 
 import (
-	"fmt"
+	"errors"
 )
 
-// Function[input, output] is a short-lived task-specific LLM configuration.
-// They are intended to be used to perform single tasks, and should not be used for long-running conversations.
-type Function[T, U any] interface {
-	// Create the input messages from the input value
+var (
+	ErrInvalidResponse = errors.New("llm produced an invalid response")
+)
+
+// A MessageEncoder encodes a structured pice of data into a set of messages for an LLM.
+type MessageEncoder[T any] interface {
 	BuildInputMessages(T) ([]Message, error)
-	// Parse the raw LLM response into an output value,
-	// returning a [ParseError] if the response cannot be parsed, or another error if somthing else.
-	ParseResponseText(string) (U, error)
 }
 
-// A parse error is a specific type of error that is created when a function fails to parse an LLM response
-type ParseError struct {
-	// The latest response of the LLM
-	Response string
-	// The error that occured
-	Err error
+// a ResponseDecoder converts an LLM response into a structured peice of data.
+// When the LLM responsee was invalid, it should return ErrInvalidResponse (or an error joined on that).
+type ResponseDecoder[T any] interface {
+	ParseResponseText(string) (T, error)
 }
 
-func (e *ParseError) Error() string {
-	return fmt.Sprintf("failed to parse: '%s'", e.Err)
+// A FeedbackGenerator can take an error and convert it to a pice of text feedback to send to the LLM.
+type FeedbackGenerator interface {
+	FormatFeedback(Message, error) string
 }
 
-// A retry function is a special type of function that can provide feedback to the LLM when the parse failed.
-// It is still not intended for long-running conversations, however under the hood it does create a long conversation until the parse is sucsessful.
-type RetryFunction[T, U any] interface {
-	Function[T, U]
-	// Format the feedback from this parse error
-	FormatFeedback(*ParseError) string
+type MapFunc[T, U any] interface {
+	Call(T) (U, Usage, error)
 }
 
-// Runs a function with one try,
-// i.e. it asks the LLM once and tries to parse once.
-func RunOneShot[T, U any](model Model, f Function[T, U], input T) (U, Usage, error) {
+func NewOneShotMapFunc[T, U any](enc MessageEncoder[T], pars ResponseDecoder[U], model Model) MapFunc[T, U] {
+	return &oneShotMapFunc[T, U]{
+		enc:   enc,
+		pars:  pars,
+		model: model,
+	}
+}
+
+type oneShotMapFunc[T, U any] struct {
+	enc   MessageEncoder[T]
+	pars  ResponseDecoder[U]
+	model Model
+}
+
+func (mf *oneShotMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	var u U
-	msgs, err := f.BuildInputMessages(input)
+	msgs, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
 		return u, Usage{}, err
 	}
-	_, resp, usage, err := model.Respond(msgs)
+	_, resp, usage, err := mf.model.Respond(msgs)
 	if err != nil {
 		return u, usage, err
 	}
-	result, err := f.ParseResponseText(resp.Content)
+	result, err := mf.pars.ParseResponseText(resp.Content)
 	if err != nil {
 		return u, usage, err
 	}
 	return result, usage, nil
 }
 
-// Runs a function with a number of retries, providing feedback at each parse fail,
-// i.e. asks the llm the inital messages at the start of the conversation and continues to provide feedback until the answer is parseable.
-func RunWithRetries[T, U any](model Model, f RetryFunction[T, U], maxRetries int, feedbackRole Role, input T) (U, Usage, error) {
+// Creates a map func that will keep adding to the conversation with feedback when errors are detected.
+// It will only ever add to the conversation if the error returned from fed is a ErrInvalidResponse (using errors.Is)
+func NewFeedbackMapFunc[T, U any](
+	enc MessageEncoder[T],
+	pars ResponseDecoder[U],
+	fed FeedbackGenerator,
+	model Model,
+	feedbackRole Role,
+	maxRetries int,
+) MapFunc[T, U] {
+	return &feedbackMapFunc[T, U]{
+		enc:          enc,
+		pars:         pars,
+		fed:          fed,
+		model:        model,
+		feedbackRole: feedbackRole,
+		maxRetries:   maxRetries,
+	}
+}
+
+type feedbackMapFunc[T, U any] struct {
+	enc          MessageEncoder[T]
+	pars         ResponseDecoder[U]
+	fed          FeedbackGenerator
+	model        Model
+	feedbackRole Role
+	maxRetries   int
+}
+
+func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	var u U
-	history, err := f.BuildInputMessages(input)
+	history, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
 		return u, Usage{}, err
 	}
 	totalUsage := Usage{}
-	var lastErr *ParseError
-	for range maxRetries {
-		_, resp, usage, err := model.Respond(history)
+	var lastErr error
+	for range mf.maxRetries {
+		_, resp, usage, err := mf.model.Respond(history)
 		totalUsage = totalUsage.Add(usage)
 		if err != nil {
 			return u, totalUsage, err
 		}
-		result, err := f.ParseResponseText(resp.Content)
+		result, err := mf.pars.ParseResponseText(resp.Content)
 		if err == nil {
 			// If the result was ok, return it
 			return result, totalUsage, nil
-		} else if parseErr, ok := err.(*ParseError); ok {
+		} else if errors.Is(err, ErrInvalidResponse) {
 			// If it was a parse error, add to the conversation history and continue looping
-			feedback := f.FormatFeedback(parseErr)
-			lastErr = parseErr
+			feedback := mf.fed.FormatFeedback(resp, err)
+			lastErr = err
+			history = append(history, resp)
 			history = append(history, Message{
-				Role:    AssistantRole,
-				Content: parseErr.Response,
-			})
-			history = append(history, Message{
-				Role:    feedbackRole,
+				Role:    mf.feedbackRole,
 				Content: feedback,
 			})
 		} else {
@@ -91,4 +121,51 @@ func RunWithRetries[T, U any](model Model, f RetryFunction[T, U], maxRetries int
 		}
 	}
 	return u, totalUsage, lastErr
+}
+
+// NewRawMessageFeedbackGenerator creates a FeedbackGenerator that formats feedback by returning the error message as a string.
+func NewRawMessageFeedbackGenerator() FeedbackGenerator {
+	return &rawMessageFeedbackGenerator{}
+}
+
+type rawMessageFeedbackGenerator struct{}
+
+func (g *rawMessageFeedbackGenerator) FormatFeedback(_ Message, err error) string {
+	return err.Error()
+}
+
+// NewRawStringMessageEncoder creates a MessageEncoder that encodes a system prompt and user input as raw string messages.
+func NewRawStringMessageEncoder(systemPrompt string) *rawStringMessageEncoder {
+	return &rawStringMessageEncoder{
+		systemPrompt: systemPrompt,
+	}
+}
+
+type rawStringMessageEncoder struct {
+	systemPrompt string
+}
+
+func (e *rawStringMessageEncoder) BuildInputMessages(input string) ([]Message, error) {
+	messages := []Message{
+		{
+			Role:    SystemRole,
+			Content: e.systemPrompt,
+		},
+		{
+			Role:    UserRole,
+			Content: input,
+		},
+	}
+	return messages, nil
+}
+
+// NewRawStringResponseDecoder creates a ResponseDecoder that returns the response as a raw string without modification.
+func NewRawStringResponseDecoder() *rawStringResponseDecoder {
+	return &rawStringResponseDecoder{}
+}
+
+type rawStringResponseDecoder struct{}
+
+func (d *rawStringResponseDecoder) DecodeResponse(response string) (string, error) {
+	return response, nil
 }
