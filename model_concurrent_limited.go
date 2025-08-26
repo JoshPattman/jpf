@@ -33,8 +33,8 @@ func (m *ConcurrentLimitedModelBuilder) New() (Model, error) {
 	if m.limiter == nil {
 		return nil, fmt.Errorf("must specify a non-nil limiter")
 	}
-	if len(m.limiter) == 0 {
-		return nil, fmt.Errorf("must have at least one length limiter, got %d", len(m.limiter))
+	if cap(m.limiter) == 0 {
+		return nil, fmt.Errorf("must have at least one length limiter, got %d", cap(m.limiter))
 	}
 	if m.builder == nil {
 		return nil, fmt.Errorf("must specify a sub builder")

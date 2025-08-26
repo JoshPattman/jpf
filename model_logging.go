@@ -12,7 +12,7 @@ type LoggingModelBuilder struct {
 	logFunc func(ModelLoggingInfo, io.Writer) error
 }
 
-func BuildLoggingModel(dst io.Writer, builder ModelBuilder) *LoggingModelBuilder {
+func BuildLoggingModel(builder ModelBuilder, dst io.Writer) *LoggingModelBuilder {
 	return &LoggingModelBuilder{
 		builder: builder,
 		dst:     dst,
@@ -32,7 +32,7 @@ func (lmb *LoggingModelBuilder) New() (Model, error) {
 	}
 	subModel, err := lmb.builder.New()
 	if err != nil {
-		return nil, fmt.Errorf("sub model may not be nil")
+		return nil, err
 	}
 	return &loggingModel{
 		dst:     lmb.dst,
