@@ -1,24 +1,35 @@
 package jpf
 
+import "fmt"
+
 type SystemReasonModelBuilder struct {
-	model *systemReasonModel
+	builder ModelBuilder
+	prefix  string
 }
 
-func BuildSystemReasonModel(model Model) *SystemReasonModelBuilder {
+func BuildSystemReasonModel(builder ModelBuilder) *SystemReasonModelBuilder {
 	return &SystemReasonModelBuilder{
-		model: &systemReasonModel{
-			model:  model,
-			prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n",
-		},
+		builder: builder,
+		prefix:  "The following information outlines some reasoning about the conversation up to this point:\n\n",
 	}
 }
 
-func (b *SystemReasonModelBuilder) Validate() (Model, error) {
-	return b.model, nil
+func (b *SystemReasonModelBuilder) New() (Model, error) {
+	if b.builder == nil {
+		return nil, fmt.Errorf("cannot have a nil builder")
+	}
+	subModel, err := b.builder.New()
+	if err != nil {
+		return nil, err
+	}
+	return &systemReasonModel{
+		model:  subModel,
+		prefix: b.prefix,
+	}, nil
 }
 
 func (b *SystemReasonModelBuilder) WithPrefix(prefix string) *SystemReasonModelBuilder {
-	b.model.prefix = prefix
+	b.prefix = prefix
 	return b
 }
 

@@ -37,7 +37,7 @@ func BuildOpenAIModel(key, modelName string, isReasoning bool) *OpenAIModelBuild
 	return model
 }
 
-func (b *OpenAIModelBuilder) Validate() (Model, error) {
+func (b *OpenAIModelBuilder) New() (Model, error) {
 	if b.isReasoning && b.model.temperature != nil {
 		return nil, fmt.Errorf("must not set temperature on a reasoning model")
 	}
