@@ -22,7 +22,7 @@ func BuildOpenAIEmbedder(key, model string) *OpenAIEmbedderBuilder {
 	}
 }
 
-func (b *OpenAIEmbedderBuilder) Validate() (Embedder, error) {
+func (b *OpenAIEmbedderBuilder) New() (Embedder, error) {
 	return b.embedder, nil
 }
 

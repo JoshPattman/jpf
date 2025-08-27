@@ -61,26 +61,29 @@ func (i *inMemoryCache) SetCachedResponse(inputs []Message, aux []Message, out M
 }
 
 type CachedModelBuilder struct {
-	model *cachedModel
+	builder ModelBuilder
+	cache   ModelResponseCache
 }
 
-func BuildCachedModel(model Model, cache ModelResponseCache) *CachedModelBuilder {
+func BuildCachedModel(builder ModelBuilder, cache ModelResponseCache) *CachedModelBuilder {
 	return &CachedModelBuilder{
-		model: &cachedModel{
-			model: model,
-			cache: cache,
-		},
+		builder: builder,
+		cache:   cache,
 	}
 }
 
-func (b *CachedModelBuilder) Validate() (Model, error) {
-	if b.model.cache == nil {
+func (b *CachedModelBuilder) New() (Model, error) {
+	if b.cache == nil {
 		return nil, fmt.Errorf("cannot have a nil cache")
 	}
-	if b.model.model == nil {
+	if b.builder == nil {
 		return nil, fmt.Errorf("cannot have a nil base model")
 	}
-	return b.model, nil
+	subModel, err := b.builder.New()
+	if err != nil {
+		return nil, err
+	}
+	return &cachedModel{model: subModel, cache: b.cache}, nil
 }
 
 type cachedModel struct {

@@ -13,6 +13,10 @@ func (u Usage) Add(u2 Usage) Usage {
 	}
 }
 
+type ModelBuilder interface {
+	New() (Model, error)
+}
+
 // Model defines an interface to an LLM.
 type Model interface {
 	// Tokens specifies how many tokens are allowed to be sent.

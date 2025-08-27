@@ -7,31 +7,42 @@ import (
 )
 
 type LoggingModelBuilder struct {
-	model *loggingModel
+	builder ModelBuilder
+	dst     io.Writer
+	logFunc func(ModelLoggingInfo, io.Writer) error
 }
 
-func BuildLoggingModel(dst io.Writer, model Model) *LoggingModelBuilder {
+func BuildLoggingModel(builder ModelBuilder, dst io.Writer) *LoggingModelBuilder {
 	return &LoggingModelBuilder{
-		model: &loggingModel{
-			model:   model,
-			dst:     dst,
-			logFunc: LogWithJson,
-		},
+		builder: builder,
+		dst:     dst,
+		logFunc: LogWithJson,
 	}
 }
 
-func (lmb *LoggingModelBuilder) Validate() (Model, error) {
-	if lmb.model.dst == nil {
+func (lmb *LoggingModelBuilder) New() (Model, error) {
+	if lmb.dst == nil {
 		return nil, fmt.Errorf("must have a non nil destinationm for logging model")
 	}
-	if lmb.model.logFunc == nil {
+	if lmb.logFunc == nil {
 		return nil, fmt.Errorf("must have a non nil logfunc for logging model")
 	}
-	return lmb.model, nil
+	if lmb.builder == nil {
+		return nil, fmt.Errorf("sub model builder may not be none")
+	}
+	subModel, err := lmb.builder.New()
+	if err != nil {
+		return nil, err
+	}
+	return &loggingModel{
+		dst:     lmb.dst,
+		model:   subModel,
+		logFunc: lmb.logFunc,
+	}, nil
 }
 
 func (lmb *LoggingModelBuilder) WithLogFunc(logFunc func(ModelLoggingInfo, io.Writer) error) *LoggingModelBuilder {
-	lmb.model.logFunc = logFunc
+	lmb.logFunc = logFunc
 	return lmb
 }
 

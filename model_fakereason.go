@@ -1,25 +1,45 @@
 package jpf
 
+import "fmt"
+
 type FakeReasoningModelBuilder struct {
-	model *fakeReasoningModel
+	reasonBuilder   ModelBuilder
+	answerBuilder   ModelBuilder
+	reasoningPrompt string
 }
 
-func BuildFakeReasoningModel(reasoner Model, answerer Model) *FakeReasoningModelBuilder {
+func BuildFakeReasoningModel(reasoner ModelBuilder, answerer ModelBuilder) *FakeReasoningModelBuilder {
 	return &FakeReasoningModelBuilder{
-		model: &fakeReasoningModel{
-			reasoner:        reasoner,
-			answerer:        answerer,
-			reasoningPrompt: defaultFakeReasoningPromptA,
-		},
+		reasonBuilder:   reasoner,
+		answerBuilder:   answerer,
+		reasoningPrompt: defaultFakeReasoningPromptA,
 	}
 }
 
-func (b *FakeReasoningModelBuilder) Validate() (Model, error) {
-	return b.model, nil
+func (b *FakeReasoningModelBuilder) New() (Model, error) {
+	if b.reasonBuilder == nil {
+		return nil, fmt.Errorf("may not have a nil reasoning model builder")
+	}
+	if b.answerBuilder == nil {
+		return nil, fmt.Errorf("may not have a nil answer model builder")
+	}
+	reasoner, err := b.reasonBuilder.New()
+	if err != nil {
+		return nil, err
+	}
+	answerer, err := b.answerBuilder.New()
+	if err != nil {
+		return nil, err
+	}
+	return &fakeReasoningModel{
+		reasoner:        reasoner,
+		answerer:        answerer,
+		reasoningPrompt: b.reasoningPrompt,
+	}, nil
 }
 
 func (b *FakeReasoningModelBuilder) WithReasoningPrompt(prompt string) *FakeReasoningModelBuilder {
-	b.model.reasoningPrompt = prompt
+	b.reasoningPrompt = prompt
 	return b
 }
 

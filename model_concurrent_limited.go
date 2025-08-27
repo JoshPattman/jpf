@@ -4,43 +4,54 @@ import (
 	"fmt"
 )
 
+type ConcurrentLimiter chan struct{}
+
+func NewMaxConcurrentLimiter(n int) ConcurrentLimiter {
+	return make(ConcurrentLimiter, n)
+}
+
+func NewOneConcurrentLimiter() ConcurrentLimiter {
+	return NewMaxConcurrentLimiter(1)
+}
+
 // Builds a model that has a maximum number of concurrent uses at once.
 // The default number of uses is 1.
 // There is no certainty about the order of calls (i.e. a later call made to this may be processed before an earlier one).
-func BuildConcurrentLimitedModel(model Model) *ConcurrentLimitedModelBuilder {
+func BuildConcurrentLimitedModel(builder ModelBuilder, limiter ConcurrentLimiter) *ConcurrentLimitedModelBuilder {
 	return &ConcurrentLimitedModelBuilder{
-		subModel: model,
-		uses:     1,
+		builder: builder,
+		limiter: limiter,
 	}
 }
 
 type ConcurrentLimitedModelBuilder struct {
-	subModel Model
-	uses     int
+	builder ModelBuilder
+	limiter ConcurrentLimiter
 }
 
-func (m *ConcurrentLimitedModelBuilder) Validate() (Model, error) {
-	if m.uses <= 0 {
-		return nil, fmt.Errorf("must have at least one use, got %d", m.uses)
+func (m *ConcurrentLimitedModelBuilder) New() (Model, error) {
+	if m.limiter == nil {
+		return nil, fmt.Errorf("must specify a non-nil limiter")
 	}
-	if m.subModel == nil {
-		return nil, fmt.Errorf("must specify a sub model")
+	if cap(m.limiter) == 0 {
+		return nil, fmt.Errorf("must have at least one length limiter, got %d", cap(m.limiter))
+	}
+	if m.builder == nil {
+		return nil, fmt.Errorf("must specify a sub builder")
+	}
+	subModel, err := m.builder.New()
+	if err != nil {
+		return nil, err
 	}
 	return &concurrentLimitedModel{
-		model: m.subModel,
-		uses:  make(chan struct{}, m.uses),
+		model: subModel,
+		uses:  m.limiter,
 	}, nil
-}
-
-// Sets the number on concurrent uses, must be >= 1.
-func (m *ConcurrentLimitedModelBuilder) WithUses(n int) *ConcurrentLimitedModelBuilder {
-	m.uses = n
-	return m
 }
 
 type concurrentLimitedModel struct {
 	model Model
-	uses  chan struct{}
+	uses  ConcurrentLimiter
 }
 
 func (c *concurrentLimitedModel) Tokens() (int, int) {
