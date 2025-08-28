@@ -1,54 +1,29 @@
 package jpf
 
 import (
-	"fmt"
 	"time"
 )
 
-type RetryModelBuilder struct {
-	builder ModelBuilder
-	retries int
-	delay   time.Duration
-}
-
-func BuildRetryModel(builder ModelBuilder) *RetryModelBuilder {
-	return &RetryModelBuilder{
-		builder: builder,
+// NewRetryModel wraps a Model with retry functionality.
+// If the underlying model returns an error, this wrapper will retry the operation
+// up to a configurable number of times with an optional delay between retries.
+func NewRetryModel(model Model, opts ...retryModelOpt) Model {
+	m := &retryModel{
 		retries: 99999,
 		delay:   0,
 	}
+	for _, o := range opts {
+		o.applyRetry(m)
+	}
+	return m
 }
 
-func (b *RetryModelBuilder) New() (Model, error) {
-	if b.builder == nil {
-		return nil, fmt.Errorf("must have a non-nil builder")
-	}
-	if b.retries < 0 {
-		return nil, fmt.Errorf("cannot have negative retries")
-	}
-	if b.delay < 0 {
-		return nil, fmt.Errorf("cannot have negative delay")
-	}
-	subModel, err := b.builder.New()
-	if err != nil {
-		return nil, err
-	}
-	return &retryModel{
-		Model:   subModel,
-		retries: b.retries,
-		delay:   b.delay,
-	}, nil
+type retryModelOpt interface {
+	applyRetry(*retryModel)
 }
 
-func (b *RetryModelBuilder) WithMaxRetries(maxRetries int) *RetryModelBuilder {
-	b.retries = maxRetries
-	return b
-}
-
-func (b *RetryModelBuilder) WithDelay(delay time.Duration) *RetryModelBuilder {
-	b.delay = delay
-	return b
-}
+func (o WithRetries) applyRetry(m *retryModel) { m.retries = o.X }
+func (o WithDelay) applyRetry(m *retryModel)   { m.delay = o.X }
 
 type retryModel struct {
 	Model

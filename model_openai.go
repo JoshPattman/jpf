@@ -8,70 +8,33 @@ import (
 	"net/http"
 )
 
-type OpenAIModelBuilder struct {
-	isReasoning bool
-	model       *openAIModel
-}
-
-func BuildOpenAIModel(key, modelName string, isReasoning bool) *OpenAIModelBuilder {
-	model := &OpenAIModelBuilder{
-		model: &openAIModel{
-			key:             key,
-			model:           modelName,
-			maxInput:        0,
-			maxOutput:       0,
-			url:             "https://api.openai.com/v1/chat/completions",
-			temperature:     nil,
-			reasoningEffort: nil,
-			extraHeaders:    make(map[string]string),
-		},
-		isReasoning: isReasoning,
+// NewOpenAIModel creates a Model that uses the OpenAI API.
+// It requires an API key and model name, with optional configuration via variadic options.
+func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) Model {
+	model := &openAIModel{
+		key:             key,
+		model:           modelName,
+		maxInput:        0,
+		maxOutput:       0,
+		url:             "https://api.openai.com/v1/chat/completions",
+		temperature:     nil,
+		reasoningEffort: nil,
+		extraHeaders:    make(map[string]string),
 	}
-	if isReasoning {
-		re := LowReasoning
-		model.model.reasoningEffort = &re
-	} else {
-		te := 0.0
-		model.model.temperature = &te
+	for _, o := range opts {
+		o.applyOpenAIModel(model)
 	}
 	return model
 }
 
-func (b *OpenAIModelBuilder) New() (Model, error) {
-	if b.isReasoning && b.model.temperature != nil {
-		return nil, fmt.Errorf("must not set temperature on a reasoning model")
-	}
-	if !b.isReasoning && b.model.reasoningEffort != nil {
-		return nil, fmt.Errorf("must not set reasoning effort on a standard model")
-	}
-	return b.model, nil
+type openAIModelOpt interface {
+	applyOpenAIModel(*openAIModel)
 }
 
-func (b *OpenAIModelBuilder) WithTemperature(temp float64) *OpenAIModelBuilder {
-	b.model.temperature = &temp
-	return b
-}
-
-func (b *OpenAIModelBuilder) WithReasoningEffort(re ReasoningEffort) *OpenAIModelBuilder {
-	b.model.reasoningEffort = &re
-	return b
-}
-
-func (b *OpenAIModelBuilder) WithURL(url string) *OpenAIModelBuilder {
-	b.model.url = url
-	return b
-}
-
-func (b *OpenAIModelBuilder) WithTokens(input, output int) *OpenAIModelBuilder {
-	b.model.maxInput = input
-	b.model.maxOutput = output
-	return b
-}
-
-func (b *OpenAIModelBuilder) WithHeader(key, val string) *OpenAIModelBuilder {
-	b.model.extraHeaders[key] = val
-	return b
-}
+func (o WithTemperature) applyOpenAIModel(m *openAIModel)     { m.temperature = &o.X }
+func (o WithReasoningEffort) applyOpenAIModel(m *openAIModel) { m.reasoningEffort = &o.X }
+func (o WithURL) applyOpenAIModel(m *openAIModel)             { m.url = o.X }
+func (o WithHTTPHeader) applyOpenAIModel(m *openAIModel)      { m.extraHeaders[o.K] = o.V }
 
 type openAIModel struct {
 	key             string

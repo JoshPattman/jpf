@@ -1,37 +1,23 @@
 package jpf
 
-import "fmt"
-
-type SystemReasonModelBuilder struct {
-	builder ModelBuilder
-	prefix  string
-}
-
-func BuildSystemReasonModel(builder ModelBuilder) *SystemReasonModelBuilder {
-	return &SystemReasonModelBuilder{
-		builder: builder,
-		prefix:  "The following information outlines some reasoning about the conversation up to this point:\n\n",
+// NewSystemReasonModel converts ReasoningRole messages to SystemRole messages.
+// This allows using models that don't natively support a reasoning role by converting
+// reasoning messages into system messages with a customizable prefix.
+// Options:
+// - WithReasoningPrefix: customizes the prefix text added before reasoning content (default provided)
+func NewSystemReasonModel(model Model, opts ...systemReasonOpt) Model {
+	m := &systemReasonModel{model: model, prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n"}
+	for _, o := range opts {
+		o.applySystemReason(m)
 	}
+	return m
 }
 
-func (b *SystemReasonModelBuilder) New() (Model, error) {
-	if b.builder == nil {
-		return nil, fmt.Errorf("cannot have a nil builder")
-	}
-	subModel, err := b.builder.New()
-	if err != nil {
-		return nil, err
-	}
-	return &systemReasonModel{
-		model:  subModel,
-		prefix: b.prefix,
-	}, nil
+type systemReasonOpt interface {
+	applySystemReason(*systemReasonModel)
 }
 
-func (b *SystemReasonModelBuilder) WithPrefix(prefix string) *SystemReasonModelBuilder {
-	b.prefix = prefix
-	return b
-}
+func (p WithReasoningPrefix) applySystemReason(m *systemReasonModel) { m.prefix = p.X }
 
 type systemReasonModel struct {
 	model  Model

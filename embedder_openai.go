@@ -8,28 +8,23 @@ import (
 	"net/http"
 )
 
-type OpenAIEmbedderBuilder struct {
-	embedder *openAIEmbedder
-}
-
-func BuildOpenAIEmbedder(key, model string) *OpenAIEmbedderBuilder {
-	return &OpenAIEmbedderBuilder{
-		embedder: &openAIEmbedder{
-			key:   key,
-			model: model,
-			url:   embeddingOpenAIUrl,
-		},
+func NewOpenAIEmbedder(key, model string, opts ...openAIEmbedderOpt) Embedder {
+	m := &openAIEmbedder{
+		key:   key,
+		model: model,
+		url:   embeddingOpenAIUrl,
 	}
+	for _, o := range opts {
+		o.applyOpenAIEmbedder(m)
+	}
+	return m
 }
 
-func (b *OpenAIEmbedderBuilder) New() (Embedder, error) {
-	return b.embedder, nil
+type openAIEmbedderOpt interface {
+	applyOpenAIEmbedder(*openAIEmbedder)
 }
 
-func (b *OpenAIEmbedderBuilder) WithURL(url string) *OpenAIEmbedderBuilder {
-	b.embedder.url = url
-	return b
-}
+func (o WithURL) applyOpenAIEmbedder(e *openAIEmbedder) { e.url = o.X }
 
 const embeddingOpenAIUrl = "https://api.openai.com/v1/embeddings"
 

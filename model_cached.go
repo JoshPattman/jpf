@@ -3,9 +3,18 @@ package jpf
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"fmt"
 	"strings"
 )
+
+// NewCachedModel wraps a Model with response caching functionality.
+// It stores responses in the provided ModelResponseCache implementation,
+// returning cached results for identical input messages to avoid redundant model calls.
+func NewCachedModel(model Model, cache ModelResponseCache) Model {
+	return &cachedModel{
+		model: model,
+		cache: cache,
+	}
+}
 
 type ModelResponseCache interface {
 	GetCachedResponse([]Message) (bool, []Message, Message, error)
@@ -26,6 +35,8 @@ func HashMessages(msgs []Message) string {
 	return hex.EncodeToString(hashBytes)
 }
 
+// NewInMemoryCache creates an in-memory implementation of ModelResponseCache.
+// It stores model responses in memory using a hash of the input messages as a key.
 func NewInMemoryCache() ModelResponseCache {
 	return &inMemoryCache{
 		resps: make(map[string]memoryCachePacket),
@@ -58,32 +69,6 @@ func (i *inMemoryCache) SetCachedResponse(inputs []Message, aux []Message, out M
 		final: out,
 	}
 	return nil
-}
-
-type CachedModelBuilder struct {
-	builder ModelBuilder
-	cache   ModelResponseCache
-}
-
-func BuildCachedModel(builder ModelBuilder, cache ModelResponseCache) *CachedModelBuilder {
-	return &CachedModelBuilder{
-		builder: builder,
-		cache:   cache,
-	}
-}
-
-func (b *CachedModelBuilder) New() (Model, error) {
-	if b.cache == nil {
-		return nil, fmt.Errorf("cannot have a nil cache")
-	}
-	if b.builder == nil {
-		return nil, fmt.Errorf("cannot have a nil base model")
-	}
-	subModel, err := b.builder.New()
-	if err != nil {
-		return nil, err
-	}
-	return &cachedModel{model: subModel, cache: b.cache}, nil
 }
 
 type cachedModel struct {

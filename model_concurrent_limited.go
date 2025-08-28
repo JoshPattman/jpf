@@ -1,52 +1,27 @@
 package jpf
 
-import (
-	"fmt"
-)
+// NewConcurrentLimitedModel wraps a Model with concurrency control.
+// It ensures that only a limited number of concurrent calls can be made to the underlying model,
+// using the provided ConcurrentLimiter to manage access.
+func NewConcurrentLimitedModel(model Model, limiter ConcurrentLimiter) Model {
+	return &concurrentLimitedModel{
+		model: model,
+		uses:  limiter,
+	}
+}
 
 type ConcurrentLimiter chan struct{}
 
+// NewMaxConcurrentLimiter creates a ConcurrentLimiter that allows up to n concurrent operations.
+// The limiter is implemented as a buffered channel with capacity n.
 func NewMaxConcurrentLimiter(n int) ConcurrentLimiter {
 	return make(ConcurrentLimiter, n)
 }
 
+// NewOneConcurrentLimiter creates a ConcurrentLimiter that allows only one operation at a time.
+// This is a convenience function equivalent to NewMaxConcurrentLimiter(1).
 func NewOneConcurrentLimiter() ConcurrentLimiter {
 	return NewMaxConcurrentLimiter(1)
-}
-
-// Builds a model that has a maximum number of concurrent uses at once.
-// The default number of uses is 1.
-// There is no certainty about the order of calls (i.e. a later call made to this may be processed before an earlier one).
-func BuildConcurrentLimitedModel(builder ModelBuilder, limiter ConcurrentLimiter) *ConcurrentLimitedModelBuilder {
-	return &ConcurrentLimitedModelBuilder{
-		builder: builder,
-		limiter: limiter,
-	}
-}
-
-type ConcurrentLimitedModelBuilder struct {
-	builder ModelBuilder
-	limiter ConcurrentLimiter
-}
-
-func (m *ConcurrentLimitedModelBuilder) New() (Model, error) {
-	if m.limiter == nil {
-		return nil, fmt.Errorf("must specify a non-nil limiter")
-	}
-	if cap(m.limiter) == 0 {
-		return nil, fmt.Errorf("must have at least one length limiter, got %d", cap(m.limiter))
-	}
-	if m.builder == nil {
-		return nil, fmt.Errorf("must specify a sub builder")
-	}
-	subModel, err := m.builder.New()
-	if err != nil {
-		return nil, err
-	}
-	return &concurrentLimitedModel{
-		model: subModel,
-		uses:  m.limiter,
-	}, nil
 }
 
 type concurrentLimitedModel struct {

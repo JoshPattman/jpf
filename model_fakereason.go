@@ -1,47 +1,27 @@
 package jpf
 
-import "fmt"
-
-type FakeReasoningModelBuilder struct {
-	reasonBuilder   ModelBuilder
-	answerBuilder   ModelBuilder
-	reasoningPrompt string
-}
-
-func BuildFakeReasoningModel(reasoner ModelBuilder, answerer ModelBuilder) *FakeReasoningModelBuilder {
-	return &FakeReasoningModelBuilder{
-		reasonBuilder:   reasoner,
-		answerBuilder:   answerer,
-		reasoningPrompt: defaultFakeReasoningPromptA,
-	}
-}
-
-func (b *FakeReasoningModelBuilder) New() (Model, error) {
-	if b.reasonBuilder == nil {
-		return nil, fmt.Errorf("may not have a nil reasoning model builder")
-	}
-	if b.answerBuilder == nil {
-		return nil, fmt.Errorf("may not have a nil answer model builder")
-	}
-	reasoner, err := b.reasonBuilder.New()
-	if err != nil {
-		return nil, err
-	}
-	answerer, err := b.answerBuilder.New()
-	if err != nil {
-		return nil, err
-	}
-	return &fakeReasoningModel{
+// NewFakeReasoningModel creates a model that uses two underlying models to simulate reasoning.
+// It first calls the reasoner model to generate reasoning about the input messages,
+// then passes that reasoning along with the original messages to the answerer model.
+// The reasoning is included as a ReasoningRole message in the auxiliary messages output.
+// Optional parameters allow customization of the reasoning prompt.
+func NewFakeReasoningModel(reasoner Model, answerer Model, opts ...fakeReasoningModelOpt) Model {
+	m := &fakeReasoningModel{
 		reasoner:        reasoner,
 		answerer:        answerer,
-		reasoningPrompt: b.reasoningPrompt,
-	}, nil
+		reasoningPrompt: defaultFakeReasoningPromptA,
+	}
+	for _, o := range opts {
+		o.applyFakeReasoning(m)
+	}
+	return m
 }
 
-func (b *FakeReasoningModelBuilder) WithReasoningPrompt(prompt string) *FakeReasoningModelBuilder {
-	b.reasoningPrompt = prompt
-	return b
+type fakeReasoningModelOpt interface {
+	applyFakeReasoning(*fakeReasoningModel)
 }
+
+func (o WithReasoningPrompt) applyFakeReasoning(m *fakeReasoningModel) { m.reasoningPrompt = o.X }
 
 const defaultFakeReasoningPromptA = `
 - You are a specialised reasoning AI, tasked with reasoning about another AIs task.

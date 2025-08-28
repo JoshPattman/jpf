@@ -2,56 +2,60 @@ package jpf
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
+	"time"
 )
 
-type LoggingModelBuilder struct {
-	builder ModelBuilder
-	dst     io.Writer
-	logFunc func(ModelLoggingInfo, io.Writer) error
-}
-
-func BuildLoggingModel(builder ModelBuilder, dst io.Writer) *LoggingModelBuilder {
-	return &LoggingModelBuilder{
-		builder: builder,
-		dst:     dst,
-		logFunc: LogWithJson,
-	}
-}
-
-func (lmb *LoggingModelBuilder) New() (Model, error) {
-	if lmb.dst == nil {
-		return nil, fmt.Errorf("must have a non nil destinationm for logging model")
-	}
-	if lmb.logFunc == nil {
-		return nil, fmt.Errorf("must have a non nil logfunc for logging model")
-	}
-	if lmb.builder == nil {
-		return nil, fmt.Errorf("sub model builder may not be none")
-	}
-	subModel, err := lmb.builder.New()
-	if err != nil {
-		return nil, err
-	}
+// NewLoggingModel wraps a Model with logging functionality.
+// It logs all interactions with the model using the provided ModelLogger.
+// Each model call is logged with input messages, output messages, usage statistics, and timing information.
+func NewLoggingModel(model Model, logger ModelLogger) Model {
 	return &loggingModel{
-		dst:     lmb.dst,
-		model:   subModel,
-		logFunc: lmb.logFunc,
-	}, nil
+		model:  model,
+		logger: logger,
+	}
 }
 
-func (lmb *LoggingModelBuilder) WithLogFunc(logFunc func(ModelLoggingInfo, io.Writer) error) *LoggingModelBuilder {
-	lmb.logFunc = logFunc
-	return lmb
-}
-
+// ModelLoggingInfo contains all information about a model interaction to be logged.
+// It includes input messages, output messages, usage statistics, and any error that occurred.
 type ModelLoggingInfo struct {
-	messages             []Message
-	responseAuxMessages  []Message
-	responseFinalMessage Message
-	usage                Usage
-	err                  error
+	Messages             []Message
+	ResponseAuxMessages  []Message
+	ResponseFinalMessage Message
+	Usage                Usage
+	Err                  error
+	Duration             time.Duration
+}
+
+// ModelLogger specifies a method of logging a call to a model.
+type ModelLogger interface {
+	ModelLog(ModelLoggingInfo) error
+}
+
+// NewJsonModelLogger creates a ModelLogger that outputs logs in JSON format.
+// The logs are written to the provided io.Writer, with each log entry
+// being a JSON object containing the model interaction details.
+func NewJsonModelLogger(to io.Writer) ModelLogger {
+	return &jsonModelLogger{enc: json.NewEncoder(to)}
+}
+
+type jsonModelLogger struct {
+	enc *json.Encoder
+}
+
+// ModelLog implements ModelLogger.
+func (j *jsonModelLogger) ModelLog(lmp ModelLoggingInfo) error {
+	res := map[string]any{
+		"messages":       messagesToLoggingJson(lmp.Messages),
+		"aux_responses":  messagesToLoggingJson(lmp.ResponseAuxMessages),
+		"final_response": messageToLoggingJson(lmp.ResponseFinalMessage),
+		"usage":          usageToLoggingJson(lmp.Usage),
+		"duration":       lmp.Duration.String(),
+	}
+	if lmp.Err != nil {
+		res["error"] = lmp.Err.Error()
+	}
+	return j.enc.Encode(res)
 }
 
 func messageToLoggingJson(msg Message) any {
@@ -76,41 +80,25 @@ func usageToLoggingJson(usage Usage) any {
 	}
 }
 
-func LogWithJson(lmp ModelLoggingInfo, dst io.Writer) error {
-	res := map[string]any{
-		"messages":       messagesToLoggingJson(lmp.messages),
-		"aux_responses":  messagesToLoggingJson(lmp.responseAuxMessages),
-		"final_response": messageToLoggingJson(lmp.responseFinalMessage),
-		"usage":          usageToLoggingJson(lmp.usage),
-	}
-	if lmp.err != nil {
-		res["error"] = lmp.err.Error()
-	}
-	bs, err := json.Marshal(res)
-	if err != nil {
-		return err
-	}
-	_, err = dst.Write(bs)
-	return err
-}
-
 type loggingModel struct {
-	dst     io.Writer
-	logFunc func(ModelLoggingInfo, io.Writer) error
-	model   Model
+	logger ModelLogger
+	model  Model
 }
 
 // Respond implements Model.
 func (l *loggingModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+	tStart := time.Now()
 	aux, final, us, err := l.model.Respond(msgs)
+	dur := time.Since(tStart)
 	lmp := ModelLoggingInfo{
-		messages:             msgs,
-		responseAuxMessages:  aux,
-		responseFinalMessage: final,
-		usage:                us,
-		err:                  err,
+		Messages:             msgs,
+		ResponseAuxMessages:  aux,
+		ResponseFinalMessage: final,
+		Usage:                us,
+		Err:                  err,
+		Duration:             dur,
 	}
-	logErr := l.logFunc(lmp, l.dst)
+	logErr := l.logger.ModelLog(lmp)
 	if err == nil {
 		err = logErr
 	}

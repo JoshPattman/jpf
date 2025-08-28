@@ -5,10 +5,6 @@ import (
 	"math"
 )
 
-type EmbedderBuilder interface {
-	New() (Embedder, error)
-}
-
 // Embedder defines an object that is capable of embedding a string into a vector.
 type Embedder interface {
 	Embed(text string) ([]float64, error)
