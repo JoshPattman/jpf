@@ -27,6 +27,13 @@ func HashMessages(msgs []Message) string {
 	for _, msg := range msgs {
 		s.WriteString(msg.Role.String())
 		s.WriteString(msg.Content)
+		for _, img := range msg.Images {
+			imgString, err := img.ToBase64Encoded(false)
+			if err != nil {
+				panic(err)
+			}
+			s.WriteString(imgString)
+		}
 	}
 	src := s.String()
 	hasher := sha256.New()
