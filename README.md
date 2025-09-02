@@ -35,7 +35,7 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
 - Will streaming (token-by-token) ever be supported?
     - No. This framework is designed to be more of a back-end tool, and character streaming would add extra complexity that most applications of this package would not benefit from (in my opinion).
 - Are there any pre-built formatters / parsers?
-    - There are a few buildt in implementations, however the aim of this package is to create the framework, not the functionality.
+    - There are a few built in implementations, however the aim of this package is to create the framework, not the functionality.
     - If you have any ideas of useful functions, feel free to put them on an issue, and if enough arise, I can make a new repo for these.
 - Where are the agents?
     - I removed the agent interface recently as I think it was far too restrictuve.
