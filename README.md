@@ -40,6 +40,10 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
 - Where are the agents?
     - I removed the agent interface recently as I think it was far too restrictuve.
     - I would like to instead get the core building blocks ironed out before moving on to coming up with an agent interface.
+- Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API feature?
+    - The aim of this package is to put the advanced stuff, like using tools, to you to figure out. IMO this allows you to do cooler, more flexible things (like a tree of agents).
+    - Also, to a degree tool calls / MCP tools lock you in to one API or another, more than just using the chat completions endpoint.
+    - I might consider adding them in the future, but for now I think that implementing your own tool calling is best.
 
 ## Author
 
