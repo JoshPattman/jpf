@@ -4,7 +4,7 @@
 
 # jpf: A Lightweight Framework for AI-Powered Applications
 
-jpf is a Go library for building lightweight AI-powered applications. It provides essential building blocks, including model construction, embedding generation, and robust LLM interaction interfaces, enabling you to craft custom solutions without the bloat.
+jpf is a Go library for building lightweight AI-powered applications. It provides essential building blocks, including model construction, embedding generation, and robust LLM interaction interfaces, enabling you to craft custom solutions without the bloat. It is aimed at using AI as a tool - not as a chatbot.
 
 ## Features
 
@@ -23,14 +23,6 @@ Install jpf in your Go project via:
 go get github.com/JoshPattman/jpf
 ```
 
-## Usage
-
-Example code is in the `examples` subdirectory. However, a brief overview of the components is as follows:
-- `Model`: An interface defining a model that can create a message given a set of other messages. This encompasses both normal and reasoning models. Models can also be wrapped by other models to achieve retry logic, hybrid reasoning, and more.
-- `Function`: An interface that defines a stateless typed function that performs one LLM call, and includes logic for formatting and parsing the text responses.
-- `RetryFunction`: An extension of the above, but including logic to generate feedback for the LLM upon a failed parse, allowing the LLM call to be run in a loop until valid.
-- `Embedder`: A string to vector embbedding interface.
-
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](./LICENSE) file for details.
@@ -42,10 +34,16 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
 ## FAQ
 - Will streaming (token-by-token) ever be supported?
     - No. This framework is designed to be more of a back-end tool, and character streaming would add extra complexity that most applications of this package would not benefit from (in my opinion).
-- Are there any pre-built functions?
-    - The aim of this package is to create the framework, not the functionality. If you have any ideas of useful functions, feel free to put them on an issue, and if enough arise, I can make a new repo for these.
+- Are there any pre-built formatters / parsers?
+    - There are a few built in implementations, however the aim of this package is to create the framework, not the functionality.
+    - If you have any ideas of useful functions, feel free to put them on an issue, and if enough arise, I can make a new repo for these.
 - Where are the agents?
-    - I removed the agent interface recently as I think it was far too restrictuve. I would like to instead get the core building blocks ironed out before moving on to coming up with an agent interface.
+    - I removed the agent interface recently as I think it was far too restrictuve.
+    - I would like to instead get the core building blocks ironed out before moving on to coming up with an agent interface.
+- Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API feature?
+    - The aim of this package is to put the advanced stuff, like using tools, to you to figure out. IMO this allows you to do cooler, more flexible things (like a tree of agents).
+    - Also, to a degree tool calls / MCP tools lock you in to one API or another, more than just using the chat completions endpoint.
+    - I might consider adding them in the future, but for now I think that implementing your own tool calling is best.
 
 ## Author
 

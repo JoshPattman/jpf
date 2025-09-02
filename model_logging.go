@@ -60,8 +60,9 @@ func (j *jsonModelLogger) ModelLog(lmp ModelLoggingInfo) error {
 
 func messageToLoggingJson(msg Message) any {
 	return map[string]any{
-		"role":    msg.Role.String(),
-		"content": msg.Content,
+		"role":       msg.Role.String(),
+		"content":    msg.Content,
+		"num_images": len(msg.Images),
 	}
 }
 

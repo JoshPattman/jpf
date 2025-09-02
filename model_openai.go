@@ -3,6 +3,7 @@ package jpf
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -67,7 +68,31 @@ func roleToOpenAI(role Role) string {
 func messagesToOpenAI(msgs []Message) (any, error) {
 	jsonMessages := make([]map[string]any, 0)
 	for _, msg := range msgs {
-		content := msg.Content
+		var content any
+		if len(msg.Images) == 0 {
+			content = msg.Content
+		} else {
+			cont := []map[string]any{
+				{
+					"type": "text",
+					"text": msg.Content,
+				},
+			}
+			for _, img := range msg.Images {
+				b64, err := img.ToBase64Encoded(true)
+				if err != nil {
+					return nil, errors.Join(errors.New("failed to encode image to base64"), err)
+				}
+				cont = append(cont, map[string]any{
+					"type": "image_url",
+					"image_url": map[string]any{
+						"url": b64,
+					},
+				},
+				)
+			}
+			content = cont
+		}
 		if msg.Role == ReasoningRole {
 			return nil, fmt.Errorf("reasoning role not allowed in openAI format, consider using NewSystemReasonModel")
 		}
