@@ -22,6 +22,7 @@ type TemplateData struct {
 
 func main() {
 	inputFile := flag.String("i", "", "The input file to use")
+	outputFile := flag.String("o", "", "The output file to use")
 	targetLang := flag.String("l", "Python", "Target language for the rewrite")
 	pointers := flag.String("p", "You may change the overall structure;Make sure to keep the functionality the same", "Semicolon separated list of pointers")
 	flag.Parse()
@@ -48,5 +49,11 @@ func main() {
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),
 	})
-	fmt.Println(rewritten)
+	f2, err := os.Create(*outputFile)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer f2.Close()
+	fmt.Fprint(f2, rewritten)
 }
