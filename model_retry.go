@@ -9,6 +9,7 @@ import (
 // up to a configurable number of times with an optional delay between retries.
 func NewRetryModel(model Model, opts ...retryModelOpt) Model {
 	m := &retryModel{
+		Model:   model,
 		retries: 99999,
 		delay:   0,
 	}
