@@ -1,6 +1,8 @@
 package jpf
 
-import "errors"
+import (
+	"errors"
+)
 
 // NewFeedbackMapFunc creates a MapFunc that adds feedback to the conversation when errors are detected.
 // It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
@@ -39,7 +41,7 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	}
 	totalUsage := Usage{}
 	var lastErr error
-	for range mf.maxRetries {
+	for range mf.maxRetries + 1 {
 		_, resp, usage, err := mf.model.Respond(history)
 		totalUsage = totalUsage.Add(usage)
 		if err != nil {
