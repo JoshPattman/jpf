@@ -54,3 +54,20 @@ func TestLoggingModel(t *testing.T) {
 		t.Fatalf("unexpected log: %v", bs)
 	}
 }
+
+func TestRetryModel(t *testing.T) {
+	var model Model = &TestingModel{
+		Responses: map[string][]string{
+			"hello": {"hi", "bye", "hi again"},
+		},
+		NFails: 3,
+	}
+	model = NewRetryModel(model, WithRetries{3})
+	_, resp, _, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", resp.Content)
+	}
+}

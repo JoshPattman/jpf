@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -28,9 +29,14 @@ type TestStruct struct {
 
 type TestingModel struct {
 	Responses map[string][]string
+	NFails    int
 }
 
 func (t *TestingModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+	if t.NFails > 0 {
+		t.NFails--
+		return nil, Message{}, Usage{}, errors.New("deliberate fail")
+	}
 	var req string
 	if len(msgs) > 0 {
 		req = msgs[len(msgs)-1].Content
