@@ -3,6 +3,7 @@ package jpf
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"strings"
 )
 
@@ -62,6 +63,7 @@ type inMemoryCache struct {
 // GetCachedResponse implements ModelResponseCache.
 func (i *inMemoryCache) GetCachedResponse(msgs []Message) (bool, []Message, Message, error) {
 	msgsHash := HashMessages(msgs)
+	fmt.Println("GET", msgsHash)
 	if cp, ok := i.resps[msgsHash]; ok {
 		return true, cp.aux, cp.final, nil
 	}
@@ -71,6 +73,7 @@ func (i *inMemoryCache) GetCachedResponse(msgs []Message) (bool, []Message, Mess
 // SetCachedResponse implements ModelResponseCache.
 func (i *inMemoryCache) SetCachedResponse(inputs []Message, aux []Message, out Message) error {
 	msgsHash := HashMessages(inputs)
+	fmt.Println("SET", msgsHash)
 	i.resps[msgsHash] = memoryCachePacket{
 		aux:   aux,
 		final: out,
@@ -92,7 +95,15 @@ func (c *cachedModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	if ok {
 		return aux, final, Usage{}, nil
 	}
-	return c.model.Respond(msgs)
+	aux, resp, usage, err := c.model.Respond(msgs)
+	if err != nil {
+		return nil, Message{}, usage, err
+	}
+	err = c.cache.SetCachedResponse(msgs, aux, resp)
+	if err != nil {
+		return nil, Message{}, usage, err
+	}
+	return aux, resp, usage, nil
 }
 
 // Tokens implements Model.
