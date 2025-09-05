@@ -20,13 +20,13 @@ func (mf *oneShotMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	if err != nil {
 		return u, Usage{}, err
 	}
-	_, resp, usage, err := mf.model.Respond(msgs)
+	res, err := mf.model.Respond(msgs)
 	if err != nil {
-		return u, usage, err
+		return u, res.Usage, err
 	}
-	result, err := mf.pars.ParseResponseText(resp.Content)
+	result, err := mf.pars.ParseResponseText(res.Main.Content)
 	if err != nil {
-		return u, usage, err
+		return u, res.Usage, err
 	}
-	return result, usage, nil
+	return result, res.Usage, nil
 }

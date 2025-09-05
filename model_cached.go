@@ -16,23 +16,23 @@ type cachedModel struct {
 }
 
 // Respond implements Model.
-func (c *cachedModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+func (c *cachedModel) Respond(msgs []Message) (ModelResult, error) {
 	ok, aux, final, err := c.cache.GetCachedResponse(msgs)
 	if err != nil {
-		return nil, Message{}, Usage{}, err
+		return ModelResult{}, err
 	}
 	if ok {
-		return aux, final, Usage{}, nil
+		return ModelResult{Aux: aux, Main: final}, nil
 	}
-	aux, resp, usage, err := c.model.Respond(msgs)
+	res, err := c.model.Respond(msgs)
 	if err != nil {
-		return nil, Message{}, usage, err
+		return res.OnlyUsage(), err
 	}
-	err = c.cache.SetCachedResponse(msgs, aux, resp)
+	err = c.cache.SetCachedResponse(msgs, res.Aux, res.Main)
 	if err != nil {
-		return nil, Message{}, usage, err
+		return res.OnlyUsage(), err
 	}
-	return aux, resp, usage, nil
+	return res, nil
 }
 
 // Tokens implements Model.

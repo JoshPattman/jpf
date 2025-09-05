@@ -87,15 +87,15 @@ type loggingModel struct {
 }
 
 // Respond implements Model.
-func (l *loggingModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+func (l *loggingModel) Respond(msgs []Message) (ModelResult, error) {
 	tStart := time.Now()
-	aux, final, us, err := l.model.Respond(msgs)
+	res, err := l.model.Respond(msgs)
 	dur := time.Since(tStart)
 	lmp := ModelLoggingInfo{
 		Messages:             msgs,
-		ResponseAuxMessages:  aux,
-		ResponseFinalMessage: final,
-		Usage:                us,
+		ResponseAuxMessages:  res.Aux,
+		ResponseFinalMessage: res.Main,
+		Usage:                res.Usage,
 		Err:                  err,
 		Duration:             dur,
 	}
@@ -103,7 +103,10 @@ func (l *loggingModel) Respond(msgs []Message) ([]Message, Message, Usage, error
 	if err == nil {
 		err = logErr
 	}
-	return aux, final, us, err
+	if err != nil {
+		return res.OnlyUsage(), err
+	}
+	return res, nil
 }
 
 // Tokens implements Model.

@@ -32,19 +32,20 @@ type retryModel struct {
 	delay   time.Duration
 }
 
-func (m *retryModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
-	var aux []Message
-	var msg Message
+func (m *retryModel) Respond(msgs []Message) (ModelResult, error) {
+	var res ModelResult
 	var usgTotal Usage
-	var usg Usage
 	var err error
 	for range m.retries + 1 {
-		aux, msg, usg, err = m.Model.Respond(msgs)
-		usgTotal = usgTotal.Add(usg)
+		res, err = m.Model.Respond(msgs)
+		usgTotal = usgTotal.Add(res.Usage)
 		if err == nil {
 			break
 		}
 		time.Sleep(m.delay)
 	}
-	return aux, msg, usgTotal, err
+	if err != nil {
+		return res.OnlyUsage(), err
+	}
+	return res, nil
 }

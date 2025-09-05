@@ -25,7 +25,7 @@ type systemReasonModel struct {
 }
 
 // Respond implements Model.
-func (s *systemReasonModel) Respond(messages []Message) ([]Message, Message, Usage, error) {
+func (s *systemReasonModel) Respond(messages []Message) (ModelResult, error) {
 	convertedMessages := make([]Message, len(messages))
 	for i, m := range messages {
 		if m.Role == ReasoningRole {

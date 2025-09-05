@@ -42,20 +42,20 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	totalUsage := Usage{}
 	var lastErr error
 	for range mf.maxRetries + 1 {
-		_, resp, usage, err := mf.model.Respond(history)
-		totalUsage = totalUsage.Add(usage)
+		res, err := mf.model.Respond(history)
+		totalUsage = totalUsage.Add(res.Usage)
 		if err != nil {
 			return u, totalUsage, err
 		}
-		result, err := mf.pars.ParseResponseText(resp.Content)
+		result, err := mf.pars.ParseResponseText(res.Main.Content)
 		if err == nil {
 			// If the result was ok, return it
 			return result, totalUsage, nil
 		} else if errors.Is(err, ErrInvalidResponse) {
 			// If it was a parse error, add to the conversation history and continue looping
-			feedback := mf.fed.FormatFeedback(resp, err)
+			feedback := mf.fed.FormatFeedback(res.Main, err)
 			lastErr = err
-			history = append(history, resp)
+			history = append(history, res.Main)
 			history = append(history, Message{
 				Role:    mf.feedbackRole,
 				Content: feedback,

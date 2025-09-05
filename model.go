@@ -2,6 +2,16 @@ package jpf
 
 import "time"
 
+type ModelResult struct {
+	Aux   []Message
+	Main  Message
+	Usage Usage
+}
+
+func (r ModelResult) OnlyUsage() ModelResult {
+	return ModelResult{Usage: r.Usage}
+}
+
 // Usage defines how many tokens were used when making calls to LLMs.
 type Usage struct {
 	InputTokens  int
@@ -21,7 +31,7 @@ type Model interface {
 	Tokens() (int, int)
 	// Responds to a set of input messages, with a set of auxilliary messages and a final message.
 	// There may be no auxilliary messages, or things like tool calls, function calls, and reasoning may go in the auxilliary messages,
-	Respond([]Message) ([]Message, Message, Usage, error)
+	Respond([]Message) (ModelResult, error)
 }
 
 // ReasoningEffort defines how hard a reasoning model should think.
