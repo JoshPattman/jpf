@@ -3,9 +3,9 @@ package jpf
 import "time"
 
 type ModelResult struct {
-	Aux   []Message
-	Main  Message
-	Usage Usage
+	Extra   []Message
+	Primary Message
+	Usage   Usage
 }
 
 func (r ModelResult) OnlyUsage() ModelResult {

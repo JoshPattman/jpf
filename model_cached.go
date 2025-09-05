@@ -22,13 +22,13 @@ func (c *cachedModel) Respond(msgs []Message) (ModelResult, error) {
 		return ModelResult{}, err
 	}
 	if ok {
-		return ModelResult{Aux: aux, Main: final}, nil
+		return ModelResult{Extra: aux, Primary: final}, nil
 	}
 	res, err := c.model.Respond(msgs)
 	if err != nil {
 		return res.OnlyUsage(), err
 	}
-	err = c.cache.SetCachedResponse(msgs, res.Aux, res.Main)
+	err = c.cache.SetCachedResponse(msgs, res.Extra, res.Primary)
 	if err != nil {
 		return res.OnlyUsage(), err
 	}

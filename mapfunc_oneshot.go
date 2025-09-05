@@ -24,7 +24,7 @@ func (mf *oneShotMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	if err != nil {
 		return u, res.Usage, err
 	}
-	result, err := mf.pars.ParseResponseText(res.Main.Content)
+	result, err := mf.pars.ParseResponseText(res.Primary.Content)
 	if err != nil {
 		return u, res.Usage, err
 	}

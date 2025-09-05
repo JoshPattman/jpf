@@ -47,7 +47,7 @@ func (t *TestingModel) Respond(msgs []Message) (ModelResult, error) {
 	}
 	resp, remaining := resps[0], resps[1:]
 	t.Responses[req] = remaining
-	return ModelResult{Main: Message{Role: AssistantRole, Content: resp}}, nil
+	return ModelResult{Primary: Message{Role: AssistantRole, Content: resp}}, nil
 }
 
 func (t *TestingModel) Tokens() (int, int) {

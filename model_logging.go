@@ -93,8 +93,8 @@ func (l *loggingModel) Respond(msgs []Message) (ModelResult, error) {
 	dur := time.Since(tStart)
 	lmp := ModelLoggingInfo{
 		Messages:             msgs,
-		ResponseAuxMessages:  res.Aux,
-		ResponseFinalMessage: res.Main,
+		ResponseAuxMessages:  res.Extra,
+		ResponseFinalMessage: res.Primary,
 		Usage:                res.Usage,
 		Err:                  err,
 		Duration:             dur,

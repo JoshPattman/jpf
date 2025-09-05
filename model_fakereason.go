@@ -43,7 +43,7 @@ func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResult, error) {
 	if err != nil {
 		return res.OnlyUsage(), err
 	}
-	reasoning := res.Main
+	reasoning := res.Primary
 	reasoning.Role = ReasoningRole
 	msgsWithReasoning := append(msgs, reasoning)
 	res2, err := f.answerer.Respond(msgsWithReasoning)
@@ -51,8 +51,8 @@ func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResult, error) {
 	if err != nil {
 		return ModelResult{Usage: usage}, err
 	}
-	allAux := append([]Message{reasoning}, res.Aux...)
-	return ModelResult{Aux: allAux, Main: res2.Main, Usage: usage}, err
+	allAux := append([]Message{reasoning}, res.Extra...)
+	return ModelResult{Extra: allAux, Primary: res2.Primary, Usage: usage}, err
 }
 
 // Tokens implements Model.

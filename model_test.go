@@ -27,8 +27,8 @@ func TestCachedModel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if res.Main.Content != "hi" {
-			t.Fatalf("expected 'hi' but got '%v' on iteration %v", res.Main.Content, i)
+		if res.Primary.Content != "hi" {
+			t.Fatalf("expected 'hi' but got '%v' on iteration %v", res.Primary.Content, i)
 		}
 	}
 }
@@ -67,7 +67,7 @@ func TestRetryModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Main.Content != "hi" {
-		t.Fatalf("expected 'hi' but got '%v'", res.Main.Content)
+	if res.Primary.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", res.Primary.Content)
 	}
 }

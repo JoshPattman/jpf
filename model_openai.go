@@ -170,5 +170,5 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResult, error) {
 		return ModelResult{Usage: Usage(respTyped.Usage)}, fmt.Errorf("failed to parse response: %s", string(respBody))
 	}
 	content := respTyped.Choices[0].Message.Content
-	return ModelResult{Main: Message{Role: AssistantRole, Content: content}, Usage: Usage(respTyped.Usage)}, nil
+	return ModelResult{Primary: Message{Role: AssistantRole, Content: content}, Usage: Usage(respTyped.Usage)}, nil
 }
