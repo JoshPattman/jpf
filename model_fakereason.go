@@ -38,17 +38,21 @@ type fakeReasoningModel struct {
 }
 
 // Respond implements Model.
-func (f *fakeReasoningModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
-	_, reasoning, usage, err := f.reasoner.Respond(append([]Message{{Role: SystemRole, Content: f.reasoningPrompt}}, msgs...))
+func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResult, error) {
+	res, err := f.reasoner.Respond(append([]Message{{Role: SystemRole, Content: f.reasoningPrompt}}, msgs...))
 	if err != nil {
-		return nil, Message{}, usage, err
+		return res.OnlyUsage(), err
 	}
+	reasoning := res.Primary
 	reasoning.Role = ReasoningRole
 	msgsWithReasoning := append(msgs, reasoning)
-	aux, msg, usage2, err := f.answerer.Respond(msgsWithReasoning)
-	usage = usage.Add(usage2)
-	allAux := append([]Message{reasoning}, aux...)
-	return allAux, msg, usage, err
+	res2, err := f.answerer.Respond(msgsWithReasoning)
+	usage := res.Usage.Add(res2.Usage)
+	if err != nil {
+		return ModelResult{Usage: usage}, err
+	}
+	allAux := append([]Message{reasoning}, res.Extra...)
+	return ModelResult{Extra: allAux, Primary: res2.Primary, Usage: usage}, err
 }
 
 // Tokens implements Model.
