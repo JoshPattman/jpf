@@ -1,29 +1,16 @@
 package jpf
 
 import (
-	"bytes"
-	"math"
-	"os"
 	"testing"
-	"time"
 )
 
-func TestConstructOtherModels(t *testing.T) {
-	model := NewOpenAIModel("abc", "123", WithHTTPHeader{K: "A", V: "B"}, WithReasoningEffort{X: HighReasoning}, WithTemperature{X: 0.5}, WithURL{X: "abc.com"})
-	model = NewConcurrentLimitedModel(model, NewOneConcurrentLimiter())
-	model = NewFakeReasoningModel(model, model, WithReasoningPrompt{X: "Reason please"})
-	model = NewLoggingModel(model, NewJsonModelLogger(os.Stdout))
-	model = NewRetryModel(model, WithDelay{X: time.Second}, WithRetries{X: 10})
-	NewSystemReasonModel(model, WithReasoningPrefix{X: "Resoning: "})
-}
-
 func TestCachedModel(t *testing.T) {
-	var model Model = &TestingModel{Responses: map[string][]string{
+	var model ChatCaller = &TestingModel{Responses: map[string][]string{
 		"hello": {"hi", "bye"},
 	}}
-	model = NewCachedModel(model, NewInMemoryCache())
+	model = NewCachedChatCaller(model, NewInMemoryCache())
 	for i := range 5 {
-		res, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		res, err := model.Call([]Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -32,6 +19,8 @@ func TestCachedModel(t *testing.T) {
 		}
 	}
 }
+
+/*
 
 func TestLoggingModel(t *testing.T) {
 	var model Model = &TestingModel{Responses: map[string][]string{
@@ -53,17 +42,17 @@ func TestLoggingModel(t *testing.T) {
 	if math.Abs(float64(len(bs)-len(expected))) > 6 {
 		t.Fatalf("unexpected log: %v", bs)
 	}
-}
+}*/
 
 func TestRetryModel(t *testing.T) {
-	var model Model = &TestingModel{
+	var model ChatCaller = &TestingModel{
 		Responses: map[string][]string{
 			"hello": {"hi", "bye", "hi again"},
 		},
 		NFails: 3,
 	}
-	model = NewRetryModel(model, WithRetries{3})
-	res, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+	model = NewRetryCaller(model, 3, 0)
+	res, err := model.Call([]Message{{Role: SystemRole, Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)
 	}

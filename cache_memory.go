@@ -1,51 +1,36 @@
 package jpf
 
+import (
+	"slices"
+	"sync"
+)
+
 // NewInMemoryCache creates an in-memory implementation of ModelResponseCache.
 // It stores model responses in memory using a hash of the input messages as a key.
-func NewInMemoryCache() Cache {
+func NewInMemoryCache() KVCache {
 	return &inMemoryCache{
-		resps: make(map[string]memoryCachePacket),
-		embs:  make(map[string][]float64),
+		entries: make(map[string][]byte),
+		lock:    &sync.Mutex{},
 	}
-}
-
-type memoryCachePacket struct {
-	aux   []Message
-	final Message
 }
 
 type inMemoryCache struct {
-	resps map[string]memoryCachePacket
-	embs  map[string][]float64
+	lock    *sync.Mutex
+	entries map[string][]byte
 }
 
-// GetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) GetCachedResponse(msgs []Message) (bool, []Message, Message, error) {
-	msgsHash := HashMessages(msgs)
-	if cp, ok := i.resps[msgsHash]; ok {
-		return true, cp.aux, cp.final, nil
-	}
-	return false, nil, Message{}, nil
-}
-
-// SetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) SetCachedResponse(inputs []Message, aux []Message, out Message) error {
-	msgsHash := HashMessages(inputs)
-	i.resps[msgsHash] = memoryCachePacket{
-		aux:   aux,
-		final: out,
-	}
+func (c *inMemoryCache) Set(key string, data []byte) error {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.entries[key] = slices.Clone(data)
 	return nil
 }
-
-func (cache *inMemoryCache) GetCachedEmbedding(s string) (bool, []float64, error) {
-	if emb, ok := cache.embs[s]; ok {
-		return true, emb, nil
+func (c *inMemoryCache) Get(key string) ([]byte, error) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	val, ok := c.entries[key]
+	if !ok {
+		return nil, ErrNoCache
 	}
-	return false, nil, nil
-}
-
-func (cache *inMemoryCache) SetCachedEmbedding(s string, e []float64) error {
-	cache.embs[s] = e
-	return nil
+	return slices.Clone(val), nil
 }

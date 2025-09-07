@@ -1,13 +1,8 @@
 package jpf
 
-import (
-	"bytes"
-	"database/sql"
-	"encoding/gob"
-	"errors"
-)
+/*
 
-func NewSQLCache(db *sql.DB) (Cache, error) {
+func NewSQLCache(db *sql.DB) (KVCache, error) {
 	c := &sqlCache{
 		db: db,
 	}
@@ -116,3 +111,4 @@ func (cache *sqlCache) SetCachedEmbedding(input string, embedding []float64) err
 	`, input, blob.Bytes())
 	return err
 }
+*/

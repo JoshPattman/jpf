@@ -5,11 +5,6 @@ import "time"
 type ChatResult struct {
 	Extra   []Message
 	Primary Message
-	Usage   Usage
-}
-
-func (r ChatResult) OnlyUsage() ChatResult {
-	return ChatResult{Usage: r.Usage}
 }
 
 // Usage defines how many tokens were used when making calls to LLMs.

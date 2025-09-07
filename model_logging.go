@@ -1,5 +1,6 @@
 package jpf
 
+/*
 import (
 	"encoding/json"
 	"io"
@@ -113,3 +114,4 @@ func (l *loggingModel) Respond(msgs []Message) (ChatResult, error) {
 func (l *loggingModel) Tokens() (int, int) {
 	return l.model.Tokens()
 }
+*/

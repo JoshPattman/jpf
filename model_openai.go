@@ -167,8 +167,8 @@ func (c *openAIModel) Call(msgs []Message) (ChatResult, error) {
 	}{}
 	err = json.Unmarshal(respBody, &respTyped)
 	if err != nil || len(respTyped.Choices) == 0 || respTyped.Choices[0].Message.Content == "" {
-		return ChatResult{Usage: Usage(respTyped.Usage)}, fmt.Errorf("failed to parse response: %s", string(respBody))
+		return ChatResult{}, fmt.Errorf("failed to parse response: %s", string(respBody))
 	}
 	content := respTyped.Choices[0].Message.Content
-	return ChatResult{Primary: Message{Role: AssistantRole, Content: content}, Usage: Usage(respTyped.Usage)}, nil
+	return ChatResult{Primary: Message{Role: AssistantRole, Content: content}}, nil
 }

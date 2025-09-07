@@ -1,5 +1,6 @@
 package jpf
 
+/*
 // NewConcurrentLimitedModel wraps a Model with concurrency control.
 // It ensures that only a limited number of concurrent calls can be made to the underlying model,
 // using the provided ConcurrentLimiter to manage access.
@@ -38,3 +39,4 @@ func (c *concurrentLimitedModel) Respond(messages []Message) (ChatResult, error)
 	defer func() { <-c.uses }()
 	return c.model.Respond(messages)
 }
+*/

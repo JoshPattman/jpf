@@ -1,5 +1,6 @@
 package jpf
 
+/*
 // NewFakeReasoningModel creates a model that uses two underlying models to simulate reasoning.
 // It first calls the reasoner model to generate reasoning about the input messages,
 // then passes that reasoning along with the original messages to the answerer model.
@@ -61,3 +62,4 @@ func (f *fakeReasoningModel) Tokens() (int, int) {
 	bi, bo := f.answerer.Tokens()
 	return min(ai, bi), min(ao, bo)
 }
+*/

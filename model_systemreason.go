@@ -5,7 +5,7 @@ package jpf
 // reasoning messages into system messages with a customizable prefix.
 // Options:
 // - WithReasoningPrefix: customizes the prefix text added before reasoning content (default provided)
-func NewSystemReasonModel(model Model, opts ...systemReasonOpt) Model {
+func NewSystemReasonModel(model ChatCaller, opts ...systemReasonOpt) ChatCaller {
 	m := &systemReasonModel{model: model, prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n"}
 	for _, o := range opts {
 		o.applySystemReason(m)
@@ -20,12 +20,12 @@ type systemReasonOpt interface {
 func (p WithReasoningPrefix) applySystemReason(m *systemReasonModel) { m.prefix = p.X }
 
 type systemReasonModel struct {
-	model  Model
+	model  ChatCaller
 	prefix string
 }
 
 // Respond implements Model.
-func (s *systemReasonModel) Respond(messages []Message) (ChatResult, error) {
+func (s *systemReasonModel) Call(messages []Message) (ChatResult, error) {
 	convertedMessages := make([]Message, len(messages))
 	for i, m := range messages {
 		if m.Role == ReasoningRole {
@@ -34,10 +34,5 @@ func (s *systemReasonModel) Respond(messages []Message) (ChatResult, error) {
 		}
 		convertedMessages[i] = m
 	}
-	return s.model.Respond(convertedMessages)
-}
-
-// Tokens implements Model.
-func (s *systemReasonModel) Tokens() (int, int) {
-	return s.model.Tokens()
+	return s.model.Call(convertedMessages)
 }

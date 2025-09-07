@@ -8,11 +8,7 @@ func NewCachedChatCaller(caller ChatCaller, cache KVCache) ChatCaller {
 		cache,
 		HashMessages,
 		EncodeChatResult,
-		func(b []byte) (ChatResult, error) {
-			res, err := DecodeChatResult(b)
-			res.Usage = Usage{}
-			return res, err
-		},
+		DecodeChatResult,
 	)
 }
 
