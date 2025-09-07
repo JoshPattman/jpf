@@ -11,7 +11,7 @@ import (
 
 // NewOpenAIModel creates a Model that uses the OpenAI API.
 // It requires an API key and model name, with optional configuration via variadic options.
-func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) Model {
+func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) ChatCaller {
 	model := &openAIModel{
 		key:             key,
 		model:           modelName,
@@ -117,10 +117,10 @@ func reasoningEffortToOpenAI(re ReasoningEffort) string {
 	}
 }
 
-func (c *openAIModel) Respond(msgs []Message) (ModelResult, error) {
+func (c *openAIModel) Call(msgs []Message) (ChatResult, error) {
 	openAIMsgs, err := messagesToOpenAI(msgs)
 	if err != nil {
-		return ModelResult{}, err
+		return ChatResult{}, err
 	}
 	bodyMap := map[string]any{
 		"model":    c.model,
@@ -134,11 +134,11 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResult, error) {
 	}
 	body, err := json.Marshal(bodyMap)
 	if err != nil {
-		return ModelResult{}, err
+		return ChatResult{}, err
 	}
 	req, err := http.NewRequest("POST", c.url, bytes.NewBuffer(body))
 	if err != nil {
-		return ModelResult{}, err
+		return ChatResult{}, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.key))
 	req.Header.Add("Content-Type", "application/json")
@@ -147,12 +147,12 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResult, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return ModelResult{}, err
+		return ChatResult{}, err
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ModelResult{}, err
+		return ChatResult{}, err
 	}
 	respTyped := struct {
 		Choices []struct {
@@ -167,8 +167,8 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResult, error) {
 	}{}
 	err = json.Unmarshal(respBody, &respTyped)
 	if err != nil || len(respTyped.Choices) == 0 || respTyped.Choices[0].Message.Content == "" {
-		return ModelResult{Usage: Usage(respTyped.Usage)}, fmt.Errorf("failed to parse response: %s", string(respBody))
+		return ChatResult{Usage: Usage(respTyped.Usage)}, fmt.Errorf("failed to parse response: %s", string(respBody))
 	}
 	content := respTyped.Choices[0].Message.Content
-	return ModelResult{Primary: Message{Role: AssistantRole, Content: content}, Usage: Usage(respTyped.Usage)}, nil
+	return ChatResult{Primary: Message{Role: AssistantRole, Content: content}, Usage: Usage(respTyped.Usage)}, nil
 }

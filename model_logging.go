@@ -87,7 +87,7 @@ type loggingModel struct {
 }
 
 // Respond implements Model.
-func (l *loggingModel) Respond(msgs []Message) (ModelResult, error) {
+func (l *loggingModel) Respond(msgs []Message) (ChatResult, error) {
 	tStart := time.Now()
 	res, err := l.model.Respond(msgs)
 	dur := time.Since(tStart)

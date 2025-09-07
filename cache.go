@@ -1,10 +1,20 @@
 package jpf
 
 import (
+	"bytes"
 	"crypto/sha256"
+	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"strings"
 )
+
+var ErrNoCache = errors.New("no cache for that hash")
+
+type KVCache interface {
+	Set(key string, data []byte) error
+	Get(key string) ([]byte, error)
+}
 
 type Cache interface {
 	ModelResponseCache
@@ -40,4 +50,40 @@ func HashMessages(msgs []Message) string {
 	hasher.Write([]byte(src))
 	hashBytes := hasher.Sum(nil)
 	return hex.EncodeToString(hashBytes)
+}
+
+func EncodeChatResult(result ChatResult) ([]byte, error) {
+	blob := bytes.NewBuffer(nil)
+	err := gob.NewEncoder(blob).Encode(result)
+	if err != nil {
+		return nil, err
+	}
+	return blob.Bytes(), nil
+}
+
+func DecodeChatResult(bs []byte) (ChatResult, error) {
+	var result ChatResult
+	err := gob.NewDecoder(bytes.NewBuffer(bs)).Decode(&result)
+	if err != nil {
+		return ChatResult{}, err
+	}
+	return result, nil
+}
+
+func EncodeEmbedResult(result []float64) ([]byte, error) {
+	blob := bytes.NewBuffer(nil)
+	err := gob.NewEncoder(blob).Encode(result)
+	if err != nil {
+		return nil, err
+	}
+	return blob.Bytes(), nil
+}
+
+func DecodeEmbedResult(bs []byte) ([]float64, error) {
+	var result []float64
+	err := gob.NewDecoder(bytes.NewBuffer(bs)).Decode(&result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }

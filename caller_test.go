@@ -8,7 +8,7 @@ import (
 
 type MFCase[T any, U comparable] struct {
 	ID            string
-	Build         func() MapFunc[T, U]
+	Build         func() Caller[T, U]
 	Input         T
 	Expected      U
 	ExpectedError bool
@@ -18,7 +18,7 @@ func (testCase MFCase[T, U]) Name() string { return testCase.ID }
 
 func (testCase MFCase[T, U]) Test() error {
 	mf := testCase.Build()
-	result, _, err := mf.Call(testCase.Input)
+	result, err := mf.Call(testCase.Input)
 	if testCase.ExpectedError {
 		if err == nil {
 			return errors.New("expected an error but got none")
@@ -37,20 +37,20 @@ func (testCase MFCase[T, U]) Test() error {
 var MFCases = []TestCase{
 	MFCase[string, string]{
 		ID: "oneshot/nominal",
-		Build: func() MapFunc[string, string] {
+		Build: func() Caller[string, string] {
 			enc := NewRawStringMessageEncoder("")
 			dec := NewRawStringResponseDecoder()
 			model := &TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
-			return NewOneShotMapFunc(enc, dec, model)
+			return NewOneShotCaller(enc, dec, model)
 		},
 		Input:    "ping",
 		Expected: "pong",
 	},
 	MFCase[string, TestStruct]{
 		ID: "feedback/nominal",
-		Build: func() MapFunc[string, TestStruct] {
+		Build: func() Caller[string, TestStruct] {
 			enc := NewRawStringMessageEncoder("")
 			dec := NewJsonResponseDecoder[TestStruct]()
 			feedback := NewRawMessageFeedbackGenerator()
@@ -58,13 +58,13 @@ var MFCases = []TestCase{
 				"ping":                             {"pong"},
 				"llm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackMapFunc(enc, dec, feedback, model, SystemRole, 1)
+			return NewFeedbackCaller(enc, dec, feedback, model, SystemRole, 1)
 		},
 		Input:    "ping",
 		Expected: TestStruct{A: 5},
 	},
 }
 
-func TestMapFunc(t *testing.T) {
+func TestCaller(t *testing.T) {
 	RunTests(t, MFCases)
 }

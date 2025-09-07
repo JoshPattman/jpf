@@ -4,17 +4,17 @@ import (
 	"errors"
 )
 
-// NewFeedbackMapFunc creates a MapFunc that adds feedback to the conversation when errors are detected.
+// NewFeedbackCaller works with ChatCallers, and adds feedback to the conversation when errors are detected.
 // It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
-func NewFeedbackMapFunc[T, U any](
+func NewFeedbackCaller[T, U any](
 	enc MessageEncoder[T],
 	pars ResponseDecoder[U],
 	fed FeedbackGenerator,
-	model Model,
+	model ChatCaller,
 	feedbackRole Role,
 	maxRetries int,
-) MapFunc[T, U] {
-	return &feedbackMapFunc[T, U]{
+) Caller[T, U] {
+	return &feedbackCaller[T, U]{
 		enc:          enc,
 		pars:         pars,
 		fed:          fed,
@@ -24,33 +24,31 @@ func NewFeedbackMapFunc[T, U any](
 	}
 }
 
-type feedbackMapFunc[T, U any] struct {
+type feedbackCaller[T, U any] struct {
 	enc          MessageEncoder[T]
 	pars         ResponseDecoder[U]
 	fed          FeedbackGenerator
-	model        Model
+	model        ChatCaller
 	feedbackRole Role
 	maxRetries   int
 }
 
-func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
+func (mf *feedbackCaller[T, U]) Call(t T) (U, error) {
 	var u U
 	history, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
-		return u, Usage{}, err
+		return u, err
 	}
-	totalUsage := Usage{}
 	var lastErr error
 	for range mf.maxRetries + 1 {
-		res, err := mf.model.Respond(history)
-		totalUsage = totalUsage.Add(res.Usage)
+		res, err := mf.model.Call(history)
 		if err != nil {
-			return u, totalUsage, err
+			return u, err
 		}
 		result, err := mf.pars.ParseResponseText(res.Primary.Content)
 		if err == nil {
 			// If the result was ok, return it
-			return result, totalUsage, nil
+			return result, nil
 		} else if errors.Is(err, ErrInvalidResponse) {
 			// If it was a parse error, add to the conversation history and continue looping
 			feedback := mf.fed.FormatFeedback(res.Primary, err)
@@ -62,8 +60,8 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 			})
 		} else {
 			// Otherwise, it was another error so return the error (don't loop)
-			return u, totalUsage, err
+			return u, err
 		}
 	}
-	return u, totalUsage, lastErr
+	return u, lastErr
 }

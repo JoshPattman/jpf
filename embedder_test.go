@@ -11,7 +11,7 @@ import (
 
 type EMCase struct {
 	ID       string
-	Build    func() Embedder
+	Build    func() EmbedCaller
 	Expected []float64
 	Server   func() func()
 }
@@ -23,7 +23,7 @@ func (testCase EMCase) Test() error {
 		defer testCase.Server()()
 	}
 	embedder := testCase.Build()
-	result, err := embedder.Embed("abcdefg")
+	result, err := embedder.Call("abcdefg")
 	if err != nil {
 		return errors.Join(errors.New("expected embedder to not err, got error"), err)
 	}
@@ -41,7 +41,7 @@ func (testCase EMCase) Test() error {
 var EMCases = []TestCase{
 	EMCase{
 		ID: "openai",
-		Build: func() Embedder {
+		Build: func() EmbedCaller {
 			return NewOpenAIEmbedder("key", "model", WithURL{"http://localhost:1234/embedding"})
 		},
 		Expected: []float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 1},

@@ -7,9 +7,9 @@ import (
 // NewRetryModel wraps a Model with retry functionality.
 // If the underlying model returns an error, this wrapper will retry the operation
 // up to a configurable number of times with an optional delay between retries.
-func NewRetryModel(model Model, opts ...retryModelOpt) Model {
-	m := &retryModel{
-		Model:   model,
+func NewRetryModel[T, U any](model Caller[T, U], opts ...retryModelOpt) Caller[T, U] {
+	m := &retryModel[T, U]{
+		Caller:  model,
 		retries: 99999,
 		delay:   0,
 	}
@@ -23,29 +23,27 @@ type retryModelOpt interface {
 	applyRetry(*retryModel)
 }
 
-func (o WithRetries) applyRetry(m *retryModel) { m.retries = o.X }
-func (o WithDelay) applyRetry(m *retryModel)   { m.delay = o.X }
+func (o WithRetries) applyRetry(m *retryModel[T, U]) { m.retries = o.X }
+func (o WithDelay) applyRetry(m *retryModel)         { m.delay = o.X }
 
-type retryModel struct {
-	Model
+type retryModel[T, U any] struct {
+	Caller  Caller[T, U]
 	retries int
 	delay   time.Duration
 }
 
-func (m *retryModel) Respond(msgs []Message) (ModelResult, error) {
-	var res ModelResult
-	var usgTotal Usage
+func (m *retryModel[T, U]) Call(inp T) (U, error) {
+	var res U
 	var err error
 	for range m.retries + 1 {
-		res, err = m.Model.Respond(msgs)
-		usgTotal = usgTotal.Add(res.Usage)
+		res, err = m.Caller.Call(inp)
 		if err == nil {
 			break
 		}
 		time.Sleep(m.delay)
 	}
 	if err != nil {
-		return res.OnlyUsage(), err
+		return res, err
 	}
 	return res, nil
 }

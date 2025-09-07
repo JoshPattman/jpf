@@ -32,10 +32,10 @@ type TestingModel struct {
 	NFails    int
 }
 
-func (t *TestingModel) Respond(msgs []Message) (ModelResult, error) {
+func (t *TestingModel) Call(msgs []Message) (ChatResult, error) {
 	if t.NFails > 0 {
 		t.NFails--
-		return ModelResult{}, errors.New("deliberate fail")
+		return ChatResult{}, errors.New("deliberate fail")
 	}
 	var req string
 	if len(msgs) > 0 {
@@ -43,11 +43,11 @@ func (t *TestingModel) Respond(msgs []Message) (ModelResult, error) {
 	}
 	resps, ok := t.Responses[req]
 	if !ok || len(resps) == 0 {
-		return ModelResult{}, fmt.Errorf("no responses left for request '%s'", req)
+		return ChatResult{}, fmt.Errorf("no responses left for request '%s'", req)
 	}
 	resp, remaining := resps[0], resps[1:]
 	t.Responses[req] = remaining
-	return ModelResult{Primary: Message{Role: AssistantRole, Content: resp}}, nil
+	return ChatResult{Primary: Message{Role: AssistantRole, Content: resp}}, nil
 }
 
 func (t *TestingModel) Tokens() (int, int) {

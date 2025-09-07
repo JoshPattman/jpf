@@ -16,13 +16,13 @@ type cachedModel struct {
 }
 
 // Respond implements Model.
-func (c *cachedModel) Respond(msgs []Message) (ModelResult, error) {
+func (c *cachedModel) Respond(msgs []Message) (ChatResult, error) {
 	ok, aux, final, err := c.cache.GetCachedResponse(msgs)
 	if err != nil {
-		return ModelResult{}, err
+		return ChatResult{}, err
 	}
 	if ok {
-		return ModelResult{Extra: aux, Primary: final}, nil
+		return ChatResult{Extra: aux, Primary: final}, nil
 	}
 	res, err := c.model.Respond(msgs)
 	if err != nil {

@@ -2,14 +2,14 @@ package jpf
 
 import "time"
 
-type ModelResult struct {
+type ChatResult struct {
 	Extra   []Message
 	Primary Message
 	Usage   Usage
 }
 
-func (r ModelResult) OnlyUsage() ModelResult {
-	return ModelResult{Usage: r.Usage}
+func (r ChatResult) OnlyUsage() ChatResult {
+	return ChatResult{Usage: r.Usage}
 }
 
 // Usage defines how many tokens were used when making calls to LLMs.
@@ -25,14 +25,7 @@ func (u Usage) Add(u2 Usage) Usage {
 	}
 }
 
-// Model defines an interface to an LLM.
-type Model interface {
-	// Tokens specifies how many tokens are allowed to be sent.
-	Tokens() (int, int)
-	// Responds to a set of input messages, with a set of auxilliary messages and a final message.
-	// There may be no auxilliary messages, or things like tool calls, function calls, and reasoning may go in the auxilliary messages,
-	Respond([]Message) (ModelResult, error)
-}
+type ChatCaller Caller[[]Message, ChatResult]
 
 // ReasoningEffort defines how hard a reasoning model should think.
 type ReasoningEffort uint8

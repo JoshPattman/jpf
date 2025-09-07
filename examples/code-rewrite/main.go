@@ -30,7 +30,7 @@ func main() {
 	model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4o-mini")
 	formatter := jpf.NewTemplateMessageEncoder[TemplateData](system, "{{.Code}}")
 	parser := jpf.NewRawStringResponseDecoder()
-	mapFunc := jpf.NewOneShotMapFunc(formatter, parser, model)
+	Caller := jpf.NewOneShotCaller(formatter, parser, model)
 
 	f, err := os.Open(*inputFile)
 	if err != nil {
@@ -44,7 +44,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	rewritten, _, err := mapFunc.Call(TemplateData{
+	rewritten, _, err := Caller.Call(TemplateData{
 		Language: *targetLang,
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),

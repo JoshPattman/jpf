@@ -8,7 +8,7 @@ import (
 	"net/http"
 )
 
-func NewOpenAIEmbedder(key, model string, opts ...openAIEmbedderOpt) Embedder {
+func NewOpenAIEmbedder(key, model string, opts ...openAIEmbedderOpt) EmbedCaller {
 	m := &openAIEmbedder{
 		key:   key,
 		model: model,
@@ -34,7 +34,7 @@ type openAIEmbedder struct {
 	url   string
 }
 
-func (o *openAIEmbedder) Embed(text string) ([]float64, error) {
+func (o *openAIEmbedder) Call(text string) ([]float64, error) {
 	bodyMap := map[string]any{
 		"input": text,
 		"model": o.model,
