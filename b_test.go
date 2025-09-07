@@ -42,7 +42,7 @@ var EMCases = []TestCase{
 	EMCase{
 		ID: "openai",
 		Build: func() EmbedCaller {
-			return NewOpenAIEmbedder("key", "model", WithURL{"http://localhost:1234/embedding"})
+			return NewOpenAIEmbedCaller("key", "model", WithURL{"http://localhost:1234/embedding"})
 		},
 		Expected: []float64{0, 0, 0, 0, 0, 0, 0, 0, 0, 1},
 		Server: func() func() {

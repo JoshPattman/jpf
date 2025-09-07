@@ -2,7 +2,7 @@ package jpf
 
 import "errors"
 
-func NewCachedChatCaller(caller ChatCaller, cache KVCache) ChatCaller {
+func NewCachedChatCaller(caller ChatCaller, cache Cache) ChatCaller {
 	return NewCachedCaller(
 		caller,
 		cache,
@@ -12,7 +12,7 @@ func NewCachedChatCaller(caller ChatCaller, cache KVCache) ChatCaller {
 	)
 }
 
-func NewCachedEmbedCaller(caller EmbedCaller, cache KVCache) EmbedCaller {
+func NewCachedEmbedCaller(caller EmbedCaller, cache Cache) EmbedCaller {
 	return NewCachedCaller(
 		caller,
 		cache,
@@ -24,7 +24,7 @@ func NewCachedEmbedCaller(caller EmbedCaller, cache KVCache) EmbedCaller {
 
 func NewCachedCaller[T, U any](
 	caller Caller[T, U],
-	cache KVCache,
+	cache Cache,
 	encodeKey func(T) string,
 	encodeVal func(U) ([]byte, error),
 	decodeVal func([]byte) (U, error),
@@ -34,7 +34,7 @@ func NewCachedCaller[T, U any](
 
 type cachedCaller[T, U any] struct {
 	caller    Caller[T, U]
-	cache     KVCache
+	cache     Cache
 	encodeKey func(T) string
 	encodeVal func(U) ([]byte, error)
 	decodeVal func([]byte) (U, error)

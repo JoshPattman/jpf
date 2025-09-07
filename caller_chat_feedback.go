@@ -4,9 +4,9 @@ import (
 	"errors"
 )
 
-// NewFeedbackCaller works with ChatCallers, and adds feedback to the conversation when errors are detected.
+// NewFeedbackTypedChatCaller works with ChatCallers, and adds feedback to the conversation when errors are detected.
 // It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
-func NewFeedbackCaller[T, U any](
+func NewFeedbackTypedChatCaller[T, U any](
 	enc MessageEncoder[T],
 	pars ResponseDecoder[U],
 	fed FeedbackGenerator,
@@ -14,7 +14,7 @@ func NewFeedbackCaller[T, U any](
 	feedbackRole Role,
 	maxRetries int,
 ) Caller[T, U] {
-	return &feedbackCaller[T, U]{
+	return &feedbackTypedChatCaller[T, U]{
 		enc:          enc,
 		pars:         pars,
 		fed:          fed,
@@ -24,7 +24,7 @@ func NewFeedbackCaller[T, U any](
 	}
 }
 
-type feedbackCaller[T, U any] struct {
+type feedbackTypedChatCaller[T, U any] struct {
 	enc          MessageEncoder[T]
 	pars         ResponseDecoder[U]
 	fed          FeedbackGenerator
@@ -33,7 +33,7 @@ type feedbackCaller[T, U any] struct {
 	maxRetries   int
 }
 
-func (mf *feedbackCaller[T, U]) Call(t T) (U, error) {
+func (mf *feedbackTypedChatCaller[T, U]) Call(t T) (U, error) {
 	var u U
 	history, err := mf.enc.BuildInputMessages(t)
 	if err != nil {

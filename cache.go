@@ -11,7 +11,7 @@ import (
 
 var ErrNoCache = errors.New("no cache for that hash")
 
-type KVCache interface {
+type Cache interface {
 	Set(key string, data []byte) error
 	Get(key string) ([]byte, error)
 }

@@ -5,8 +5,6 @@ import (
 	"math"
 )
 
-type EmbedCaller = Caller[string, []float64]
-
 // CosineSimilarity takes the cosine similarity between two vectors.
 func CosineSimilarity(vec1, vec2 []float64) (float64, error) {
 	if len(vec1) != len(vec2) {

@@ -27,10 +27,10 @@ func main() {
 	pointers := flag.String("p", "You may change the overall structure;Make sure to keep the functionality the same", "Semicolon separated list of pointers")
 	flag.Parse()
 
-	model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4o-mini")
+	model := jpf.NewOpenAIChatCaller(os.Getenv("OPENAI_KEY"), "gpt-4o-mini")
 	formatter := jpf.NewTemplateMessageEncoder[TemplateData](system, "{{.Code}}")
 	parser := jpf.NewRawStringResponseDecoder()
-	Caller := jpf.NewOneShotCaller(formatter, parser, model)
+	Caller := jpf.NewOneShotTypedChatCaller(formatter, parser, model)
 
 	f, err := os.Open(*inputFile)
 	if err != nil {
@@ -44,7 +44,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	rewritten, _, err := Caller.Call(TemplateData{
+	rewritten, err := Caller.Call(TemplateData{
 		Language: *targetLang,
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),
@@ -56,4 +56,5 @@ func main() {
 	}
 	defer f2.Close()
 	fmt.Fprint(f2, rewritten)
+	fmt.Println("Done")
 }

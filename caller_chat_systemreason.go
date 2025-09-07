@@ -1,12 +1,12 @@
 package jpf
 
-// NewSystemReasonModel converts ReasoningRole messages to SystemRole messages.
+// NewSystemReasonChatCaller converts ReasoningRole messages to SystemRole messages.
 // This allows using models that don't natively support a reasoning role by converting
 // reasoning messages into system messages with a customizable prefix.
 // Options:
 // - WithReasoningPrefix: customizes the prefix text added before reasoning content (default provided)
-func NewSystemReasonModel(model ChatCaller, opts ...systemReasonOpt) ChatCaller {
-	m := &systemReasonModel{model: model, prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n"}
+func NewSystemReasonChatCaller(model ChatCaller, opts ...systemReasonOpt) ChatCaller {
+	m := &systemReasonChatCaller{caller: model, prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n"}
 	for _, o := range opts {
 		o.applySystemReason(m)
 	}
@@ -14,18 +14,18 @@ func NewSystemReasonModel(model ChatCaller, opts ...systemReasonOpt) ChatCaller 
 }
 
 type systemReasonOpt interface {
-	applySystemReason(*systemReasonModel)
+	applySystemReason(*systemReasonChatCaller)
 }
 
-func (p WithReasoningPrefix) applySystemReason(m *systemReasonModel) { m.prefix = p.X }
+func (p WithReasoningPrefix) applySystemReason(m *systemReasonChatCaller) { m.prefix = p.X }
 
-type systemReasonModel struct {
-	model  ChatCaller
+type systemReasonChatCaller struct {
+	caller ChatCaller
 	prefix string
 }
 
 // Respond implements Model.
-func (s *systemReasonModel) Call(messages []Message) (ChatResult, error) {
+func (s *systemReasonChatCaller) Call(messages []Message) (ChatResult, error) {
 	convertedMessages := make([]Message, len(messages))
 	for i, m := range messages {
 		if m.Role == ReasoningRole {
@@ -34,5 +34,5 @@ func (s *systemReasonModel) Call(messages []Message) (ChatResult, error) {
 		}
 		convertedMessages[i] = m
 	}
-	return s.model.Call(convertedMessages)
+	return s.caller.Call(convertedMessages)
 }

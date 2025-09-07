@@ -7,12 +7,34 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
-// NewOpenAIModel creates a Model that uses the OpenAI API.
+// ReasoningEffort defines how hard a reasoning model should think.
+type ReasoningEffort uint8
+
+const (
+	LowReasoning ReasoningEffort = iota
+	MediumReasoning
+	HighReasoning
+)
+
+type WithReasoningPrefix struct{ X string }
+type WithRetries struct{ X int }
+type WithDelay struct{ X time.Duration }
+type WithTemperature struct{ X float64 }
+type WithReasoningEffort struct{ X ReasoningEffort }
+type WithURL struct{ X string }
+type WithHTTPHeader struct {
+	K string
+	V string
+}
+type WithReasoningPrompt struct{ X string }
+
+// NewOpenAIChatCaller creates a Model that uses the OpenAI API.
 // It requires an API key and model name, with optional configuration via variadic options.
-func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) ChatCaller {
-	model := &openAIModel{
+func NewOpenAIChatCaller(key, modelName string, opts ...openAIModelOpt) ChatCaller {
+	model := &openAIChatCaller{
 		key:             key,
 		model:           modelName,
 		maxInput:        0,
@@ -29,15 +51,15 @@ func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) ChatCaller {
 }
 
 type openAIModelOpt interface {
-	applyOpenAIModel(*openAIModel)
+	applyOpenAIModel(*openAIChatCaller)
 }
 
-func (o WithTemperature) applyOpenAIModel(m *openAIModel)     { m.temperature = &o.X }
-func (o WithReasoningEffort) applyOpenAIModel(m *openAIModel) { m.reasoningEffort = &o.X }
-func (o WithURL) applyOpenAIModel(m *openAIModel)             { m.url = o.X }
-func (o WithHTTPHeader) applyOpenAIModel(m *openAIModel)      { m.extraHeaders[o.K] = o.V }
+func (o WithTemperature) applyOpenAIModel(m *openAIChatCaller)     { m.temperature = &o.X }
+func (o WithReasoningEffort) applyOpenAIModel(m *openAIChatCaller) { m.reasoningEffort = &o.X }
+func (o WithURL) applyOpenAIModel(m *openAIChatCaller)             { m.url = o.X }
+func (o WithHTTPHeader) applyOpenAIModel(m *openAIChatCaller)      { m.extraHeaders[o.K] = o.V }
 
-type openAIModel struct {
+type openAIChatCaller struct {
 	key             string
 	model           string
 	maxInput        int
@@ -48,7 +70,7 @@ type openAIModel struct {
 	extraHeaders    map[string]string
 }
 
-func (c *openAIModel) Tokens() (int, int) {
+func (c *openAIChatCaller) Tokens() (int, int) {
 	return c.maxInput, c.maxOutput
 }
 
@@ -117,7 +139,7 @@ func reasoningEffortToOpenAI(re ReasoningEffort) string {
 	}
 }
 
-func (c *openAIModel) Call(msgs []Message) (ChatResult, error) {
+func (c *openAIChatCaller) Call(msgs []Message) (ChatResult, error) {
 	openAIMsgs, err := messagesToOpenAI(msgs)
 	if err != nil {
 		return ChatResult{}, err

@@ -43,7 +43,7 @@ var MFCases = []TestCase{
 			model := &TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
-			return NewOneShotCaller(enc, dec, model)
+			return NewOneShotTypedChatCaller(enc, dec, model)
 		},
 		Input:    "ping",
 		Expected: "pong",
@@ -58,7 +58,7 @@ var MFCases = []TestCase{
 				"ping":                             {"pong"},
 				"llm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackCaller(enc, dec, feedback, model, SystemRole, 1)
+			return NewFeedbackTypedChatCaller(enc, dec, feedback, model, SystemRole, 1)
 		},
 		Input:    "ping",
 		Expected: TestStruct{A: 5},

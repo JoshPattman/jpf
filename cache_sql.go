@@ -1,8 +1,12 @@
 package jpf
 
-/*
+import (
+	"database/sql"
+	"errors"
+)
 
-func NewSQLCache(db *sql.DB) (KVCache, error) {
+// NewSQLCache creates a new SQL-backed key-value cache.
+func NewSQLCache(db *sql.DB) (Cache, error) {
 	c := &sqlCache{
 		db: db,
 	}
@@ -17,98 +21,39 @@ type sqlCache struct {
 	db *sql.DB
 }
 
-type sqlModelCachePayload struct {
-	Aux []Message
+// Set stores a value in the SQL cache under the given key.
+// If the key already exists, the value is updated.
+func (cache *sqlCache) Set(key string, data []byte) error {
+	_, err := cache.db.Exec(`
+		INSERT INTO kv_cache (key, value)
+		VALUES (?, ?)
+		ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+	`, key, data)
+	return err
 }
 
-func (cache *sqlCache) GetCachedResponse(msgs []Message) (bool, []Message, Message, error) {
-	h := HashMessages(msgs)
-	row := cache.db.QueryRow(`SELECT resp FROM model_cache WHERE hash=?;`, h)
-	blob := []byte{}
-	err := row.Scan(&blob)
+// Get retrieves a value from the SQL cache by key.
+// Returns ErrNoCache if the key does not exist.
+func (cache *sqlCache) Get(key string) ([]byte, error) {
+	row := cache.db.QueryRow(`SELECT value FROM kv_cache WHERE key=?;`, key)
+	var data []byte
+	err := row.Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil, Message{}, nil
+		return nil, ErrNoCache
 	}
-	var outputs []Message
-	err = gob.NewDecoder(bytes.NewBuffer(blob)).Decode(&outputs)
 	if err != nil {
-		return false, nil, Message{}, err
+		return nil, err
 	}
-	if len(outputs) == 0 {
-		return false, nil, Message{}, errors.New("cached messages have 0 length")
-	}
-	return true, outputs[:len(outputs)-1], outputs[len(outputs)-1], nil
+	return data, nil
 }
 
-func (cache *sqlCache) SetCachedResponse(inputs []Message, aux []Message, out Message) error {
-	h := HashMessages(inputs)
-	blob := bytes.NewBuffer(nil)
-	err := gob.NewEncoder(blob).Encode(append(aux, out))
-	if err != nil {
-		return err
-	}
-	_, err = cache.db.Exec(`INSERT INTO model_cache (hash, resp) VALUES (?, ?) ON CONFLICT(hash) DO UPDATE SET resp = excluded.resp;`, h, blob.Bytes())
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
+// setupDB ensures that the underlying table exists.
 func (cache *sqlCache) setupDB() error {
 	query := `
-	CREATE TABLE IF NOT EXISTS model_cache (
-		hash TEXT PRIMARY KEY,
-		resp BLOB NOT NULL
+	CREATE TABLE IF NOT EXISTS kv_cache (
+		key TEXT PRIMARY KEY,
+		value BLOB NOT NULL
 	);`
 	_, err := cache.db.Exec(query)
-	if err != nil {
-		return err
-	}
-
-	// New table for embeddings
-	query = `
-	CREATE TABLE IF NOT EXISTS embed_cache (
-		text TEXT PRIMARY KEY,
-		embedding BLOB NOT NULL
-	);`
-	_, err = cache.db.Exec(query)
 	return err
 }
-
-// ===== Implementation of EmbedderResponseCache =====
-
-func (cache *sqlCache) GetCachedEmbedding(input string) (bool, []float64, error) {
-	row := cache.db.QueryRow(`SELECT embedding FROM embed_cache WHERE text=?;`, input)
-	blob := []byte{}
-	err := row.Scan(&blob)
-	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil, nil
-	}
-	if err != nil {
-		return false, nil, err
-	}
-
-	var embedding []float64
-	err = gob.NewDecoder(bytes.NewBuffer(blob)).Decode(&embedding)
-	if err != nil {
-		return false, nil, err
-	}
-
-	return true, embedding, nil
-}
-
-func (cache *sqlCache) SetCachedEmbedding(input string, embedding []float64) error {
-	blob := bytes.NewBuffer(nil)
-	err := gob.NewEncoder(blob).Encode(embedding)
-	if err != nil {
-		return err
-	}
-
-	_, err = cache.db.Exec(`
-		INSERT INTO embed_cache (text, embedding)
-		VALUES (?, ?)
-		ON CONFLICT(text) DO UPDATE SET embedding = excluded.embedding;
-	`, input, blob.Bytes())
-	return err
-}
-*/

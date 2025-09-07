@@ -8,8 +8,8 @@ import (
 	"net/http"
 )
 
-func NewOpenAIEmbedder(key, model string, opts ...openAIEmbedderOpt) EmbedCaller {
-	m := &openAIEmbedder{
+func NewOpenAIEmbedCaller(key, model string, opts ...openAIEmbedderOpt) EmbedCaller {
+	m := &openAIEmbedCaller{
 		key:   key,
 		model: model,
 		url:   embeddingOpenAIUrl,
@@ -21,20 +21,20 @@ func NewOpenAIEmbedder(key, model string, opts ...openAIEmbedderOpt) EmbedCaller
 }
 
 type openAIEmbedderOpt interface {
-	applyOpenAIEmbedder(*openAIEmbedder)
+	applyOpenAIEmbedder(*openAIEmbedCaller)
 }
 
-func (o WithURL) applyOpenAIEmbedder(e *openAIEmbedder) { e.url = o.X }
+func (o WithURL) applyOpenAIEmbedder(e *openAIEmbedCaller) { e.url = o.X }
 
 const embeddingOpenAIUrl = "https://api.openai.com/v1/embeddings"
 
-type openAIEmbedder struct {
+type openAIEmbedCaller struct {
 	key   string
 	model string
 	url   string
 }
 
-func (o *openAIEmbedder) Call(text string) ([]float64, error) {
+func (o *openAIEmbedCaller) Call(text string) ([]float64, error) {
 	bodyMap := map[string]any{
 		"input": text,
 		"model": o.model,

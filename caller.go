@@ -6,3 +6,12 @@ package jpf
 type Caller[T, U any] interface {
 	Call(T) (U, error)
 }
+
+type EmbedCaller = Caller[string, []float64]
+
+type ChatResult struct {
+	Extra   []Message
+	Primary Message
+}
+
+type ChatCaller Caller[[]Message, ChatResult]

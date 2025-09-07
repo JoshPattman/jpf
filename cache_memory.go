@@ -7,7 +7,7 @@ import (
 
 // NewInMemoryCache creates an in-memory implementation of ModelResponseCache.
 // It stores model responses in memory using a hash of the input messages as a key.
-func NewInMemoryCache() KVCache {
+func NewInMemoryCache() Cache {
 	return &inMemoryCache{
 		entries: make(map[string][]byte),
 		lock:    &sync.Mutex{},
