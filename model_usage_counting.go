@@ -7,9 +7,9 @@ import (
 // NewUsageCountingModel wraps a Model with token usage tracking functionality.
 // It aggregates token usage statistics in the provided UsageCounter,
 // which allows monitoring total token consumption across multiple model calls.
-func NewUsageCountingModel(model Model, counter UsageCounter) Model {
+func NewUsageCountingModel(model Model, counter *UsageCounter) Model {
 	return &usageCountingModel{
-		counter: &counter,
+		counter: counter,
 		model:   model,
 	}
 }
