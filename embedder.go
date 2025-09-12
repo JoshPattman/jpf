@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+// TODO: I would like to move all embedding to another package. It feels like it does not belong in this package.
+
 // Embedder defines an object that is capable of embedding a string into a vector.
 type Embedder interface {
 	Embed(text string) ([]float64, error)

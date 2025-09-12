@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
@@ -13,7 +14,8 @@ import (
 func main() {
 	// Build model
 	fac := &ModelFactory{
-		Cache: CreateCache(),
+		Cache:  CreateCache(),
+		Logger: slog.Default(),
 	}
 	model := fac.Build(true)
 	// Time first request (should take about ~1 second)
@@ -57,7 +59,8 @@ func CreateCache() jpf.Cache {
 // ModelFactory builds models that share the same resources (cache).
 // This is the suggested pattern to use with this package.
 type ModelFactory struct {
-	Cache jpf.Cache
+	Cache  jpf.Cache
+	Logger *slog.Logger
 }
 
 func (fac *ModelFactory) Build(withCache bool) jpf.Model {
@@ -65,6 +68,9 @@ func (fac *ModelFactory) Build(withCache bool) jpf.Model {
 	model = jpf.NewRetryModel(model, jpf.WithRetries{X: 5})
 	if withCache {
 		model = jpf.NewCachedModel(model, fac.Cache)
+	}
+	if fac.Logger != nil {
+		model = jpf.NewLoggingModel(model, jpf.NewSlogModelLogger(fac.Logger.Info, true))
 	}
 	return model
 }
