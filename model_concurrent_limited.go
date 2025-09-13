@@ -33,7 +33,7 @@ func (c *concurrentLimitedModel) Tokens() (int, int) {
 	return c.model.Tokens()
 }
 
-func (c *concurrentLimitedModel) Respond(messages []Message) ([]Message, Message, Usage, error) {
+func (c *concurrentLimitedModel) Respond(messages []Message) (ModelResponse, error) {
 	c.uses <- struct{}{}
 	defer func() { <-c.uses }()
 	return c.model.Respond(messages)

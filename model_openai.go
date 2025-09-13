@@ -138,10 +138,10 @@ func verbosityToOpenAI(v Verbosity) string {
 	}
 }
 
-func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
+func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	openAIMsgs, err := messagesToOpenAI(msgs)
 	if err != nil {
-		return nil, Message{}, Usage{}, err
+		return ModelResponse{}, err
 	}
 	bodyMap := map[string]any{
 		"model":    c.model,
@@ -167,11 +167,11 @@ func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	}
 	body, err := json.Marshal(bodyMap)
 	if err != nil {
-		return nil, Message{}, Usage{}, err
+		return ModelResponse{}, err
 	}
 	req, err := http.NewRequest("POST", c.url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, Message{}, Usage{}, err
+		return ModelResponse{}, err
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.key))
 	req.Header.Add("Content-Type", "application/json")
@@ -180,12 +180,12 @@ func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, Message{}, Usage{}, err
+		return ModelResponse{}, err
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, Message{}, Usage{}, err
+		return ModelResponse{}, err
 	}
 	respTyped := struct {
 		Choices []struct {
@@ -200,8 +200,11 @@ func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	}{}
 	err = json.Unmarshal(respBody, &respTyped)
 	if err != nil || len(respTyped.Choices) == 0 || respTyped.Choices[0].Message.Content == "" {
-		return nil, Message{}, Usage(respTyped.Usage), fmt.Errorf("failed to parse response: %s", string(respBody))
+		return ModelResponse{Usage: Usage(respTyped.Usage)}, fmt.Errorf("failed to parse response: %s", string(respBody))
 	}
 	content := respTyped.Choices[0].Message.Content
-	return nil, Message{Role: AssistantRole, Content: content}, Usage(respTyped.Usage), nil
+	return ModelResponse{
+		PrimaryMessage: Message{Role: AssistantRole, Content: content},
+		Usage:          Usage(respTyped.Usage),
+	}, nil
 }

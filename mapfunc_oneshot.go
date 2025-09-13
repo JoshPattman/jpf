@@ -15,18 +15,18 @@ type oneShotMapFunc[T, U any] struct {
 }
 
 func (mf *oneShotMapFunc[T, U]) Call(t T) (U, Usage, error) {
-	var u U
+	var zero U
 	msgs, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
-		return u, Usage{}, err
+		return zero, Usage{}, err
 	}
-	_, resp, usage, err := mf.model.Respond(msgs)
+	resp, err := mf.model.Respond(msgs)
 	if err != nil {
-		return u, usage, err
+		return zero, resp.Usage, err
 	}
-	result, err := mf.pars.ParseResponseText(resp.Content)
+	result, err := mf.pars.ParseResponseText(resp.PrimaryMessage.Content)
 	if err != nil {
-		return u, usage, err
+		return zero, resp.Usage, err
 	}
-	return result, usage, nil
+	return result, resp.Usage, nil
 }

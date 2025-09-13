@@ -23,12 +23,12 @@ func TestCachedModel(t *testing.T) {
 	}}
 	model = NewCachedModel(model, NewInMemoryCache())
 	for i := range 5 {
-		_, r1, _, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp1, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
-		if r1.Content != "hi" {
-			t.Fatalf("expected 'hi' but got '%v' on iteration %v", r1.Content, i)
+		if resp1.PrimaryMessage.Content != "hi" {
+			t.Fatalf("expected 'hi' but got '%v' on iteration %v", resp1.PrimaryMessage.Content, i)
 		}
 	}
 }
@@ -40,7 +40,7 @@ func TestLoggingModel(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	model = NewLoggingModel(model, NewJsonModelLogger(buf))
 	for range 3 {
-		_, _, _, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		_, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,11 +63,11 @@ func TestRetryModel(t *testing.T) {
 		NFails: 3,
 	}
 	model = NewRetryModel(model, 3)
-	_, resp, _, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+	resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.Content != "hi" {
-		t.Fatalf("expected 'hi' but got '%v'", resp.Content)
+	if resp.PrimaryMessage.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", resp.PrimaryMessage.Content)
 	}
 }

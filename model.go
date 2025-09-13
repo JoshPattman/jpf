@@ -1,6 +1,9 @@
 package jpf
 
-import "time"
+import (
+	"slices"
+	"time"
+)
 
 // Usage defines how many tokens were used when making calls to LLMs.
 type Usage struct {
@@ -15,13 +18,39 @@ func (u Usage) Add(u2 Usage) Usage {
 	}
 }
 
+type ModelResponse struct {
+	// Extra messages that are not the final response,
+	// but were used to build up the final response.
+	// For example, reasoning messages.
+	AuxilliaryMessages []Message
+	// The primary repsponse to the users query.
+	// Usually the only response that matters.
+	PrimaryMessage Message
+	// The usage of making this call.
+	// This may be the sum of multiple LLM calls.
+	Usage Usage
+}
+
+// Utility to allow you to return the usage but 0 value messages when an error occurs.
+func (r ModelResponse) OnlyUsage() ModelResponse {
+	return ModelResponse{Usage: r.Usage}
+}
+
+// Utility to include another usage object in this response object
+func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
+	return ModelResponse{
+		AuxilliaryMessages: slices.Clone(r.AuxilliaryMessages),
+		PrimaryMessage:     r.PrimaryMessage,
+		Usage:              r.Usage.Add(u),
+	}
+}
+
 // Model defines an interface to an LLM.
 type Model interface {
 	// Tokens specifies how many tokens are allowed to be sent.
 	Tokens() (int, int)
-	// Responds to a set of input messages, with a set of auxilliary messages and a final message.
-	// There may be no auxilliary messages, or things like tool calls, function calls, and reasoning may go in the auxilliary messages,
-	Respond([]Message) ([]Message, Message, Usage, error)
+	// Responds to a set of input messages.
+	Respond([]Message) (ModelResponse, error)
 }
 
 // ReasoningEffort defines how hard a reasoning model should think.

@@ -65,7 +65,7 @@ type ModelFactory struct {
 
 func (fac *ModelFactory) Build(withCache bool) jpf.Model {
 	model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4o-mini")
-	model = jpf.NewRetryModel(model, jpf.WithRetries{X: 5})
+	model = jpf.NewRetryModel(model, 5)
 	if withCache {
 		model = jpf.NewCachedModel(model, fac.Cache)
 	}

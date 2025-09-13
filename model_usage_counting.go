@@ -53,8 +53,8 @@ func (c *usageCountingModel) Tokens() (int, int) {
 	return c.model.Tokens()
 }
 
-func (c *usageCountingModel) Respond(messages []Message) ([]Message, Message, Usage, error) {
-	auxMessages, response, usage, err := c.model.Respond(messages)
-	c.counter.Add(usage)
-	return auxMessages, response, usage, err
+func (c *usageCountingModel) Respond(messages []Message) (ModelResponse, error) {
+	resp, err := c.model.Respond(messages)
+	c.counter.Add(resp.Usage)
+	return resp, err
 }
