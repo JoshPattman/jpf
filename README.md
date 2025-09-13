@@ -10,12 +10,12 @@ jpf is aimed at using AI as a tool - not as a chatbot (this is not to say you ca
 
 ## Features
 
-- **Flexible Orchestration**: Design iterative workflows for reasoning, task automation, or application backends.
 - **Retry and Feedback Handling**: Resilient mechanisms for retrying tasks and incorporating feedback into interactions.
 - **Embedding Utilities**: Generate and manipulate vector embeddings for tasks like similarity, search, or clustering.
 - **Customizable Models**: Seamlessly integrate LLMs, including reasoning chains and hybrid models.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
 - **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.
+- **Out-of-the-box Logging**: Simply add logging messages to your models, helping yuo track down issues.
 
 ## Installation
 
@@ -40,12 +40,13 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
     - There are a few built in implementations, however the aim of this package is to create the framework, not the functionality.
     - If you have any ideas of useful functions, feel free to put them on an issue, and if enough arise, I can make a new repo for these.
 - Where are the agents?
-    - I removed the agent interface recently as I think it was far too restrictuve.
-    - I would like to instead get the core building blocks ironed out before moving on to coming up with an agent interface.
+    - This package is tries to simplify single calls to LLMs, which is a level below what agents do.
+    - I have plans to build an agent framework on top of this package, but I would like to build a strong foundation first.
 - Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API feature?
     - The aim of this package is to put the advanced stuff, like using tools, to you to figure out. IMO this allows you to do cooler, more flexible things (like a tree of agents).
     - Also, to a degree tool calls / MCP tools lock you in to one API or another, more than just using the chat completions endpoint.
     - I might consider adding them in the future, but for now I think that implementing your own tool calling is best.
+    - As a rule of thumb, I will add API features that fiddle with the log probs (e.g. structured output, temperature, top p, ...) but I will not add somthing if a model could not acheive the same result with perfect prompting.
 
 ## Author
 
