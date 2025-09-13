@@ -7,7 +7,7 @@ import (
 // NewRetryModel wraps a Model with retry functionality.
 // If the underlying model returns an error, this wrapper will retry the operation
 // up to a configurable number of times with an optional delay between retries.
-func NewRetryModel(model Model, opts ...retryModelOpt) Model {
+func NewRetryModel(model Model, opts ...RetryModelOpt) Model {
 	m := &retryModel{
 		Model:   model,
 		retries: 99999,
@@ -19,7 +19,7 @@ func NewRetryModel(model Model, opts ...retryModelOpt) Model {
 	return m
 }
 
-type retryModelOpt interface {
+type RetryModelOpt interface {
 	applyRetry(*retryModel)
 }
 

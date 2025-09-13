@@ -33,6 +33,14 @@ const (
 	HighReasoning
 )
 
+type Verbosity uint8
+
+const (
+	LowVerbosity Verbosity = iota
+	MediumVerbosity
+	HighVerbosity
+)
+
 type WithReasoningPrefix struct{ X string }
 type WithRetries struct{ X int }
 type WithDelay struct{ X time.Duration }
@@ -44,3 +52,7 @@ type WithHTTPHeader struct {
 	V string
 }
 type WithReasoningPrompt struct{ X string }
+type WithVerbosity struct{ X Verbosity }
+type WithTopP struct{ X int }
+type WithPresencePenalty struct{ X float64 }
+type WithPrediction struct{ X string }

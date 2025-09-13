@@ -11,7 +11,7 @@ import (
 
 // NewOpenAIModel creates a Model that uses the OpenAI API.
 // It requires an API key and model name, with optional configuration via variadic options.
-func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) Model {
+func NewOpenAIModel(key, modelName string, opts ...OpenAIModelOpt) Model {
 	model := &openAIModel{
 		key:             key,
 		model:           modelName,
@@ -28,7 +28,7 @@ func NewOpenAIModel(key, modelName string, opts ...openAIModelOpt) Model {
 	return model
 }
 
-type openAIModelOpt interface {
+type OpenAIModelOpt interface {
 	applyOpenAIModel(*openAIModel)
 }
 
@@ -36,6 +36,10 @@ func (o WithTemperature) applyOpenAIModel(m *openAIModel)     { m.temperature = 
 func (o WithReasoningEffort) applyOpenAIModel(m *openAIModel) { m.reasoningEffort = &o.X }
 func (o WithURL) applyOpenAIModel(m *openAIModel)             { m.url = o.X }
 func (o WithHTTPHeader) applyOpenAIModel(m *openAIModel)      { m.extraHeaders[o.K] = o.V }
+func (o WithTopP) applyOpenAIModel(m *openAIModel)            { m.topP = &o.X }
+func (o WithVerbosity) applyOpenAIModel(m *openAIModel)       { m.verbosity = &o.X }
+func (o WithPresencePenalty) applyOpenAIModel(m *openAIModel) { m.presencePenalty = &o.X }
+func (o WithPrediction) applyOpenAIModel(m *openAIModel)      { m.prediction = &o.X }
 
 type openAIModel struct {
 	key             string
@@ -45,6 +49,10 @@ type openAIModel struct {
 	url             string
 	temperature     *float64
 	reasoningEffort *ReasoningEffort
+	topP            *int
+	verbosity       *Verbosity
+	presencePenalty *float64
+	prediction      *string
 	extraHeaders    map[string]string
 }
 
@@ -117,6 +125,19 @@ func reasoningEffortToOpenAI(re ReasoningEffort) string {
 	}
 }
 
+func verbosityToOpenAI(v Verbosity) string {
+	switch v {
+	case LowVerbosity:
+		return "low"
+	case MediumVerbosity:
+		return "medium"
+	case HighVerbosity:
+		return "high"
+	default:
+		panic("not possible")
+	}
+}
+
 func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error) {
 	openAIMsgs, err := messagesToOpenAI(msgs)
 	if err != nil {
@@ -131,6 +152,18 @@ func (c *openAIModel) Respond(msgs []Message) ([]Message, Message, Usage, error)
 	}
 	if c.reasoningEffort != nil {
 		bodyMap["reasoning_effort"] = reasoningEffortToOpenAI(*c.reasoningEffort)
+	}
+	if c.verbosity != nil {
+		bodyMap["verbosity"] = verbosityToOpenAI(*c.verbosity)
+	}
+	if c.topP != nil {
+		bodyMap["top_p"] = *c.topP
+	}
+	if c.presencePenalty != nil {
+		bodyMap["presence_penalty"] = *c.presencePenalty
+	}
+	if c.prediction != nil {
+		bodyMap["prediction"] = *c.prediction
 	}
 	body, err := json.Marshal(bodyMap)
 	if err != nil {

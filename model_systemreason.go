@@ -5,7 +5,7 @@ package jpf
 // reasoning messages into system messages with a customizable prefix.
 // Options:
 // - WithReasoningPrefix: customizes the prefix text added before reasoning content (default provided)
-func NewSystemReasonModel(model Model, opts ...systemReasonOpt) Model {
+func NewSystemReasonModel(model Model, opts ...SystemReasonModelOpt) Model {
 	m := &systemReasonModel{model: model, prefix: "The following information outlines some reasoning about the conversation up to this point:\n\n"}
 	for _, o := range opts {
 		o.applySystemReason(m)
@@ -13,7 +13,7 @@ func NewSystemReasonModel(model Model, opts ...systemReasonOpt) Model {
 	return m
 }
 
-type systemReasonOpt interface {
+type SystemReasonModelOpt interface {
 	applySystemReason(*systemReasonModel)
 }
 

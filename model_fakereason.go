@@ -5,7 +5,7 @@ package jpf
 // then passes that reasoning along with the original messages to the answerer model.
 // The reasoning is included as a ReasoningRole message in the auxiliary messages output.
 // Optional parameters allow customization of the reasoning prompt.
-func NewFakeReasoningModel(reasoner Model, answerer Model, opts ...fakeReasoningModelOpt) Model {
+func NewFakeReasoningModel(reasoner Model, answerer Model, opts ...FakeReasoningModelOpt) Model {
 	m := &fakeReasoningModel{
 		reasoner:        reasoner,
 		answerer:        answerer,
@@ -17,7 +17,7 @@ func NewFakeReasoningModel(reasoner Model, answerer Model, opts ...fakeReasoning
 	return m
 }
 
-type fakeReasoningModelOpt interface {
+type FakeReasoningModelOpt interface {
 	applyFakeReasoning(*fakeReasoningModel)
 }
 
