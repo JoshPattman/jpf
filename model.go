@@ -84,3 +84,4 @@ type WithVerbosity struct{ X Verbosity }
 type WithTopP struct{ X int }
 type WithPresencePenalty struct{ X float64 }
 type WithPrediction struct{ X string }
+type WithJsonSchema struct{ X map[string]any }

@@ -5,4 +5,5 @@ use (
 	./examples/cached-retry-model
 	./examples/code-rewrite
 	./examples/gpt-5-poems
+	./examples/structured_output
 )

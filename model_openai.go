@@ -40,6 +40,7 @@ func (o WithTopP) applyOpenAIModel(m *openAIModel)            { m.topP = &o.X }
 func (o WithVerbosity) applyOpenAIModel(m *openAIModel)       { m.verbosity = &o.X }
 func (o WithPresencePenalty) applyOpenAIModel(m *openAIModel) { m.presencePenalty = &o.X }
 func (o WithPrediction) applyOpenAIModel(m *openAIModel)      { m.prediction = &o.X }
+func (o WithJsonSchema) applyOpenAIModel(m *openAIModel)      { m.jsonSchema = o.X }
 
 type openAIModel struct {
 	key             string
@@ -54,6 +55,7 @@ type openAIModel struct {
 	presencePenalty *float64
 	prediction      *string
 	extraHeaders    map[string]string
+	jsonSchema      map[string]any
 }
 
 func (c *openAIModel) Tokens() (int, int) {
@@ -138,6 +140,17 @@ func verbosityToOpenAI(v Verbosity) string {
 	}
 }
 
+func jsonSchemaToOpenAI(schema map[string]any) map[string]any {
+	return map[string]any{
+		"type": "json_schema",
+		"json_schema": map[string]any{
+			"name":   "custom_schema",
+			"schema": schema,
+			"strict": true,
+		},
+	}
+}
+
 func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	openAIMsgs, err := messagesToOpenAI(msgs)
 	if err != nil {
@@ -164,6 +177,9 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	}
 	if c.prediction != nil {
 		bodyMap["prediction"] = *c.prediction
+	}
+	if c.jsonSchema != nil {
+		bodyMap["response_format"] = jsonSchemaToOpenAI(c.jsonSchema)
 	}
 	body, err := json.Marshal(bodyMap)
 	if err != nil {
