@@ -55,8 +55,8 @@ var MFCases = []TestCase{
 			dec := NewJsonResponseDecoder[TestStruct]()
 			feedback := NewRawMessageFeedbackGenerator()
 			model := &TestingModel{Responses: map[string][]string{
-				"ping":                             {"pong"},
-				"llm produced an invalid response": {`{"a":5}`},
+				"ping": {"pong"},
+				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
 			return NewFeedbackMapFunc(enc, dec, feedback, model, SystemRole, 1)
 		},

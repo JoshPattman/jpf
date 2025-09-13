@@ -18,15 +18,15 @@ func (mf *oneShotMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	var zero U
 	msgs, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
-		return zero, Usage{}, err
+		return zero, Usage{}, wrap(err, "failed to build input messages")
 	}
 	resp, err := mf.model.Respond(msgs)
 	if err != nil {
-		return zero, resp.Usage, err
+		return zero, resp.Usage, wrap(err, "failed to get model response")
 	}
 	result, err := mf.pars.ParseResponseText(resp.PrimaryMessage.Content)
 	if err != nil {
-		return zero, resp.Usage, err
+		return zero, resp.Usage, wrap(err, "failed to parse model response")
 	}
 	return result, resp.Usage, nil
 }

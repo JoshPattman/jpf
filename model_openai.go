@@ -141,7 +141,7 @@ func verbosityToOpenAI(v Verbosity) string {
 func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	openAIMsgs, err := messagesToOpenAI(msgs)
 	if err != nil {
-		return ModelResponse{}, err
+		return ModelResponse{}, wrap(err, "could not convert messages to OpenAI format")
 	}
 	bodyMap := map[string]any{
 		"model":    c.model,
@@ -167,11 +167,11 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	}
 	body, err := json.Marshal(bodyMap)
 	if err != nil {
-		return ModelResponse{}, err
+		return ModelResponse{}, wrap(err, "could not encode body")
 	}
 	req, err := http.NewRequest("POST", c.url, bytes.NewBuffer(body))
 	if err != nil {
-		return ModelResponse{}, err
+		return ModelResponse{}, wrap(err, "could not create request")
 	}
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.key))
 	req.Header.Add("Content-Type", "application/json")
@@ -180,12 +180,12 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return ModelResponse{}, err
+		return ModelResponse{}, wrap(err, "could not execute request")
 	}
 	defer resp.Body.Close()
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return ModelResponse{}, err
+		return ModelResponse{}, wrap(err, "could not read response body")
 	}
 	respTyped := struct {
 		Choices []struct {
@@ -199,8 +199,11 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 		}
 	}{}
 	err = json.Unmarshal(respBody, &respTyped)
-	if err != nil || len(respTyped.Choices) == 0 || respTyped.Choices[0].Message.Content == "" {
-		return ModelResponse{Usage: Usage(respTyped.Usage)}, fmt.Errorf("failed to parse response: %s", string(respBody))
+	if err != nil {
+		return ModelResponse{Usage: Usage(respTyped.Usage)}, wrap(err, "failed to parse response: %s", string(respBody))
+	}
+	if len(respTyped.Choices) == 0 || respTyped.Choices[0].Message.Content == "" {
+		return ModelResponse{Usage: Usage(respTyped.Usage)}, wrap(err, "response had no choices: %s", string(respBody))
 	}
 	content := respTyped.Choices[0].Message.Content
 	return ModelResponse{

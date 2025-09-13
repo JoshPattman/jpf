@@ -28,7 +28,11 @@ func (j *jsonModelLogger) ModelLog(lmp ModelLoggingInfo) error {
 	if lmp.Err != nil {
 		res["error"] = lmp.Err.Error()
 	}
-	return j.enc.Encode(res)
+	err := j.enc.Encode(res)
+	if err != nil {
+		return wrap(err, "failed to encode information to json")
+	}
+	return nil
 }
 
 func messageToLoggingJson(msg Message) any {

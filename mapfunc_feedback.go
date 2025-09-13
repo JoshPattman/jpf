@@ -37,7 +37,7 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	var u U
 	history, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
-		return u, Usage{}, err
+		return u, Usage{}, wrap(err, "failed to build input messages")
 	}
 	totalUsage := Usage{}
 	var lastErr error
@@ -45,7 +45,7 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 		resp, err := mf.model.Respond(history)
 		totalUsage = totalUsage.Add(resp.Usage)
 		if err != nil {
-			return u, totalUsage, err
+			return u, totalUsage, wrap(err, "failed to get model response")
 		}
 		result, err := mf.pars.ParseResponseText(resp.PrimaryMessage.Content)
 		if err == nil {
@@ -62,8 +62,8 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 			})
 		} else {
 			// Otherwise, it was another error so return the error (don't loop)
-			return u, totalUsage, err
+			return u, totalUsage, wrap(err, "failed to parse model response")
 		}
 	}
-	return u, totalUsage, lastErr
+	return u, totalUsage, wrap(lastErr, "model failed to produce a valid response after trying %d times", mf.maxRetries+1)
 }

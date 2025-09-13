@@ -34,7 +34,7 @@ func (e *templateMessageEncoder[T]) BuildInputMessages(data T) ([]Message, error
 	if e.systemTemplate != nil {
 		var systemBuf bytes.Buffer
 		if err := e.systemTemplate.Execute(&systemBuf, data); err != nil {
-			return nil, err
+			return nil, wrap(err, "failed to execute system prompt template")
 		}
 		messages = append(messages, Message{
 			Role:    SystemRole,
@@ -45,7 +45,7 @@ func (e *templateMessageEncoder[T]) BuildInputMessages(data T) ([]Message, error
 	if e.userTemplate != nil {
 		var userBuf bytes.Buffer
 		if err := e.userTemplate.Execute(&userBuf, data); err != nil {
-			return nil, err
+			return nil, wrap(err, "failed to execute user prompt template")
 		}
 		messages = append(messages, Message{
 			Role:    UserRole,

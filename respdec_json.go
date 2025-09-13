@@ -29,13 +29,13 @@ func (d *jsonResponseDecoder[T]) ParseResponseText(response string) (T, error) {
 	match := re.FindString(response)
 	if match == "" {
 		var zero T
-		return zero, ErrInvalidResponse
+		return zero, wrap(ErrInvalidResponse, "response did not contain a json object")
 	}
 	var result T
 	err := json.Unmarshal([]byte(match), &result)
 	if err != nil {
 		var zero T
-		return zero, errors.Join(ErrInvalidResponse, err)
+		return zero, wrap(errors.Join(err, ErrInvalidResponse), "llm returned an invalid json object")
 	}
 	return result, nil
 }

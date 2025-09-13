@@ -41,7 +41,7 @@ type fakeReasoningModel struct {
 func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResponse, error) {
 	reasoningResp, err := f.reasoner.Respond(append([]Message{{Role: SystemRole, Content: f.reasoningPrompt}}, msgs...))
 	if err != nil {
-		return reasoningResp.OnlyUsage(), err
+		return reasoningResp.OnlyUsage(), wrap(err, "failed to call reasoning model")
 	}
 	reasoningMessage := reasoningResp.PrimaryMessage
 	reasoningMessage.Role = ReasoningRole
@@ -49,10 +49,10 @@ func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResponse, error) {
 	finalResp, err := f.answerer.Respond(msgsWithReasoning)
 	finalResp = finalResp.IncludingUsage(reasoningResp.Usage)
 	if err != nil {
-		return finalResp.OnlyUsage(), err
+		return finalResp.OnlyUsage(), wrap(err, "failed to call final response model")
 	}
 	finalResp.AuxilliaryMessages = append(finalResp.AuxilliaryMessages, reasoningMessage)
-	return finalResp, err
+	return finalResp, nil
 }
 
 // Tokens implements Model.

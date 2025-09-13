@@ -44,5 +44,5 @@ func (m *retryModel) Respond(msgs []Message) (ModelResponse, error) {
 		totalUsageSoFar = resp.Usage
 		time.Sleep(m.delay)
 	}
-	return ModelResponse{Usage: totalUsageSoFar}, err
+	return ModelResponse{Usage: totalUsageSoFar}, wrap(err, "could not get model response after retrying %d times", m.retries)
 }

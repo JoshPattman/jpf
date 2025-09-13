@@ -33,8 +33,11 @@ func (l *loggingModel) Respond(msgs []Message) (ModelResponse, error) {
 		Duration:             dur,
 	}
 	logErr := l.logger.ModelLog(lmp)
-	if err == nil {
-		err = logErr
+	if err != nil {
+		// There was an error with the original mode, do nothing
+	} else if logErr != nil {
+		// There was not an original model error, but we got a logging error
+		err = wrap(logErr, "failed to execute logging")
 	}
 	return resp, err
 }

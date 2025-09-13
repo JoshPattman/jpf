@@ -33,11 +33,13 @@ func (cache *sqlCache) GetCachedResponse(msgs []Message) (bool, []Message, Messa
 	err := row.Scan(&blob)
 	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil, Message{}, nil
+	} else if err != nil {
+		return false, nil, Message{}, wrap(err, "failed to query database")
 	}
 	var outputs []Message
 	err = gob.NewDecoder(bytes.NewBuffer(blob)).Decode(&outputs)
 	if err != nil {
-		return false, nil, Message{}, err
+		return false, nil, Message{}, wrap(err, "failed to decode cached data")
 	}
 	if len(outputs) == 0 {
 		return false, nil, Message{}, errors.New("cached messages have 0 length")
@@ -50,11 +52,11 @@ func (cache *sqlCache) SetCachedResponse(inputs []Message, aux []Message, out Me
 	blob := bytes.NewBuffer(nil)
 	err := gob.NewEncoder(blob).Encode(append(aux, out))
 	if err != nil {
-		return err
+		return wrap(err, "failed to encode messages to binary data")
 	}
 	_, err = cache.db.Exec(`INSERT INTO model_cache (hash, resp) VALUES (?, ?) ON CONFLICT(hash) DO UPDATE SET resp = excluded.resp;`, h, blob.Bytes())
 	if err != nil {
-		return err
+		return wrap(err, "failed to execute database insert")
 	}
 	return nil
 }
@@ -67,7 +69,7 @@ func (cache *sqlCache) setupDB() error {
 	);`
 	_, err := cache.db.Exec(query)
 	if err != nil {
-		return err
+		return wrap(err, "failed to create model cache table")
 	}
 
 	// New table for embeddings
@@ -77,7 +79,10 @@ func (cache *sqlCache) setupDB() error {
 		embedding BLOB NOT NULL
 	);`
 	_, err = cache.db.Exec(query)
-	return err
+	if err != nil {
+		return wrap(err, "failed to create embedding cache table")
+	}
+	return nil
 }
 
 // ===== Implementation of EmbedderResponseCache =====

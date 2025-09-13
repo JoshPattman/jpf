@@ -19,7 +19,7 @@ type cachedModel struct {
 func (c *cachedModel) Respond(msgs []Message) (ModelResponse, error) {
 	ok, aux, final, err := c.cache.GetCachedResponse(msgs)
 	if err != nil {
-		return ModelResponse{}, err
+		return ModelResponse{}, wrap(err, "failed to query cache")
 	}
 	if ok {
 		return ModelResponse{
@@ -33,7 +33,7 @@ func (c *cachedModel) Respond(msgs []Message) (ModelResponse, error) {
 	}
 	err = c.cache.SetCachedResponse(msgs, resp.AuxilliaryMessages, resp.PrimaryMessage)
 	if err != nil {
-		return resp.OnlyUsage(), err
+		return resp.OnlyUsage(), wrap(err, "failed to set cache")
 	}
 	return resp, nil
 }
