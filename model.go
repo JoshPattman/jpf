@@ -42,7 +42,6 @@ const (
 )
 
 type WithReasoningPrefix struct{ X string }
-type WithRetries struct{ X int }
 type WithDelay struct{ X time.Duration }
 type WithTemperature struct{ X float64 }
 type WithReasoningEffort struct{ X ReasoningEffort }

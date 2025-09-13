@@ -13,7 +13,7 @@ func TestConstructOtherModels(t *testing.T) {
 	model = NewConcurrentLimitedModel(model, NewOneConcurrentLimiter())
 	model = NewFakeReasoningModel(model, model, WithReasoningPrompt{X: "Reason please"})
 	model = NewLoggingModel(model, NewJsonModelLogger(os.Stdout))
-	model = NewRetryModel(model, WithDelay{X: time.Second}, WithRetries{X: 10})
+	model = NewRetryModel(model, 10, WithDelay{X: time.Second})
 	NewSystemReasonModel(model, WithReasoningPrefix{X: "Resoning: "})
 }
 
@@ -62,7 +62,7 @@ func TestRetryModel(t *testing.T) {
 		},
 		NFails: 3,
 	}
-	model = NewRetryModel(model, WithRetries{3})
+	model = NewRetryModel(model, 3)
 	_, resp, _, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)

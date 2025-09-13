@@ -7,10 +7,10 @@ import (
 // NewRetryModel wraps a Model with retry functionality.
 // If the underlying model returns an error, this wrapper will retry the operation
 // up to a configurable number of times with an optional delay between retries.
-func NewRetryModel(model Model, opts ...RetryModelOpt) Model {
+func NewRetryModel(model Model, maxRetries int, opts ...RetryModelOpt) Model {
 	m := &retryModel{
 		Model:   model,
-		retries: 99999,
+		retries: maxRetries,
 		delay:   0,
 	}
 	for _, o := range opts {
@@ -23,8 +23,7 @@ type RetryModelOpt interface {
 	applyRetry(*retryModel)
 }
 
-func (o WithRetries) applyRetry(m *retryModel) { m.retries = o.X }
-func (o WithDelay) applyRetry(m *retryModel)   { m.delay = o.X }
+func (o WithDelay) applyRetry(m *retryModel) { m.delay = o.X }
 
 type retryModel struct {
 	Model
