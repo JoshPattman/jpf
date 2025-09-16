@@ -7,14 +7,18 @@ import (
 
 // Usage defines how many tokens were used when making calls to LLMs.
 type Usage struct {
-	InputTokens  int
-	OutputTokens int
+	InputTokens     int
+	OutputTokens    int
+	SuccessfulCalls int
+	FailedCalls     int
 }
 
 func (u Usage) Add(u2 Usage) Usage {
 	return Usage{
 		u.InputTokens + u2.InputTokens,
 		u.OutputTokens + u2.OutputTokens,
+		u.SuccessfulCalls + u2.SuccessfulCalls,
+		u.FailedCalls + u2.FailedCalls,
 	}
 }
 
