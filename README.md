@@ -4,14 +4,13 @@
 
 # `jpf` - A Lightweight Framework for AI-Powered Applications
 
-jpf is a Go library for building lightweight AI-powered applications. It provides essential building blocks, including model construction, embedding generation, and robust LLM interaction interfaces, enabling you to craft custom solutions without the bloat.
+jpf is a Go library for building lightweight AI-powered applications. It provides essential building blocks and robust LLM interaction interfaces, enabling you to craft custom solutions without the bloat.
 
 jpf is aimed at using AI as a tool - not as a chatbot (this is not to say you cannot use it to make a chatbot, however there is no framework provided for this yet). It focusses on adding AI features locally, as opposed to relying too heavily on external APIs - this makes the package particularly flexible when switching models or providers.
 
 ## Features
 
 - **Retry and Feedback Handling**: Resilient mechanisms for retrying tasks and incorporating feedback into interactions.
-- **Embedding Utilities**: Generate and manipulate vector embeddings for tasks like similarity, search, or clustering.
 - **Customizable Models**: Seamlessly integrate LLMs, including reasoning chains and hybrid models.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
 - **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.
