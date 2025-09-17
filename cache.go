@@ -6,19 +6,9 @@ import (
 	"strings"
 )
 
-type Cache interface {
-	ModelResponseCache
-	EmbedderResponseCache
-}
-
 type ModelResponseCache interface {
 	GetCachedResponse([]Message) (bool, []Message, Message, error)
 	SetCachedResponse(inputs []Message, aux []Message, out Message) error
-}
-
-type EmbedderResponseCache interface {
-	GetCachedEmbedding(string) (bool, []float64, error)
-	SetCachedEmbedding(string, []float64) error
 }
 
 func HashMessages(msgs []Message) string {

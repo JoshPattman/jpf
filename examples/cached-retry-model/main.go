@@ -27,24 +27,10 @@ func main() {
 	model.Respond([]jpf.Message{{Role: jpf.SystemRole, Content: "abc"}})
 	t2 := time.Since(now)
 	fmt.Println(t1, t2)
-
-	emb := fac.BuildEmbedder(true)
-	// Do the same for embedder
-	now = time.Now()
-	_, err := emb.Embed("abc")
-	if err != nil {
-		panic(err)
-	}
-	t1 = time.Since(now)
-	// Time second request (should be instant)
-	now = time.Now()
-	emb.Embed("abc")
-	t2 = time.Since(now)
-	fmt.Println(t1, t2)
 }
 
 // Setup a sqlite database and use that as the cache
-func CreateCache() jpf.Cache {
+func CreateCache() jpf.ModelResponseCache {
 	db, err := sql.Open("sqlite3", "./cache.db")
 	if err != nil {
 		panic(err)
@@ -59,7 +45,7 @@ func CreateCache() jpf.Cache {
 // ModelFactory builds models that share the same resources (cache).
 // This is the suggested pattern to use with this package.
 type ModelFactory struct {
-	Cache  jpf.Cache
+	Cache  jpf.ModelResponseCache
 	Logger *slog.Logger
 }
 
@@ -73,12 +59,4 @@ func (fac *ModelFactory) Build(withCache bool) jpf.Model {
 		model = jpf.NewLoggingModel(model, jpf.NewSlogModelLogger(fac.Logger.Info, true))
 	}
 	return model
-}
-
-func (fac *ModelFactory) BuildEmbedder(withCache bool) jpf.Embedder {
-	emb := jpf.NewOpenAIEmbedder(os.Getenv("OPENAI_KEY"), "text-embedding-3-small")
-	if withCache {
-		emb = jpf.NewCachedEmbedder(emb, fac.Cache)
-	}
-	return emb
 }
