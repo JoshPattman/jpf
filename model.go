@@ -51,8 +51,6 @@ func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
 
 // Model defines an interface to an LLM.
 type Model interface {
-	// Tokens specifies how many tokens are allowed to be sent.
-	Tokens() (int, int)
 	// Responds to a set of input messages.
 	Respond([]Message) (ModelResponse, error)
 }
@@ -89,3 +87,4 @@ type WithTopP struct{ X int }
 type WithPresencePenalty struct{ X float64 }
 type WithPrediction struct{ X string }
 type WithJsonSchema struct{ X map[string]any }
+type WithMaxOutputTokens struct{ X int }

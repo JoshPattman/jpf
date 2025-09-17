@@ -36,8 +36,3 @@ func (s *systemReasonModel) Respond(messages []Message) (ModelResponse, error) {
 	}
 	return s.model.Respond(convertedMessages)
 }
-
-// Tokens implements Model.
-func (s *systemReasonModel) Tokens() (int, int) {
-	return s.model.Tokens()
-}

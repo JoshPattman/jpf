@@ -54,10 +54,3 @@ func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResponse, error) {
 	finalResp.AuxilliaryMessages = append(finalResp.AuxilliaryMessages, reasoningMessage)
 	return finalResp, nil
 }
-
-// Tokens implements Model.
-func (f *fakeReasoningModel) Tokens() (int, int) {
-	ai, ao := f.reasoner.Tokens()
-	bi, bo := f.answerer.Tokens()
-	return min(ai, bi), min(ao, bo)
-}

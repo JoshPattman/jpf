@@ -29,10 +29,6 @@ type concurrentLimitedModel struct {
 	uses  ConcurrentLimiter
 }
 
-func (c *concurrentLimitedModel) Tokens() (int, int) {
-	return c.model.Tokens()
-}
-
 func (c *concurrentLimitedModel) Respond(messages []Message) (ModelResponse, error) {
 	c.uses <- struct{}{}
 	defer func() { <-c.uses }()

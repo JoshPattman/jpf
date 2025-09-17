@@ -37,8 +37,3 @@ func (c *cachedModel) Respond(msgs []Message) (ModelResponse, error) {
 	}
 	return resp, nil
 }
-
-// Tokens implements Model.
-func (c *cachedModel) Tokens() (int, int) {
-	return c.model.Tokens()
-}

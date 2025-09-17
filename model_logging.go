@@ -41,8 +41,3 @@ func (l *loggingModel) Respond(msgs []Message) (ModelResponse, error) {
 	}
 	return resp, err
 }
-
-// Tokens implements Model.
-func (l *loggingModel) Tokens() (int, int) {
-	return l.model.Tokens()
-}

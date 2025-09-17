@@ -15,7 +15,6 @@ func NewOpenAIModel(key, modelName string, opts ...OpenAIModelOpt) Model {
 	model := &openAIModel{
 		key:             key,
 		model:           modelName,
-		maxInput:        0,
 		maxOutput:       0,
 		url:             "https://api.openai.com/v1/chat/completions",
 		temperature:     nil,
@@ -41,11 +40,11 @@ func (o WithVerbosity) applyOpenAIModel(m *openAIModel)       { m.verbosity = &o
 func (o WithPresencePenalty) applyOpenAIModel(m *openAIModel) { m.presencePenalty = &o.X }
 func (o WithPrediction) applyOpenAIModel(m *openAIModel)      { m.prediction = &o.X }
 func (o WithJsonSchema) applyOpenAIModel(m *openAIModel)      { m.jsonSchema = o.X }
+func (o WithMaxOutputTokens) applyOpenAIModel(m *openAIModel) { m.maxOutput = o.X }
 
 type openAIModel struct {
 	key             string
 	model           string
-	maxInput        int
 	maxOutput       int
 	url             string
 	temperature     *float64
@@ -56,10 +55,6 @@ type openAIModel struct {
 	prediction      *string
 	extraHeaders    map[string]string
 	jsonSchema      map[string]any
-}
-
-func (c *openAIModel) Tokens() (int, int) {
-	return c.maxInput, c.maxOutput
 }
 
 func roleToOpenAI(role Role) string {
@@ -180,6 +175,9 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	if c.prediction != nil {
 		bodyMap["prediction"] = *c.prediction
 	}
+	if c.maxOutput != 0 {
+		bodyMap["max_completion_tokens"] = c.maxOutput
+	}
 	if c.jsonSchema != nil {
 		bodyMap["response_format"] = jsonSchemaToOpenAI(c.jsonSchema)
 	}
@@ -224,7 +222,7 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	if err != nil {
 		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "failed to parse response: %s", string(respBody))
 	}
-	if len(respTyped.Choices) == 0 || respTyped.Choices[0].Message.Content == "" {
+	if len(respTyped.Choices) == 0 {
 		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "response had no choices: %s", string(respBody))
 	}
 	content := respTyped.Choices[0].Message.Content

@@ -49,10 +49,6 @@ type usageCountingModel struct {
 	model   Model
 }
 
-func (c *usageCountingModel) Tokens() (int, int) {
-	return c.model.Tokens()
-}
-
 func (c *usageCountingModel) Respond(messages []Message) (ModelResponse, error) {
 	resp, err := c.model.Respond(messages)
 	c.counter.Add(resp.Usage)
