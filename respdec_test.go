@@ -6,6 +6,26 @@ import (
 	"testing"
 )
 
+func buildTestingSubstringRespDec() ResponseDecoder[string] {
+	return NewSubstringResponseDecoder(
+		NewRawStringResponseDecoder(),
+		SubstringAfter("::"),
+	)
+}
+
+func buildTestingValidatorRespDec() ResponseDecoder[string] {
+	return NewValidatingResponseDecoder(
+		NewRawStringResponseDecoder(),
+		func(x string) error {
+			if x == "abc" {
+				return nil
+			} else {
+				return errors.New("invalid")
+			}
+		},
+	)
+}
+
 type RDCase[T comparable] struct {
 	ID            string
 	Build         func() ResponseDecoder[T]
@@ -76,6 +96,36 @@ var RDCases = []TestCase{
 		Build:    NewRawStringResponseDecoder,
 		Input:    "  hdvdihiuhdibdb  \n",
 		Expected: "  hdvdihiuhdibdb  \n",
+	},
+	RDCase[string]{
+		ID:       "substring/normal",
+		Build:    buildTestingSubstringRespDec,
+		Input:    "abcdefg",
+		Expected: "abcdefg",
+	},
+	RDCase[string]{
+		ID:       "substring/with_split",
+		Build:    buildTestingSubstringRespDec,
+		Input:    "abcdefg::1234",
+		Expected: "1234",
+	},
+	RDCase[string]{
+		ID:       "substring/with_two",
+		Build:    buildTestingSubstringRespDec,
+		Input:    "abcdefg::1234::xyz",
+		Expected: "xyz",
+	},
+	RDCase[string]{
+		ID:       "validating/ok",
+		Build:    buildTestingValidatorRespDec,
+		Input:    "abc",
+		Expected: "abc",
+	},
+	RDCase[string]{
+		ID:            "validating/not_ok",
+		Build:         buildTestingValidatorRespDec,
+		Input:         "abcd",
+		ExpectedError: true,
 	},
 }
 

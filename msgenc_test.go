@@ -80,6 +80,27 @@ var MECases = []TestCase{
 		Input:    TestStruct{A: 5, B: "x"},
 		Expected: []string{"Data (A): 5", "Data (B): x"},
 	},
+	MECase[string]{
+		ID: "sequential/single",
+		Build: func() MessageEncoder[string] {
+			return NewSequentialMessageEncoder(
+				NewRawStringMessageEncoder("prompt1"),
+			)
+		},
+		Input:    "abc",
+		Expected: []string{"prompt1", "abc"},
+	},
+	MECase[string]{
+		ID: "sequential/double",
+		Build: func() MessageEncoder[string] {
+			return NewSequentialMessageEncoder(
+				NewRawStringMessageEncoder("prompt1"),
+				NewRawStringMessageEncoder("prompt2"),
+			)
+		},
+		Input:    "abc",
+		Expected: []string{"prompt1", "abc", "prompt2", "abc"},
+	},
 }
 
 func TestMessageEncoder(t *testing.T) {
