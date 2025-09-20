@@ -25,9 +25,15 @@ func main() {
 	outputFile := flag.String("o", "", "The output file to use")
 	targetLang := flag.String("l", "Python", "Target language for the rewrite")
 	pointers := flag.String("p", "You may change the overall structure;Make sure to keep the functionality the same", "Semicolon separated list of pointers")
+	useGemini := flag.Bool("g", false, "If specified, we will use gemini instead of openai")
 	flag.Parse()
 
-	model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4o-mini")
+	var model jpf.Model
+	if *useGemini {
+		model = jpf.NewGeminiModel(os.Getenv("GEMINI_KEY"), "gemini-2.0-flash")
+	} else {
+		model = jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4o-mini")
+	}
 	formatter := jpf.NewTemplateMessageEncoder[TemplateData](system, "{{.Code}}")
 	parser := jpf.NewRawStringResponseDecoder()
 	mapFunc := jpf.NewOneShotMapFunc(formatter, parser, model)
