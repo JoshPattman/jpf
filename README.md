@@ -46,6 +46,9 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
     - Also, to a degree tool calls / MCP tools lock you in to one API or another, more than just using the chat completions endpoint.
     - I might consider adding them in the future, but for now I think that implementing your own tool calling is best.
     - As a rule of thumb, I will add API features that fiddle with the log probs (e.g. structured output, temperature, top p, ...) but I will not add somthing if a model could not acheive the same result with perfect prompting.
+- I want to change my models temperature/structured output/output tokens/... after I have built it!
+    - The intention is to provide functions that need to use an LLM with a builder function instead of a built object. This way, you can use the builder function multiple times with different paramters.
+    - IMO, a model only exposing its respond fucntion is cleanest and simplest.
 
 ## Author
 
