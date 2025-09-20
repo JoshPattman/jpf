@@ -72,7 +72,7 @@ const (
 	HighVerbosity
 )
 
-type WithReasoningPrefix struct{ X string }
+type WithMessagePrefix struct{ X string }
 type WithDelay struct{ X time.Duration }
 type WithTemperature struct{ X float64 }
 type WithReasoningEffort struct{ X ReasoningEffort }
@@ -88,3 +88,18 @@ type WithPresencePenalty struct{ X float64 }
 type WithPrediction struct{ X string }
 type WithJsonSchema struct{ X map[string]any }
 type WithMaxOutputTokens struct{ X int }
+type WithSystemAs struct {
+	X                Role
+	TransformContent func(string) string
+}
+
+type WithReasoningAs struct {
+	X                Role
+	TransformContent func(string) string
+}
+
+func TransformByPrefix(prefix string) func(string) string {
+	return func(s string) string {
+		return prefix + s
+	}
+}

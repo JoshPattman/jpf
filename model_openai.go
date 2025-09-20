@@ -20,6 +20,7 @@ func NewOpenAIModel(key, modelName string, opts ...OpenAIModelOpt) Model {
 		temperature:     nil,
 		reasoningEffort: nil,
 		extraHeaders:    make(map[string]string),
+		reasoningRole:   SystemRole,
 	}
 	for _, o := range opts {
 		o.applyOpenAIModel(model)
@@ -41,46 +42,60 @@ func (o WithPresencePenalty) applyOpenAIModel(m *openAIModel) { m.presencePenalt
 func (o WithPrediction) applyOpenAIModel(m *openAIModel)      { m.prediction = &o.X }
 func (o WithJsonSchema) applyOpenAIModel(m *openAIModel)      { m.jsonSchema = o.X }
 func (o WithMaxOutputTokens) applyOpenAIModel(m *openAIModel) { m.maxOutput = o.X }
-
-type openAIModel struct {
-	key             string
-	model           string
-	maxOutput       int
-	url             string
-	temperature     *float64
-	reasoningEffort *ReasoningEffort
-	topP            *int
-	verbosity       *Verbosity
-	presencePenalty *float64
-	prediction      *string
-	extraHeaders    map[string]string
-	jsonSchema      map[string]any
+func (o WithReasoningAs) applyOpenAIModel(m *openAIModel) {
+	m.reasoningRole = o.X
+	m.reasoningTransform = o.TransformContent
 }
 
-func roleToOpenAI(role Role) string {
+type openAIModel struct {
+	key                string
+	model              string
+	maxOutput          int
+	url                string
+	temperature        *float64
+	reasoningEffort    *ReasoningEffort
+	topP               *int
+	verbosity          *Verbosity
+	presencePenalty    *float64
+	prediction         *string
+	extraHeaders       map[string]string
+	jsonSchema         map[string]any
+	reasoningRole      Role
+	reasoningTransform func(string) string
+}
+
+func roleToOpenAI(role Role) (string, error) {
 	switch role {
 	case SystemRole:
-		return "system"
+		return "system", nil
 	case UserRole:
-		return "user"
+		return "user", nil
 	case AssistantRole:
-		return "assistant"
+		return "assistant", nil
 	default:
-		panic("not a valid role")
+		return "", fmt.Errorf("openai does not support that role: %s", role.String())
 	}
 }
 
-func messagesToOpenAI(msgs []Message) (any, error) {
+func (m *openAIModel) messagesToOpenAI(msgs []Message) (any, error) {
 	jsonMessages := make([]map[string]any, 0)
 	for _, msg := range msgs {
+		role := msg.Role
+		contentStr := msg.Content
+		if role == ReasoningRole {
+			role = m.reasoningRole
+			if m.reasoningTransform != nil {
+				contentStr = m.reasoningTransform(contentStr)
+			}
+		}
 		var content any
 		if len(msg.Images) == 0 {
-			content = msg.Content
+			content = contentStr
 		} else {
 			cont := []map[string]any{
 				{
 					"type": "text",
-					"text": msg.Content,
+					"text": contentStr,
 				},
 			}
 			for _, img := range msg.Images {
@@ -98,11 +113,13 @@ func messagesToOpenAI(msgs []Message) (any, error) {
 			}
 			content = cont
 		}
-		if msg.Role == ReasoningRole {
-			return nil, fmt.Errorf("reasoning role not allowed in openAI format, consider using NewSystemReasonModel")
+		oaiRole, err := roleToOpenAI(msg.Role)
+		if err != nil {
+			return nil, err
 		}
+
 		jsonMessages = append(jsonMessages, map[string]any{
-			"role":    roleToOpenAI(msg.Role),
+			"role":    oaiRole,
 			"content": content,
 		})
 	}
@@ -149,7 +166,7 @@ func jsonSchemaToOpenAI(schema map[string]any) map[string]any {
 func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	failedUsage := Usage{FailedCalls: 1}
 	failedResp := ModelResponse{Usage: failedUsage}
-	openAIMsgs, err := messagesToOpenAI(msgs)
+	openAIMsgs, err := c.messagesToOpenAI(msgs)
 	if err != nil {
 		return failedResp, wrap(err, "could not convert messages to OpenAI format")
 	}

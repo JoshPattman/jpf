@@ -36,43 +36,69 @@ func (o WithMaxOutputTokens) applyGeminiModel(m *geminiModel) { m.maxOutput = o.
 func (o WithURL) applyGeminiModel(m *geminiModel)             { m.url = o.X }
 
 type geminiModel struct {
-	key          string
-	model        string
-	url          string
-	temperature  *float64
-	topP         *int
-	verbosity    *Verbosity
-	maxOutput    int
-	extraHeaders map[string]string
+	key                string
+	model              string
+	url                string
+	temperature        *float64
+	topP               *int
+	verbosity          *Verbosity
+	maxOutput          int
+	extraHeaders       map[string]string
+	reasoningRole      Role
+	reasoningTransform func(string) string
+	systemRole         Role
+	systemTransform    func(string) string
 }
 
-func roleToGemini(role Role) string {
+func roleToGemini(role Role) (string, error) {
 	switch role {
-	case SystemRole:
-		return "user" // Gemini does not have explicit "system", treat as user
 	case UserRole:
-		return "user"
+		return "user", nil
 	case AssistantRole:
-		return "model"
+		return "assistant", nil
 	default:
-		panic("not a valid role")
+		return "", fmt.Errorf("gemini does not support that role: %s", role.String())
 	}
 }
 
 // Converts internal messages to Gemini's format
-func messagesToGemini(msgs []Message) ([]map[string]any, error) {
+func (m *geminiModel) messagesToGemini(msgs []Message) (string, []map[string]any, error) {
 	parts := make([]map[string]any, 0)
-	for _, msg := range msgs {
-		// Gemini supports text and images as separate parts
+	systemMessage := ""
+	for i, msg := range msgs {
+		role := msg.Role
+		contentStr := msg.Content
+		if role == ReasoningRole {
+			role = m.reasoningRole
+			if m.reasoningTransform != nil {
+				contentStr = m.reasoningTransform(contentStr)
+			}
+		} else if role == SystemRole {
+			role = m.systemRole
+			if m.systemTransform != nil {
+				contentStr = m.systemTransform(contentStr)
+			}
+		}
+		if role == SystemRole {
+			if i == 0 {
+				if len(msg.Images) > 0 {
+					return "", nil, errors.New("cannot attach images to system messages in gemini")
+				}
+				systemMessage = contentStr
+				continue
+			} else {
+				return "", nil, errors.New("gemini only supports at most one system message at the start of the conversation")
+			}
+		}
 		textPart := map[string]any{
-			"text": msg.Content,
+			"text": contentStr,
 		}
 		allParts := []map[string]any{textPart}
 
 		for _, img := range msg.Images {
 			b64, err := img.ToBase64Encoded(false)
 			if err != nil {
-				return nil, errors.Join(errors.New("failed to encode image to base64"), err)
+				return "", nil, errors.Join(errors.New("failed to encode image to base64"), err)
 			}
 			allParts = append(allParts, map[string]any{
 				"inline_data": map[string]any{
@@ -81,26 +107,38 @@ func messagesToGemini(msgs []Message) ([]map[string]any, error) {
 				},
 			})
 		}
-
+		gRole, err := roleToGemini(role)
+		if err != nil {
+			return "", nil, err
+		}
 		parts = append(parts, map[string]any{
-			"role":  roleToGemini(msg.Role),
+			"role":  gRole,
 			"parts": allParts,
 		})
 	}
-	return parts, nil
+	return systemMessage, parts, nil
 }
 
 func (c *geminiModel) Respond(msgs []Message) (ModelResponse, error) {
 	failedUsage := Usage{FailedCalls: 1}
 	failedResp := ModelResponse{Usage: failedUsage}
 
-	geminiMsgs, err := messagesToGemini(msgs)
+	systemMessage, geminiMsgs, err := c.messagesToGemini(msgs)
 	if err != nil {
 		return failedResp, wrap(err, "could not convert messages to Gemini format")
 	}
 
 	bodyMap := map[string]any{
 		"contents": geminiMsgs,
+	}
+	if systemMessage != "" {
+		bodyMap["systemInstruction"] = map[string]any{
+			"parts": []map[string]any{
+				{
+					"text": systemMessage,
+				},
+			},
+		}
 	}
 	if c.temperature != nil {
 		bodyMap["generationConfig"] = map[string]any{

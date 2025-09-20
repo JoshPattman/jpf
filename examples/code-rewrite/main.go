@@ -55,6 +55,9 @@ func main() {
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),
 	})
+	if err != nil {
+		panic(err)
+	}
 	f2, err := os.Create(*outputFile)
 	if err != nil {
 		fmt.Println(err)

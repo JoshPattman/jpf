@@ -14,7 +14,6 @@ func TestConstructOtherModels(t *testing.T) {
 	model = NewFakeReasoningModel(model, model, WithReasoningPrompt{X: "Reason please"})
 	model = NewLoggingModel(model, NewJsonModelLogger(os.Stdout))
 	model = NewRetryModel(model, 10, WithDelay{X: time.Second})
-	NewSystemReasonModel(model, WithReasoningPrefix{X: "Resoning: "})
 }
 
 func TestCachedModel(t *testing.T) {
