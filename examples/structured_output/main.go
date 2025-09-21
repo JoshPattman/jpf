@@ -60,6 +60,8 @@ func main() {
 
 // Builds a MapFunc that answers a question with a typed struct.
 // Uses OpenAI gpt 4o, with 5 retries on API failiure.
+// IMO this is not as powerful a pattern as the building structs in the other examples,
+// but I have added this here to show that it can be simplified.
 func BuildStructuredQuerier[T any]() (jpf.MapFunc[string, T], error) {
 	var example T
 	schema, err := getSchema(example)

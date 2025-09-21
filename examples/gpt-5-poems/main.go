@@ -8,6 +8,15 @@ import (
 )
 
 func main() {
+	modelBuilder := &ModelBuilder{
+		OpenAIKey:       os.Getenv("OPENAI_KEY"),
+		OpenAIModelName: "gpt-5",
+	}
+	poemMFBuilder := &PoemMFBuilder{
+		ModelBuilder: modelBuilder,
+		SystemPrompt: "Write a poem about the topic the user asks you to.",
+	}
+
 	topic := "Dogs"
 	params := []struct {
 		verbosity jpf.Verbosity
@@ -20,7 +29,7 @@ func main() {
 
 	for _, param := range params {
 		fmt.Println("Verbosity", param.verbosity, "PPenalty", param.pPenalty)
-		poemWriter := buildPoemWriter(param.verbosity, param.pPenalty)
+		poemWriter := poemMFBuilder.Build(param.verbosity, param.pPenalty)
 		poem, usage, err := poemWriter.Call(topic)
 		fmt.Println("Used", usage)
 		if err != nil {
@@ -32,14 +41,28 @@ func main() {
 	}
 }
 
-func buildPoemWriter(verbosity jpf.Verbosity, pPenalty float64) jpf.MapFunc[string, string] {
-	model := jpf.NewOpenAIModel(
-		os.Getenv("OPENAI_KEY"),
-		"gpt-5",
+type ModelBuilder struct {
+	OpenAIKey       string
+	OpenAIModelName string
+}
+
+func (builder *ModelBuilder) Build(verbosity jpf.Verbosity, pPenalty float64) jpf.Model {
+	return jpf.NewOpenAIModel(
+		builder.OpenAIKey,
+		builder.OpenAIModelName,
 		jpf.WithVerbosity{X: verbosity},
 		jpf.WithPresencePenalty{X: pPenalty},
 	)
-	enc := jpf.NewRawStringMessageEncoder("Write a poem about the topic the user asks you to.")
+}
+
+type PoemMFBuilder struct {
+	ModelBuilder *ModelBuilder
+	SystemPrompt string
+}
+
+func (builder *PoemMFBuilder) Build(verbosity jpf.Verbosity, pPenalty float64) jpf.MapFunc[string, string] {
+	model := builder.ModelBuilder.Build(verbosity, pPenalty)
+	enc := jpf.NewRawStringMessageEncoder(builder.SystemPrompt)
 	dec := jpf.NewRawStringResponseDecoder()
 	return jpf.NewOneShotMapFunc(enc, dec, model)
 }
