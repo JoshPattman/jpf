@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/JoshPattman/jpf"
 	_ "github.com/mattn/go-sqlite3"
@@ -105,10 +106,10 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 	if useGemini {
 		model = jpf.NewGeminiModel(builder.GeminiKey, builder.GeminiModelName)
 	} else {
-		model = jpf.NewOpenAIModel(builder.OpenAIModelName, builder.OpenAIKey)
+		model = jpf.NewOpenAIModel(builder.OpenAIKey, builder.OpenAIModelName)
 	}
 	if builder.Retries > 0 {
-		model = jpf.NewRetryModel(model, builder.Retries, jpf.WithDelay{X: 1})
+		model = jpf.NewRetryModel(model, builder.Retries, jpf.WithDelay{X: time.Second})
 	}
 	if builder.Cache != nil {
 		model = jpf.NewCachedModel(model, builder.Cache)

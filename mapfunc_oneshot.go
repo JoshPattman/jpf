@@ -1,5 +1,6 @@
 package jpf
 
+// NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
 func NewOneShotMapFunc[T, U any](enc MessageEncoder[T], pars ResponseDecoder[U], model Model) MapFunc[T, U] {
 	return &oneShotMapFunc[T, U]{
 		enc:   enc,

@@ -4,7 +4,8 @@ import (
 	"errors"
 )
 
-// NewFeedbackMapFunc creates a MapFunc that adds feedback to the conversation when errors are detected.
+// NewFeedbackMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
+// However, it adds feedback to the conversation when errors are detected.
 // It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
 func NewFeedbackMapFunc[T, U any](
 	enc MessageEncoder[T],

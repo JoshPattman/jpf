@@ -8,6 +8,17 @@ jpf is a Go library for building lightweight AI-powered applications. It provide
 
 jpf is aimed at using AI as a tool - not as a chatbot (this is not to say you cannot use it to make a chatbot, however there is no framework provided for this yet). It focusses on adding AI features locally, as opposed to relying too heavily on external APIs - this makes the package particularly flexible when switching models or providers.
 
+## Table of Contents
+
+- [Table of Contents](#table-of-contents)
+- [Features](#features)
+- [Installation](#installation)
+- [License](#license)
+- [Contributing](#contributing)
+- [FAQ](#faq)
+- [Author](#author)
+- [Core Concepts](#core-concepts)
+
 ## Features
 
 - **Retry and Feedback Handling**: Resilient mechanisms for retrying tasks and incorporating feedback into interactions.
@@ -53,3 +64,183 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
 ## Author
 
 Developed by Josh Pattman. Learn more at [GitHub](https://github.com/JoshPattman/jpf).
+
+## Core Concepts
+
+- jpf aims to separate the various components of building a robust interation with an LLM for three main reasons:
+  - **Resuability**: Build up a set of components you find useful, and write less repeated code.
+  - **Flexibility**: Write code in a way that easily allows you to extend the LLM's capabilities - for example you can add cache to an LLM without changing a single line of buisness logic.
+  - **Testability**: Each component being an atomic piece of logic allows you to unit test and mock each and every piece of logic in isolation.
+- Below are the core components you will need to understand to write code with jpf:
+
+<details>
+<summary>Model</summary>
+
+- `Model`s are the core component of jpf - they wrap an LLM with some additional logic in a consistent interface.
+```go
+// Model defines an interface to an LLM.
+type Model interface {
+	// Responds to a set of input messages.
+	Respond([]Message) (ModelResponse, error)
+}
+
+type ModelResponse struct {
+	// Extra messages that are not the final response,
+	// but were used to build up the final response.
+	// For example, reasoning messages.
+	AuxilliaryMessages []Message
+	// The primary repsponse to the users query.
+	// Usually the only response that matters.
+	PrimaryMessage Message
+	// The usage of making this call.
+	// This may be the sum of multiple LLM calls.
+	Usage Usage
+}
+
+// Message defines a text message to/from an LLM.
+type Message struct {
+	Role    Role
+	Content string
+	Images  []ImageAttachment
+}
+```
+- Models are built using composition - you can produce a very powerful model by stacking up multiple less powerful models together.
+  - The power with this approach is you can abstract away a lot of the complexity from your client code, allowing it to focus primarily on buisness logic.
+
+```go
+// All model constructors in jpf return the Model interface,
+// we can re-use our variable as we build it up.
+var model jpf.Model
+
+// Switch, based on a boolean variable, if we should use Gemini or OpenAI.
+// If using Gemini, we will scale the temperature down a bit (NOT useful - just for demonstration).
+if useGemini {
+    model = jpf.NewGeminiModel(apiKey, modelName, jpf.WithTemperature{X: temperature*0.8})
+} else {
+    model = jpf.NewOpenAIModel(apiKey, modelName, jpf.WithTemperature{X: temperature})
+}
+
+// Add retrying on API fails to the model.
+// This will retry calling the child model multiple times upon an error.
+if retries > 0 {
+    model = jpf.NewRetryModel(model, retries, jpf.WithDelay{X: time.Second})
+}
+
+// Add cache to the model.
+// This will skip calling out to the model if the same messages are requested a second time.
+if cache != nil {
+    model = jpf.NewCachedModel(model, cache)
+}
+
+// We now have a model that may/may not be gemini / openai, with retrying and cache.
+// However, the client code does not need to know about any of this - to it we are still just calling a model!
+```
+
+</details>
+
+<details>
+<summary>Message Encoder</summary>
+
+- A `MessageEncoder` provides an interface to take a specific typed object and produce some messages for the LLM.
+  - It does not actually make a call to the `Model`, and it does not decode the response.
+
+```go
+// MessageEncoder encodes a structured piece of data into a set of messages for an LLM.
+type MessageEncoder[T any] interface {
+	BuildInputMessages(T) ([]Message, error)
+}
+```
+
+- For more complex tasks, you may choose to implement this yourself, however there are some useful encoders built in (or use a combination of both):
+  
+```go
+// NewRawStringMessageEncoder creates a MessageEncoder that encodes a system prompt and user input as raw string messages.
+func NewRawStringMessageEncoder(systemPrompt string) MessageEncoder[string] {...}
+
+// NewTemplateMessageEncoder creates a MessageEncoder that uses Go's text/template for formatting messages.
+// It accepts templates for both system and user messages, allowing dynamic content insertion.
+func NewTemplateMessageEncoder[T any](systemTemplate, userTemplate string) MessageEncoder[T] {...}
+
+// Create a new message encoder that appends the results of running each message encoder sequentially.
+// Useful, for example, to have a templating system / user message encoder, and a custom agent history message encoder after.
+func NewSequentialMessageEncoder[T any](msgEncs ...MessageEncoder[T]) MessageEncoder[T] {...}
+```
+
+</details>
+
+<details>
+<summary>Response Decoder</summary>
+
+- A `ResponseDecoder` parses the output of an LLM into structured data.
+- As with message encoders, they do not make any LLM calls.
+```go
+// ResponseDecoder converts an LLM response into a structured piece of data.
+// When the LLM response is invalid, it should return ErrInvalidResponse (or an error joined on that).
+type ResponseDecoder[T any] interface {
+	ParseResponseText(string) (T, error)
+}
+```
+- You may choose to implement your own response decoder, however in my experience a json object is usually sufficient output.
+- When an error in response format is detected, the response decoder must return an error that, at some point in its chain, is an `ErrInvalidResponse` (this will be explained in the Map Func section).
+- There are some pre-defined response decoders inculded with jpf:
+```go
+// NewRawStringResponseDecoder creates a ResponseDecoder that returns the response as a raw string without modification.
+func NewRawStringResponseDecoder() ResponseDecoder[string] {...}
+
+// NewJsonResponseDecoder creates a ResponseDecoder that tries to parse a json object from the response.
+// It can ONLY parse json objects with an OBJECT as top level (i.e. it cannot parse a list directly).
+func NewJsonResponseDecoder[T any]() ResponseDecoder[T] {...}
+
+// Wrap an existing response decoder with one that takes only the part of interest of the response into account.
+// The part of interest is determined by the substring function.
+// If an error is detected when getting the substring, ErrInvalidResponse is raised.
+func NewSubstringResponseDecoder[T any](decoder ResponseDecoder[T], substring func(string) (string, error)) ResponseDecoder[T] {...}
+
+// Creates a response decoder that wraps the provided one,
+// but then performs an extra validation step on the parsed response.
+// If an error is found during validation, the error is wrapped with ErrInvalidResponse and returned.
+func NewValidatingResponseDecoder[T any](decoder ResponseDecoder[T], validate func(T) error) ResponseDecoder[T] {...}
+```
+
+</details>
+
+<details>
+<summary>Map Func</summary>
+
+- A `MapFunc` is a collection of a `MessageEncoder`, `ResponseDecoder`, `Model`, and some additional logic.
+- Your buisness logic should only ever be interacting with LLMs though a Map Func.
+- It is a very generic interface, but it is intended to only ever be used for LLM-based functionality.
+```go
+// MapFunc transforms input of type T into output of type U using an LLM.
+// It handles the encoding of input, interaction with the LLM, and decoding of output.
+type MapFunc[T, U any] interface {
+	Call(T) (U, Usage, error)
+}
+```
+
+- It is not really expected that users will implement their own Map Funcs, but that is absolutely possible.
+- jpf ships with two built-in Map Funcs:
+
+```go
+// NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
+func NewOneShotMapFunc[T, U any](enc MessageEncoder[T], pars ResponseDecoder[U], model Model) MapFunc[T, U] {...}
+
+// NewFeedbackMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
+// However, it adds feedback to the conversation when errors are detected.
+// It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
+func NewFeedbackMapFunc[T, U any](
+	enc MessageEncoder[T],
+	pars ResponseDecoder[U],
+	fed FeedbackGenerator,
+	model Model,
+	feedbackRole Role,
+	maxRetries int,
+) MapFunc[T, U] {...}
+```
+
+- Notice in the above, we have introduced a second place for retries to occur - this is intentional.
+  - API-level errors should be retried at the `Model` level - these are errors that are not the fault of the LLM.
+  - LLM response errors should be retried at the `MapFunc` level - these are errors where the LLM has responded with an invalid response, and we would like to tell it what it did wrong and ask again.
+- However, if you choose not to use these higher-level retries, you can simply use the one-shot map func.
+
+</details>
