@@ -63,6 +63,38 @@ var MFCases = []TestCase{
 		Input:    "ping",
 		Expected: TestStruct{A: 5},
 	},
+	MFCase[string, TestStruct]{
+		ID: "fallback/nominal",
+		Build: func() MapFunc[string, TestStruct] {
+			enc := NewRawStringMessageEncoder("")
+			dec := NewJsonResponseDecoder[TestStruct]()
+			model1 := &TestingModel{Responses: map[string][]string{
+				"ping": {"pong"},
+			}}
+			model2 := &TestingModel{Responses: map[string][]string{
+				"ping": {`{"a":5}`},
+			}}
+			return NewModelFallbackOneShotMapFunc(enc, dec, model1, model2)
+		},
+		Input:    "ping",
+		Expected: TestStruct{A: 5},
+	},
+	MFCase[string, TestStruct]{
+		ID: "fallback/fail",
+		Build: func() MapFunc[string, TestStruct] {
+			enc := NewRawStringMessageEncoder("")
+			dec := NewJsonResponseDecoder[TestStruct]()
+			model1 := &TestingModel{Responses: map[string][]string{
+				"ping": {"pong"},
+			}}
+			model2 := &TestingModel{Responses: map[string][]string{
+				"ping": {`{"a":"x"}`},
+			}}
+			return NewModelFallbackOneShotMapFunc(enc, dec, model1, model2)
+		},
+		Input:         "ping",
+		ExpectedError: true,
+	},
 }
 
 func TestMapFunc(t *testing.T) {

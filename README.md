@@ -236,6 +236,16 @@ func NewFeedbackMapFunc[T, U any](
 	feedbackRole Role,
 	maxRetries int,
 ) MapFunc[T, U] {...}
+
+// Creates a map func that first tries to ask the first model,
+// and if that produces an invalid format will try to ask the next models
+// until a valid format is found.
+// This is useful, for example, to try a second time with a model that overwrites the cache.
+func NewModelFallbackOneShotMapFunc[T, U any](
+	enc MessageEncoder[T],
+	dec ResponseDecoder[U],
+	models ...Model,
+) MapFunc[T, U] {...}
 ```
 
 - Notice in the above, we have introduced a second place for retries to occur - this is intentional.
