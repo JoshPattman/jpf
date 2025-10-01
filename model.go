@@ -92,6 +92,7 @@ type WithSystemAs struct {
 	X                Role
 	TransformContent func(string) string
 }
+type WithSalt struct{ X string }
 
 type WithReasoningAs struct {
 	X                Role

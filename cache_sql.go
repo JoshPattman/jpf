@@ -26,8 +26,8 @@ type sqlModelCachePayload struct {
 	Aux []Message
 }
 
-func (cache *sqlCache) GetCachedResponse(msgs []Message) (bool, []Message, Message, error) {
-	h := HashMessages(msgs)
+func (cache *sqlCache) GetCachedResponse(salt string, msgs []Message) (bool, []Message, Message, error) {
+	h := HashMessages(salt, msgs)
 	row := cache.db.QueryRow(`SELECT resp FROM model_cache WHERE hash=?;`, h)
 	blob := []byte{}
 	err := row.Scan(&blob)
@@ -47,8 +47,8 @@ func (cache *sqlCache) GetCachedResponse(msgs []Message) (bool, []Message, Messa
 	return true, outputs[:len(outputs)-1], outputs[len(outputs)-1], nil
 }
 
-func (cache *sqlCache) SetCachedResponse(inputs []Message, aux []Message, out Message) error {
-	h := HashMessages(inputs)
+func (cache *sqlCache) SetCachedResponse(salt string, inputs []Message, aux []Message, out Message) error {
+	h := HashMessages(salt, inputs)
 	blob := bytes.NewBuffer(nil)
 	err := gob.NewEncoder(blob).Encode(append(aux, out))
 	if err != nil {

@@ -7,14 +7,15 @@ import (
 )
 
 type ModelResponseCache interface {
-	GetCachedResponse([]Message) (bool, []Message, Message, error)
-	SetCachedResponse(inputs []Message, aux []Message, out Message) error
+	GetCachedResponse(salt string, inputs []Message) (bool, []Message, Message, error)
+	SetCachedResponse(salt string, inputs []Message, aux []Message, out Message) error
 }
 
-func HashMessages(msgs []Message) string {
+func HashMessages(salt string, inputs []Message) string {
 	s := &strings.Builder{}
+	s.WriteString(salt)
 	s.WriteString("Messages")
-	for _, msg := range msgs {
+	for _, msg := range inputs {
 		s.WriteString(msg.Role.String())
 		s.WriteString(msg.Content)
 		for _, img := range msg.Images {
