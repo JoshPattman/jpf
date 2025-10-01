@@ -18,8 +18,8 @@ type inMemoryCache struct {
 }
 
 // GetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) GetCachedResponse(msgs []Message) (bool, []Message, Message, error) {
-	msgsHash := HashMessages(msgs)
+func (i *inMemoryCache) GetCachedResponse(salt string, msgs []Message) (bool, []Message, Message, error) {
+	msgsHash := HashMessages(salt, msgs)
 	if cp, ok := i.resps[msgsHash]; ok {
 		return true, cp.aux, cp.final, nil
 	}
@@ -27,8 +27,8 @@ func (i *inMemoryCache) GetCachedResponse(msgs []Message) (bool, []Message, Mess
 }
 
 // SetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) SetCachedResponse(inputs []Message, aux []Message, out Message) error {
-	msgsHash := HashMessages(inputs)
+func (i *inMemoryCache) SetCachedResponse(salt string, inputs []Message, aux []Message, out Message) error {
+	msgsHash := HashMessages(salt, inputs)
 	i.resps[msgsHash] = memoryCachePacket{
 		aux:   aux,
 		final: out,
