@@ -2,7 +2,7 @@ package jpf
 
 // NewCachedModel wraps a Model with response caching functionality.
 // It stores responses in the provided ModelResponseCache implementation,
-// returning cached results for identical input messages to avoid redundant model calls.
+// returning cached results for identical input messages and salts to avoid redundant model calls.
 func NewCachedModel(model Model, cache ModelResponseCache, opts ...CachedModelOpt) Model {
 	m := &cachedModel{
 		model: model,
