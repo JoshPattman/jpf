@@ -113,7 +113,7 @@ func (m *openAIModel) messagesToOpenAI(msgs []Message) (any, error) {
 			}
 			content = cont
 		}
-		oaiRole, err := roleToOpenAI(msg.Role)
+		oaiRole, err := roleToOpenAI(role)
 		if err != nil {
 			return nil, err
 		}
