@@ -29,7 +29,8 @@ jpf is aimed at using AI as a tool - not as a chatbot (this is not to say you ca
 - **Customizable Models**: Seamlessly integrate LLMs, including reasoning chains and hybrid models.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
 - **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.
-- **Out-of-the-box Logging**: Simply add logging messages to your models, helping yuo track down issues.
+- **Out-of-the-box Logging**: Simply add logging messages to your models, helping you track down issues.
+- **Industry Standard Context Management**: All potentially slow interfaces support Go's context.Context for timeouts and cancellation.
 
 ## Installation
 
@@ -85,7 +86,7 @@ Developed by Josh Pattman. Learn more at [GitHub](https://github.com/JoshPattman
 // Model defines an interface to an LLM.
 type Model interface {
 	// Responds to a set of input messages.
-	Respond([]Message) (ModelResponse, error)
+	Respond(ctx context.Context, messages []Message) (ModelResponse, error)
 }
 
 type ModelResponse struct {
@@ -218,7 +219,7 @@ func NewValidatingResponseDecoder[T any](decoder ResponseDecoder[T], validate fu
 // MapFunc transforms input of type T into output of type U using an LLM.
 // It handles the encoding of input, interaction with the LLM, and decoding of output.
 type MapFunc[T, U any] interface {
-	Call(T) (U, Usage, error)
+	Call(ctx context.Context, input T) (U, Usage, error)
 }
 ```
 
