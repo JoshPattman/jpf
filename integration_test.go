@@ -3,8 +3,10 @@
 package jpf
 
 import (
+	"context"
 	"os"
 	"testing"
+	"time"
 )
 
 func TestHelloModels(t *testing.T) {
@@ -22,17 +24,19 @@ func TestHelloModels(t *testing.T) {
 		NewOpenAIModel(oaiKey, "gpt-5", WithVerbosity{HighVerbosity}),
 	}
 	for _, model := range models {
-		testHelloModel(t, model)
+		testHelloModel(t, NewTimeoutModel(model, time.Minute))
 	}
 }
 
 func testHelloModel(t *testing.T, model Model) {
-	resp, err := model.Respond([]Message{
-		{
-			Role:    UserRole,
-			Content: "Hello there!",
-		},
-	})
+	resp, err := model.Respond(
+		context.Background(),
+		[]Message{
+			{
+				Role:    UserRole,
+				Content: "Hello there!",
+			},
+		})
 	if err != nil {
 		t.Fatal(err)
 	}
