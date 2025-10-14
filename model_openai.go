@@ -2,11 +2,13 @@ package jpf
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // NewOpenAIModel creates a Model that uses the OpenAI API.
@@ -47,6 +49,8 @@ func (o WithReasoningAs) applyOpenAIModel(m *openAIModel) {
 	m.reasoningTransform = o.TransformContent
 }
 
+func (o WithTimeout) applyOpenAIModel(m *openAIModel) { m.timeout = o.X }
+
 type openAIModel struct {
 	key                string
 	model              string
@@ -62,6 +66,7 @@ type openAIModel struct {
 	jsonSchema         map[string]any
 	reasoningRole      Role
 	reasoningTransform func(string) string
+	timeout            time.Duration
 }
 
 func roleToOpenAI(role Role) (string, error) {
@@ -211,6 +216,13 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	for k, v := range c.extraHeaders {
 		req.Header.Add(k, v)
 	}
+
+	if c.timeout > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
+	}
+
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return failedResp, wrap(err, "could not execute request")

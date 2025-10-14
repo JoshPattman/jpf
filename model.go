@@ -72,6 +72,7 @@ const (
 	HighVerbosity
 )
 
+type WithTimeout struct{ X time.Duration }
 type WithMessagePrefix struct{ X string }
 type WithDelay struct{ X time.Duration }
 type WithTemperature struct{ X float64 }
