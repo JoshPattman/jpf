@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -30,7 +31,7 @@ func main() {
 	for _, param := range params {
 		fmt.Println("Verbosity", param.verbosity, "PPenalty", param.pPenalty)
 		poemWriter := poemMFBuilder.Build(param.verbosity, param.pPenalty)
-		poem, usage, err := poemWriter.Call(topic)
+		poem, usage, err := poemWriter.Call(context.Background(), topic)
 		fmt.Println("Used", usage)
 		if err != nil {
 			fmt.Println(err)
