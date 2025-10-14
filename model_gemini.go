@@ -2,11 +2,13 @@ package jpf
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 )
 
 // NewGeminiModel creates a Model that uses the Google Gemini API.
@@ -34,6 +36,7 @@ func (o WithVerbosity) applyGeminiModel(m *geminiModel)       { m.verbosity = &o
 func (o WithHTTPHeader) applyGeminiModel(m *geminiModel)      { m.extraHeaders[o.K] = o.V }
 func (o WithMaxOutputTokens) applyGeminiModel(m *geminiModel) { m.maxOutput = o.X }
 func (o WithURL) applyGeminiModel(m *geminiModel)             { m.url = o.X }
+func (o WithTimeout) applyGeminiModel(m *geminiModel)         { m.timeout = o.X }
 
 type geminiModel struct {
 	key                string
@@ -48,6 +51,7 @@ type geminiModel struct {
 	reasoningTransform func(string) string
 	systemRole         Role
 	systemTransform    func(string) string
+	timeout            time.Duration
 }
 
 func roleToGemini(role Role) (string, error) {
@@ -170,6 +174,12 @@ func (c *geminiModel) Respond(msgs []Message) (ModelResponse, error) {
 	req.Header.Add("Content-Type", "application/json")
 	for k, v := range c.extraHeaders {
 		req.Header.Add(k, v)
+	}
+
+	if c.timeout > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
+		defer cancel()
+		req = req.WithContext(ctx)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
