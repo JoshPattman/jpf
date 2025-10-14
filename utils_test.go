@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 )
 
 type TestCase interface {
@@ -58,4 +59,27 @@ func (t *TestingModel) Respond(ctx context.Context, msgs []Message) (ModelRespon
 
 func (t *TestingModel) Tokens() (int, int) {
 	return 100, 100
+}
+
+var _ Model = &SlowTestingModel{}
+
+// SlowTestingModel is a testing model that simulates slow operations and respects context cancellation
+type SlowTestingModel struct {
+	Delay    time.Duration
+	Response ModelResponse
+}
+
+func (s *SlowTestingModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
+	// Use a timer that respects context cancellation
+	timer := time.NewTimer(s.Delay)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		// Delay completed, return response
+		return s.Response, nil
+	case <-ctx.Done():
+		// Context cancelled or timed out
+		return ModelResponse{}, ctx.Err()
+	}
 }
