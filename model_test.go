@@ -13,7 +13,7 @@ func TestConstructOtherModels(t *testing.T) {
 	model = NewConcurrentLimitedModel(model, NewOneConcurrentLimiter())
 	model = NewFakeReasoningModel(model, model, WithReasoningPrompt{X: "Reason please"})
 	model = NewLoggingModel(model, NewJsonModelLogger(os.Stdout))
-	model = NewRetryModel(model, 10, WithDelay{X: time.Second})
+	NewRetryModel(model, 10, WithDelay{X: time.Second})
 }
 
 func TestCachedModel(t *testing.T) {
