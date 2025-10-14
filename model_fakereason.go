@@ -1,5 +1,7 @@
 package jpf
 
+import "context"
+
 // NewFakeReasoningModel creates a model that uses two underlying models to simulate reasoning.
 // It first calls the reasoner model to generate reasoning about the input messages,
 // then passes that reasoning along with the original messages to the answerer model.
@@ -38,15 +40,15 @@ type fakeReasoningModel struct {
 }
 
 // Respond implements Model.
-func (f *fakeReasoningModel) Respond(msgs []Message) (ModelResponse, error) {
-	reasoningResp, err := f.reasoner.Respond(append([]Message{{Role: SystemRole, Content: f.reasoningPrompt}}, msgs...))
+func (f *fakeReasoningModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
+	reasoningResp, err := f.reasoner.Respond(ctx, append([]Message{{Role: SystemRole, Content: f.reasoningPrompt}}, msgs...))
 	if err != nil {
 		return reasoningResp.OnlyUsage(), wrap(err, "failed to call reasoning model")
 	}
 	reasoningMessage := reasoningResp.PrimaryMessage
 	reasoningMessage.Role = ReasoningRole
 	msgsWithReasoning := append(msgs, reasoningMessage)
-	finalResp, err := f.answerer.Respond(msgsWithReasoning)
+	finalResp, err := f.answerer.Respond(ctx, msgsWithReasoning)
 	finalResp = finalResp.IncludingUsage(reasoningResp.Usage)
 	if err != nil {
 		return finalResp.OnlyUsage(), wrap(err, "failed to call final response model")

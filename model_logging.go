@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"time"
 )
 
@@ -20,9 +21,9 @@ type loggingModel struct {
 }
 
 // Respond implements Model.
-func (l *loggingModel) Respond(msgs []Message) (ModelResponse, error) {
+func (l *loggingModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
 	tStart := time.Now()
-	resp, err := l.model.Respond(msgs)
+	resp, err := l.model.Respond(ctx, msgs)
 	dur := time.Since(tStart)
 	lmp := ModelLoggingInfo{
 		Messages:             msgs,

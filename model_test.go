@@ -2,6 +2,7 @@ package jpf
 
 import (
 	"bytes"
+	"context"
 	"math"
 	"os"
 	"testing"
@@ -23,7 +24,7 @@ func TestCachedModel(t *testing.T) {
 	}}
 	model = NewCachedModel(model, NewInMemoryCache())
 	for i := range 5 {
-		resp1, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp1, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +41,7 @@ func TestLoggingModel(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	model = NewLoggingModel(model, NewJsonModelLogger(buf))
 	for range 3 {
-		_, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,7 +64,7 @@ func TestRetryModel(t *testing.T) {
 		NFails: 3,
 	}
 	model = NewRetryModel(model, 3)
-	resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+	resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +108,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +132,7 @@ func TestRetryChainModel(t *testing.T) {
 				NFails:    1,
 			},
 		})
-		_, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err == nil {
 			t.Fatal("expected error but got none")
 		}
@@ -152,7 +153,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}

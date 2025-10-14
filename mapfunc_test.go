@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -18,7 +19,7 @@ func (testCase MFCase[T, U]) Name() string { return testCase.ID }
 
 func (testCase MFCase[T, U]) Test() error {
 	mf := testCase.Build()
-	result, _, err := mf.Call(testCase.Input)
+	result, _, err := mf.Call(context.Background(), testCase.Input)
 	if testCase.ExpectedError {
 		if err == nil {
 			return errors.New("expected an error but got none")

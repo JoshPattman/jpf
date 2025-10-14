@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 )
 
 // NewOpenAIModel creates a Model that uses the OpenAI API.
@@ -49,8 +48,6 @@ func (o WithReasoningAs) applyOpenAIModel(m *openAIModel) {
 	m.reasoningTransform = o.TransformContent
 }
 
-func (o WithTimeout) applyOpenAIModel(m *openAIModel) { m.timeout = o.X }
-
 type openAIModel struct {
 	key                string
 	model              string
@@ -66,7 +63,6 @@ type openAIModel struct {
 	jsonSchema         map[string]any
 	reasoningRole      Role
 	reasoningTransform func(string) string
-	timeout            time.Duration
 }
 
 func roleToOpenAI(role Role) (string, error) {
@@ -168,7 +164,7 @@ func jsonSchemaToOpenAI(schema map[string]any) map[string]any {
 	}
 }
 
-func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
+func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
 	failedUsage := Usage{FailedCalls: 1}
 	failedResp := ModelResponse{Usage: failedUsage}
 	openAIMsgs, err := c.messagesToOpenAI(msgs)
@@ -216,12 +212,7 @@ func (c *openAIModel) Respond(msgs []Message) (ModelResponse, error) {
 	for k, v := range c.extraHeaders {
 		req.Header.Add(k, v)
 	}
-
-	if c.timeout > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), c.timeout)
-		defer cancel()
-		req = req.WithContext(ctx)
-	}
+	req = req.WithContext(ctx)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {

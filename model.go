@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"slices"
 	"time"
 )
@@ -52,7 +53,7 @@ func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
 // Model defines an interface to an LLM.
 type Model interface {
 	// Responds to a set of input messages.
-	Respond([]Message) (ModelResponse, error)
+	Respond(context.Context, []Message) (ModelResponse, error)
 }
 
 // ReasoningEffort defines how hard a reasoning model should think.
@@ -72,7 +73,6 @@ const (
 	HighVerbosity
 )
 
-type WithTimeout struct{ X time.Duration }
 type WithMessagePrefix struct{ X string }
 type WithDelay struct{ X time.Duration }
 type WithTemperature struct{ X float64 }

@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"testing"
@@ -27,12 +28,14 @@ type TestStruct struct {
 	B string `json:"b"`
 }
 
+var _ Model = &TestingModel{}
+
 type TestingModel struct {
 	Responses map[string][]string
 	NFails    int
 }
 
-func (t *TestingModel) Respond(msgs []Message) (ModelResponse, error) {
+func (t *TestingModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
 	if t.NFails > 0 {
 		t.NFails--
 		return ModelResponse{}, errors.New("deliberate fail")

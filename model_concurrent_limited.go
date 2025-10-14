@@ -1,5 +1,7 @@
 package jpf
 
+import "context"
+
 // NewConcurrentLimitedModel wraps a Model with concurrency control.
 // It ensures that only a limited number of concurrent calls can be made to the underlying model,
 // using the provided ConcurrentLimiter to manage access.
@@ -29,8 +31,8 @@ type concurrentLimitedModel struct {
 	uses  ConcurrentLimiter
 }
 
-func (c *concurrentLimitedModel) Respond(messages []Message) (ModelResponse, error) {
+func (c *concurrentLimitedModel) Respond(ctx context.Context, messages []Message) (ModelResponse, error) {
 	c.uses <- struct{}{}
 	defer func() { <-c.uses }()
-	return c.model.Respond(messages)
+	return c.model.Respond(ctx, messages)
 }
