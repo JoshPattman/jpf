@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"errors"
 	"slices"
 )
@@ -27,11 +28,11 @@ type modelFallbackOneShotMapFunc[T, U any] struct {
 	models []Model
 }
 
-func (m *modelFallbackOneShotMapFunc[T, U]) Call(input T) (U, Usage, error) {
+func (m *modelFallbackOneShotMapFunc[T, U]) Call(ctx context.Context, input T) (U, Usage, error) {
 	totalUsage := Usage{}
 	errs := make([]error, 0)
 	for _, model := range m.models {
-		result, usage, err := m.callOne(input, model)
+		result, usage, err := m.callOne(ctx, input, model)
 		totalUsage = totalUsage.Add(usage)
 		if err == nil {
 			return result, totalUsage, nil
@@ -43,13 +44,13 @@ func (m *modelFallbackOneShotMapFunc[T, U]) Call(input T) (U, Usage, error) {
 	return zero, totalUsage, errors.Join(errs...)
 }
 
-func (mf *modelFallbackOneShotMapFunc[T, U]) callOne(t T, model Model) (U, Usage, error) {
+func (mf *modelFallbackOneShotMapFunc[T, U]) callOne(ctx context.Context, t T, model Model) (U, Usage, error) {
 	var zero U
 	msgs, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
 		return zero, Usage{}, wrap(err, "failed to build input messages")
 	}
-	resp, err := model.Respond(msgs)
+	resp, err := model.Respond(ctx, msgs)
 	if err != nil {
 		return zero, resp.Usage, wrap(err, "failed to get model response")
 	}

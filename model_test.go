@@ -2,6 +2,7 @@ package jpf
 
 import (
 	"bytes"
+	"context"
 	"math"
 	"os"
 	"testing"
@@ -23,7 +24,7 @@ func TestCachedModel(t *testing.T) {
 	}}
 	model = NewCachedModel(model, NewInMemoryCache())
 	for i := range 5 {
-		resp1, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp1, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -40,7 +41,7 @@ func TestLoggingModel(t *testing.T) {
 	buf := bytes.NewBuffer(nil)
 	model = NewLoggingModel(model, NewJsonModelLogger(buf))
 	for range 3 {
-		_, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -63,7 +64,7 @@ func TestRetryModel(t *testing.T) {
 		NFails: 3,
 	}
 	model = NewRetryModel(model, 3)
-	resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+	resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +87,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +108,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -131,7 +132,7 @@ func TestRetryChainModel(t *testing.T) {
 				NFails:    1,
 			},
 		})
-		_, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err == nil {
 			t.Fatal("expected error but got none")
 		}
@@ -152,12 +153,96 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond([]Message{{Role: SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if resp.PrimaryMessage.Content != "third response" {
 			t.Fatalf("expected 'third response' but got '%v'", resp.PrimaryMessage.Content)
+		}
+	})
+}
+
+func TestTimeoutModel(t *testing.T) {
+	t.Run("timeout triggers on slow model", func(t *testing.T) {
+		// Create a slow model that takes 200ms
+		slowModel := &SlowTestingModel{
+			Delay: 200 * time.Millisecond,
+			Response: ModelResponse{
+				PrimaryMessage: Message{Role: AssistantRole, Content: "response"},
+			},
+		}
+
+		// Wrap with 50ms timeout
+		model := NewTimeoutModel(slowModel, 50*time.Millisecond)
+
+		start := time.Now()
+		_, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
+		elapsed := time.Since(start)
+
+		// Should fail with context deadline exceeded
+		if err == nil {
+			t.Fatal("expected timeout error but got none")
+		}
+		if !contains(err.Error(), "context deadline exceeded") {
+			t.Fatalf("expected 'context deadline exceeded' error, got: %v", err)
+		}
+
+		// Should have timed out around 50ms, not 200ms
+		if elapsed > 100*time.Millisecond {
+			t.Fatalf("timeout took too long: %v (expected ~50ms)", elapsed)
+		}
+	})
+
+	t.Run("succeeds when operation is fast enough", func(t *testing.T) {
+		// Create a fast model that takes 10ms
+		fastModel := &SlowTestingModel{
+			Delay: 10 * time.Millisecond,
+			Response: ModelResponse{
+				PrimaryMessage: Message{Role: AssistantRole, Content: "fast response"},
+			},
+		}
+
+		// Wrap with 100ms timeout (plenty of time)
+		model := NewTimeoutModel(fastModel, 100*time.Millisecond)
+
+		resp, err := model.Respond(context.Background(), []Message{{Role: SystemRole, Content: "hello"}})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if resp.PrimaryMessage.Content != "fast response" {
+			t.Fatalf("expected 'fast response' but got '%v'", resp.PrimaryMessage.Content)
+		}
+	})
+
+	t.Run("parent context timeout takes precedence when shorter", func(t *testing.T) {
+		// Create a slow model
+		slowModel := &SlowTestingModel{
+			Delay: 200 * time.Millisecond,
+			Response: ModelResponse{
+				PrimaryMessage: Message{Role: AssistantRole, Content: "response"},
+			},
+		}
+
+		// Model configured with 100ms timeout
+		model := NewTimeoutModel(slowModel, 100*time.Millisecond)
+
+		// But parent context has 30ms timeout (shorter)
+		parentCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+		defer cancel()
+
+		start := time.Now()
+		_, err := model.Respond(parentCtx, []Message{{Role: SystemRole, Content: "hello"}})
+		elapsed := time.Since(start)
+
+		// Should fail with context deadline exceeded
+		if err == nil {
+			t.Fatal("expected timeout error but got none")
+		}
+
+		// Should have timed out around 30ms (parent timeout), not 100ms
+		if elapsed > 60*time.Millisecond {
+			t.Fatalf("timeout took too long: %v (expected ~30ms from parent)", elapsed)
 		}
 	})
 }

@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"sync"
 )
 
@@ -49,8 +50,8 @@ type usageCountingModel struct {
 	model   Model
 }
 
-func (c *usageCountingModel) Respond(messages []Message) (ModelResponse, error) {
-	resp, err := c.model.Respond(messages)
+func (c *usageCountingModel) Respond(ctx context.Context, messages []Message) (ModelResponse, error) {
+	resp, err := c.model.Respond(ctx, messages)
 	c.counter.Add(resp.Usage)
 	return resp, err
 }

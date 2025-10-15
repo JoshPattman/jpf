@@ -2,16 +2,17 @@ package jpf
 
 import (
 	"bytes"
+	"context"
 	"database/sql"
 	"encoding/gob"
 	"errors"
 )
 
-func NewSQLCache(db *sql.DB) (ModelResponseCache, error) {
+func NewSQLCache(ctx context.Context, db *sql.DB) (ModelResponseCache, error) {
 	c := &sqlCache{
 		db: db,
 	}
-	err := c.setupDB()
+	err := c.setupDB(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -22,13 +23,9 @@ type sqlCache struct {
 	db *sql.DB
 }
 
-type sqlModelCachePayload struct {
-	Aux []Message
-}
-
-func (cache *sqlCache) GetCachedResponse(salt string, msgs []Message) (bool, []Message, Message, error) {
+func (cache *sqlCache) GetCachedResponse(ctx context.Context, salt string, msgs []Message) (bool, []Message, Message, error) {
 	h := HashMessages(salt, msgs)
-	row := cache.db.QueryRow(`SELECT resp FROM model_cache WHERE hash=?;`, h)
+	row := cache.db.QueryRowContext(ctx, `SELECT resp FROM model_cache WHERE hash=?;`, h)
 	blob := []byte{}
 	err := row.Scan(&blob)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -47,27 +44,27 @@ func (cache *sqlCache) GetCachedResponse(salt string, msgs []Message) (bool, []M
 	return true, outputs[:len(outputs)-1], outputs[len(outputs)-1], nil
 }
 
-func (cache *sqlCache) SetCachedResponse(salt string, inputs []Message, aux []Message, out Message) error {
+func (cache *sqlCache) SetCachedResponse(ctx context.Context, salt string, inputs []Message, aux []Message, out Message) error {
 	h := HashMessages(salt, inputs)
 	blob := bytes.NewBuffer(nil)
 	err := gob.NewEncoder(blob).Encode(append(aux, out))
 	if err != nil {
 		return wrap(err, "failed to encode messages to binary data")
 	}
-	_, err = cache.db.Exec(`INSERT INTO model_cache (hash, resp) VALUES (?, ?) ON CONFLICT(hash) DO UPDATE SET resp = excluded.resp;`, h, blob.Bytes())
+	_, err = cache.db.ExecContext(ctx, `INSERT INTO model_cache (hash, resp) VALUES (?, ?) ON CONFLICT(hash) DO UPDATE SET resp = excluded.resp;`, h, blob.Bytes())
 	if err != nil {
 		return wrap(err, "failed to execute database insert")
 	}
 	return nil
 }
 
-func (cache *sqlCache) setupDB() error {
+func (cache *sqlCache) setupDB(ctx context.Context) error {
 	query := `
 	CREATE TABLE IF NOT EXISTS model_cache (
 		hash TEXT PRIMARY KEY,
 		resp BLOB NOT NULL
 	);`
-	_, err := cache.db.Exec(query)
+	_, err := cache.db.ExecContext(ctx, query)
 	if err != nil {
 		return wrap(err, "failed to create model cache table")
 	}

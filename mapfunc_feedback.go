@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"errors"
 )
 
@@ -34,7 +35,7 @@ type feedbackMapFunc[T, U any] struct {
 	maxRetries   int
 }
 
-func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
+func (mf *feedbackMapFunc[T, U]) Call(ctx context.Context, t T) (U, Usage, error) {
 	var u U
 	history, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
@@ -43,7 +44,7 @@ func (mf *feedbackMapFunc[T, U]) Call(t T) (U, Usage, error) {
 	totalUsage := Usage{}
 	var lastErr error
 	for range mf.maxRetries + 1 {
-		resp, err := mf.model.Respond(history)
+		resp, err := mf.model.Respond(ctx, history)
 		totalUsage = totalUsage.Add(resp.Usage)
 		if err != nil {
 			return u, totalUsage, wrap(err, "failed to get model response")

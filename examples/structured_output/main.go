@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,7 +34,7 @@ func main() {
 		"Who is the president of the US?",
 	}
 	for _, q := range questions {
-		person, _, err := personQ.Call(q)
+		person, _, err := personQ.Call(context.Background(), q)
 		if err != nil {
 			panic(err)
 		}
@@ -50,7 +51,7 @@ func main() {
 		"What is the fastest bird?",
 	}
 	for _, q := range questions {
-		animal, _, err := animalQ.Call(q)
+		animal, _, err := animalQ.Call(context.Background(), q)
 		if err != nil {
 			panic(err)
 		}

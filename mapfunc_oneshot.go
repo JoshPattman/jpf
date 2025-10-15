@@ -1,5 +1,7 @@
 package jpf
 
+import "context"
+
 // NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
 func NewOneShotMapFunc[T, U any](
 	enc MessageEncoder[T],
@@ -19,13 +21,13 @@ type oneShotMapFunc[T, U any] struct {
 	model Model
 }
 
-func (mf *oneShotMapFunc[T, U]) Call(t T) (U, Usage, error) {
+func (mf *oneShotMapFunc[T, U]) Call(ctx context.Context, t T) (U, Usage, error) {
 	var zero U
 	msgs, err := mf.enc.BuildInputMessages(t)
 	if err != nil {
 		return zero, Usage{}, wrap(err, "failed to build input messages")
 	}
-	resp, err := mf.model.Respond(msgs)
+	resp, err := mf.model.Respond(ctx, msgs)
 	if err != nil {
 		return zero, resp.Usage, wrap(err, "failed to get model response")
 	}

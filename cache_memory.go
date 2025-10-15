@@ -1,5 +1,7 @@
 package jpf
 
+import "context"
+
 // NewInMemoryCache creates an in-memory implementation of ModelResponseCache.
 // It stores model responses in memory using a hash of the input messages as a key.
 func NewInMemoryCache() ModelResponseCache {
@@ -18,7 +20,7 @@ type inMemoryCache struct {
 }
 
 // GetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) GetCachedResponse(salt string, msgs []Message) (bool, []Message, Message, error) {
+func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []Message) (bool, []Message, Message, error) {
 	msgsHash := HashMessages(salt, msgs)
 	if cp, ok := i.resps[msgsHash]; ok {
 		return true, cp.aux, cp.final, nil
@@ -27,7 +29,7 @@ func (i *inMemoryCache) GetCachedResponse(salt string, msgs []Message) (bool, []
 }
 
 // SetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) SetCachedResponse(salt string, inputs []Message, aux []Message, out Message) error {
+func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []Message, aux []Message, out Message) error {
 	msgsHash := HashMessages(salt, inputs)
 	i.resps[msgsHash] = memoryCachePacket{
 		aux:   aux,

@@ -1,6 +1,7 @@
 package jpf
 
 import (
+	"context"
 	"time"
 )
 
@@ -31,12 +32,12 @@ type retryModel struct {
 	delay   time.Duration
 }
 
-func (m *retryModel) Respond(msgs []Message) (ModelResponse, error) {
+func (m *retryModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
 	var totalUsageSoFar Usage
 	var err error
 	for range m.retries + 1 {
 		var resp ModelResponse
-		resp, err = m.Model.Respond(msgs)
+		resp, err = m.Model.Respond(ctx, msgs)
 		resp = resp.IncludingUsage(totalUsageSoFar)
 		if err == nil {
 			return resp, nil

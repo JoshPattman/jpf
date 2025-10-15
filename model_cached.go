@@ -1,5 +1,7 @@
 package jpf
 
+import "context"
+
 // NewCachedModel wraps a Model with response caching functionality.
 // It stores responses in the provided ModelResponseCache implementation,
 // returning cached results for identical input messages and salts to avoid redundant model calls.
@@ -27,8 +29,8 @@ type cachedModel struct {
 }
 
 // Respond implements Model.
-func (c *cachedModel) Respond(msgs []Message) (ModelResponse, error) {
-	ok, aux, final, err := c.cache.GetCachedResponse(c.salt, msgs)
+func (c *cachedModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
+	ok, aux, final, err := c.cache.GetCachedResponse(ctx, c.salt, msgs)
 	if err != nil {
 		return ModelResponse{}, wrap(err, "failed to query cache")
 	}
@@ -38,11 +40,11 @@ func (c *cachedModel) Respond(msgs []Message) (ModelResponse, error) {
 			PrimaryMessage:     final,
 		}, nil
 	}
-	resp, err := c.model.Respond(msgs)
+	resp, err := c.model.Respond(ctx, msgs)
 	if err != nil {
 		return resp.OnlyUsage(), err
 	}
-	err = c.cache.SetCachedResponse(c.salt, msgs, resp.AuxilliaryMessages, resp.PrimaryMessage)
+	err = c.cache.SetCachedResponse(ctx, c.salt, msgs, resp.AuxilliaryMessages, resp.PrimaryMessage)
 	if err != nil {
 		return resp.OnlyUsage(), wrap(err, "failed to set cache")
 	}

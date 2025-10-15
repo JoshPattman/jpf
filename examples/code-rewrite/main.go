@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"flag"
@@ -38,7 +39,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	cache, err := jpf.NewSQLCache(db)
+	cache, err := jpf.NewSQLCache(context.Background(), db)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -46,12 +47,13 @@ func main() {
 
 	// Set up our builders
 	modelBuilder := &ModelBuilder{
-		OpenAIKey:       os.Getenv("OPENAI_KEY"),
-		OpenAIModelName: "gpt-4o-mini",
-		GeminiKey:       os.Getenv("GEMINI_KEY"),
-		GeminiModelName: "gemini-2.0-flash",
-		Cache:           cache,
-		Retries:         5,
+		OpenAIKey:         os.Getenv("OPENAI_KEY"),
+		OpenAIModelName:   "gpt-4o-mini",
+		GeminiKey:         os.Getenv("GEMINI_KEY"),
+		GeminiModelName:   "gemini-2.0-flash",
+		Cache:             cache,
+		Retries:           5,
+		APIRequestTimeout: time.Second * 30,
 	}
 	codeConnvertBuilder := &CodeConvertMFBuilder{
 		ModelBuilder: modelBuilder,
@@ -69,7 +71,7 @@ func main() {
 	}
 
 	// Rewrite the code
-	rewritten, _, err := codeConverter.Call(CodeConversionInput{
+	rewritten, _, err := codeConverter.Call(context.Background(), CodeConversionInput{
 		Language: *targetLang,
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),
@@ -93,12 +95,13 @@ func main() {
 // Some of the data for building models comes from its fields, some is passed in at build time.
 // Each build model will share persistent resources (i.e. cache).
 type ModelBuilder struct {
-	OpenAIKey       string
-	OpenAIModelName string
-	GeminiModelName string
-	GeminiKey       string
-	Cache           jpf.ModelResponseCache
-	Retries         int
+	OpenAIKey         string
+	OpenAIModelName   string
+	GeminiModelName   string
+	GeminiKey         string
+	Cache             jpf.ModelResponseCache
+	Retries           int
+	APIRequestTimeout time.Duration
 }
 
 func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
@@ -110,6 +113,9 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 	} else {
 		model = jpf.NewOpenAIModel(builder.OpenAIKey, builder.OpenAIModelName)
 		saltName = builder.OpenAIModelName
+	}
+	if builder.APIRequestTimeout != 0 {
+		model = jpf.NewTimeoutModel(model, builder.APIRequestTimeout)
 	}
 	if builder.Retries > 0 {
 		model = jpf.NewRetryModel(model, builder.Retries, jpf.WithDelay{X: time.Second})

@@ -1,14 +1,15 @@
 package jpf
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
 )
 
 type ModelResponseCache interface {
-	GetCachedResponse(salt string, inputs []Message) (bool, []Message, Message, error)
-	SetCachedResponse(salt string, inputs []Message, aux []Message, out Message) error
+	GetCachedResponse(ctx context.Context, salt string, inputs []Message) (bool, []Message, Message, error)
+	SetCachedResponse(ctx context.Context, salt string, inputs []Message, aux []Message, out Message) error
 }
 
 func HashMessages(salt string, inputs []Message) string {
