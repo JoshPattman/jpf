@@ -53,6 +53,6 @@ func (f *fakeReasoningModel) Respond(ctx context.Context, msgs []Message) (Model
 	if err != nil {
 		return finalResp.OnlyUsage(), wrap(err, "failed to call final response model")
 	}
-	finalResp.AuxilliaryMessages = append(finalResp.AuxilliaryMessages, reasoningMessage)
+	finalResp.AuxiliaryMessages = append(finalResp.AuxiliaryMessages, reasoningMessage)
 	return finalResp, nil
 }

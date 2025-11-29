@@ -27,8 +27,8 @@ type ModelResponse struct {
 	// Extra messages that are not the final response,
 	// but were used to build up the final response.
 	// For example, reasoning messages.
-	AuxilliaryMessages []Message
-	// The primary repsponse to the users query.
+	AuxiliaryMessages []Message
+	// The primary response to the users query.
 	// Usually the only response that matters.
 	PrimaryMessage Message
 	// The usage of making this call.
@@ -44,9 +44,9 @@ func (r ModelResponse) OnlyUsage() ModelResponse {
 // Utility to include another usage object in this response object
 func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
 	return ModelResponse{
-		AuxilliaryMessages: slices.Clone(r.AuxilliaryMessages),
-		PrimaryMessage:     r.PrimaryMessage,
-		Usage:              r.Usage.Add(u),
+		AuxiliaryMessages: slices.Clone(r.AuxiliaryMessages),
+		PrimaryMessage:    r.PrimaryMessage,
+		Usage:             r.Usage.Add(u),
 	}
 }
 
