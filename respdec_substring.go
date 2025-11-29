@@ -17,23 +17,23 @@ func SubstringAfter(split string) func(string) (string, error) {
 // Wrap an existing response decoder with one that takes only the part of interest of the response into account.
 // The part of interest is determined by the substring function.
 // If an error is detected when getting the substring, ErrInvalidResponse is raised.
-func NewSubstringResponseDecoder[T any](decoder ResponseDecoder[T], substring func(string) (string, error)) ResponseDecoder[T] {
-	return &substringResponseDecoder[T]{
+func NewSubstringResponseDecoder[T, U any](decoder ResponseDecoder[T, U], substring func(string) (string, error)) ResponseDecoder[T, U] {
+	return &substringResponseDecoder[T, U]{
 		decoder:   decoder,
 		substring: substring,
 	}
 }
 
-type substringResponseDecoder[T any] struct {
-	decoder   ResponseDecoder[T]
+type substringResponseDecoder[T, U any] struct {
+	decoder   ResponseDecoder[T, U]
 	substring func(string) (string, error)
 }
 
-func (srd *substringResponseDecoder[T]) ParseResponseText(resp string) (T, error) {
-	var zero T
+func (srd *substringResponseDecoder[T, U]) ParseResponseText(input T, resp string) (U, error) {
+	var zero U
 	sub, err := srd.substring(resp)
 	if err != nil {
 		return zero, errors.Join(err, ErrInvalidResponse)
 	}
-	return srd.decoder.ParseResponseText(sub)
+	return srd.decoder.ParseResponseText(input, sub)
 }

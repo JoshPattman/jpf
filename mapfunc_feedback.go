@@ -10,7 +10,7 @@ import (
 // It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
 func NewFeedbackMapFunc[T, U any](
 	enc MessageEncoder[T],
-	pars ResponseDecoder[U],
+	pars ResponseDecoder[T, U],
 	fed FeedbackGenerator,
 	model Model,
 	feedbackRole Role,
@@ -28,7 +28,7 @@ func NewFeedbackMapFunc[T, U any](
 
 type feedbackMapFunc[T, U any] struct {
 	enc          MessageEncoder[T]
-	pars         ResponseDecoder[U]
+	pars         ResponseDecoder[T, U]
 	fed          FeedbackGenerator
 	model        Model
 	feedbackRole Role
@@ -49,7 +49,7 @@ func (mf *feedbackMapFunc[T, U]) Call(ctx context.Context, t T) (U, Usage, error
 		if err != nil {
 			return u, totalUsage, wrap(err, "failed to get model response")
 		}
-		result, err := mf.pars.ParseResponseText(resp.PrimaryMessage.Content)
+		result, err := mf.pars.ParseResponseText(t, resp.PrimaryMessage.Content)
 		if err == nil {
 			// If the result was ok, return it
 			return result, totalUsage, nil
