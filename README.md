@@ -61,10 +61,10 @@ Contributions are welcome! Open an issue or submit a pull request on GitHub.
     - The aim of this package is to put the advanced stuff, like using tools, to you to figure out. IMO this allows you to do cooler, more flexible things (like a tree of agents).
     - Also, to a degree tool calls / MCP tools lock you in to one API or another, more than just using the chat completions endpoint.
     - I might consider adding them in the future, but for now I think that implementing your own tool calling is best.
-    - As a rule of thumb, I will add API features that fiddle with the log probs (e.g. structured output, temperature, top p, ...) but I will not add somthing if a model could not acheive the same result with perfect prompting.
+    - As a rule of thumb, I will add API features that fiddle with the log probs (e.g. structured output, temperature, top p, ...) but I will not add something if a model could not achieve the same result with perfect prompting.
 - I want to change my models temperature/structured output/output tokens/... after I have built it!
-    - The intention is to provide functions that need to use an LLM with a builder function instead of a built object. This way, you can use the builder function multiple times with different paramters.
-    - IMO, a model only exposing its respond fucntion is cleanest and simplest.
+    - The intention is to provide functions that need to use an LLM with a builder function instead of a built object. This way, you can use the builder function multiple times with different parameters.
+    - IMO, a model only exposing its respond function is cleanest and simplest.
 
 ## Author
 
@@ -72,9 +72,9 @@ Developed by Josh Pattman. Learn more at [GitHub](https://github.com/JoshPattman
 
 ## Core Concepts
 
-- jpf aims to separate the various components of building a robust interation with an LLM for three main reasons:
-  - **Resuability**: Build up a set of components you find useful, and write less repeated code.
-  - **Flexibility**: Write code in a way that easily allows you to extend the LLM's capabilities - for example you can add cache to an LLM without changing a single line of buisness logic.
+- jpf aims to separate the various components of building a robust interaction with an LLM for three main reasons:
+  - **Reusability**: Build up a set of components you find useful, and write less repeated code.
+  - **Flexibility**: Write code in a way that easily allows you to extend the LLM's capabilities - for example you can add cache to an LLM without changing a single line of business logic.
   - **Testability**: Each component being an atomic piece of logic allows you to unit test and mock each and every piece of logic in isolation.
 - Below are the core components you will need to understand to write code with jpf:
 
@@ -93,8 +93,8 @@ type ModelResponse struct {
 	// Extra messages that are not the final response,
 	// but were used to build up the final response.
 	// For example, reasoning messages.
-	AuxilliaryMessages []Message
-	// The primary repsponse to the users query.
+	AuxiliaryMessages []Message
+	// The primary response to the users query.
 	// Usually the only response that matters.
 	PrimaryMessage Message
 	// The usage of making this call.
@@ -110,7 +110,7 @@ type Message struct {
 }
 ```
 - Models are built using composition - you can produce a very powerful model by stacking up multiple less powerful models together.
-  - The power with this approach is you can abstract away a lot of the complexity from your client code, allowing it to focus primarily on buisness logic.
+  - The power with this approach is you can abstract away a lot of the complexity from your client code, allowing it to focus primarily on business logic.
 
 ```go
 // All model constructors in jpf return the Model interface,
@@ -156,7 +156,7 @@ type MessageEncoder[T any] interface {
 }
 ```
 
-- For more complex tasks, you may choose to implement this yourself, however there are some useful encoders built in (or use a combination of both):
+- For more complex tasks, you may choose to implement this yourself, however there are some useful encoders built in (or use a combination of both built-in and custom):
   
 ```go
 // NewRawStringMessageEncoder creates a MessageEncoder that encodes a system prompt and user input as raw string messages.
@@ -188,7 +188,7 @@ type ResponseDecoder[T, U any] interface {
 ```
 - You may choose to implement your own response decoder, however in my experience a json object is usually sufficient output.
 - When an error in response format is detected, the response decoder must return an error that, at some point in its chain, is an `ErrInvalidResponse` (this will be explained in the Map Func section).
-- There are some pre-defined response decoders inculded with jpf:
+- There are some pre-defined response decoders included with jpf:
 ```go
 // NewRawStringResponseDecoder creates a ResponseDecoder that returns the response as a raw string without modification.
 // The type parameter T represents the input type that will be passed through (but ignored by this decoder).
@@ -217,7 +217,7 @@ func NewValidatingResponseDecoder[T, U any](decoder ResponseDecoder[T, U], valid
 <summary>Map Func</summary>
 
 - A `MapFunc` is a collection of a `MessageEncoder`, `ResponseDecoder`, `Model`, and some additional logic.
-- Your buisness logic should only ever be interacting with LLMs though a Map Func.
+- Your business logic should only ever be interacting with LLMs through a Map Func.
 - It is a very generic interface, but it is intended to only ever be used for LLM-based functionality.
 ```go
 // MapFunc transforms input of type T into output of type U using an LLM.
@@ -228,7 +228,7 @@ type MapFunc[T, U any] interface {
 ```
 
 - It is not really expected that users will implement their own Map Funcs, but that is absolutely possible.
-- jpf ships with two built-in Map Funcs:
+- jpf ships with three built-in Map Funcs:
 
 ```go
 // NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.

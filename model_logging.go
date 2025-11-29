@@ -27,7 +27,7 @@ func (l *loggingModel) Respond(ctx context.Context, msgs []Message) (ModelRespon
 	dur := time.Since(tStart)
 	lmp := ModelLoggingInfo{
 		Messages:             msgs,
-		ResponseAuxMessages:  resp.AuxilliaryMessages,
+		ResponseAuxMessages:  resp.AuxiliaryMessages,
 		ResponseFinalMessage: resp.PrimaryMessage,
 		Usage:                resp.Usage,
 		Err:                  err,

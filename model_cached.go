@@ -36,15 +36,15 @@ func (c *cachedModel) Respond(ctx context.Context, msgs []Message) (ModelRespons
 	}
 	if ok {
 		return ModelResponse{
-			AuxilliaryMessages: aux,
-			PrimaryMessage:     final,
+			AuxiliaryMessages: aux,
+			PrimaryMessage:    final,
 		}, nil
 	}
 	resp, err := c.model.Respond(ctx, msgs)
 	if err != nil {
 		return resp.OnlyUsage(), err
 	}
-	err = c.cache.SetCachedResponse(ctx, c.salt, msgs, resp.AuxilliaryMessages, resp.PrimaryMessage)
+	err = c.cache.SetCachedResponse(ctx, c.salt, msgs, resp.AuxiliaryMessages, resp.PrimaryMessage)
 	if err != nil {
 		return resp.OnlyUsage(), wrap(err, "failed to set cache")
 	}
