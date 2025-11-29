@@ -233,6 +233,11 @@ func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelRespons
 			InputTokens  int `json:"prompt_tokens"`
 			OutputTokens int `json:"completion_tokens"`
 		}
+		Error struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Code    string `json:"code"`
+		}
 	}{}
 	err = json.Unmarshal(respBody, &respTyped)
 	usage := Usage{
@@ -242,6 +247,13 @@ func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelRespons
 	if err != nil {
 		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "failed to parse response: %s", string(respBody))
 	}
+	if respTyped.Error.Code != "" {
+		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, &openAIError{
+			respTyped.Error.Message,
+			respTyped.Error.Type,
+			respTyped.Error.Code,
+		}
+	}
 	if len(respTyped.Choices) == 0 {
 		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "response had no choices: %s", string(respBody))
 	}
@@ -250,4 +262,14 @@ func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelRespons
 		PrimaryMessage: Message{Role: AssistantRole, Content: content},
 		Usage:          usage.Add(Usage{SuccessfulCalls: 1}),
 	}, nil
+}
+
+type openAIError struct {
+	msg     string
+	errType string
+	code    string
+}
+
+func (e *openAIError) Error() string {
+	return fmt.Sprintf("openai api returned an error: %s.%s - %s", e.errType, e.code, e.msg)
 }

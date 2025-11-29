@@ -76,7 +76,7 @@ func BuildStructuredQuerier[T any]() (jpf.MapFunc[string, T], error) {
 	)
 	model = jpf.NewRetryModel(model, 5)
 	enc := jpf.NewRawStringMessageEncoder("Answer the users question in a json format.")
-	dec := jpf.NewJsonResponseDecoder[T]()
+	dec := jpf.NewJsonResponseDecoder[string, T]()
 	return jpf.NewOneShotMapFunc(enc, dec, model), nil
 }
 

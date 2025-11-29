@@ -64,6 +64,6 @@ type PoemMFBuilder struct {
 func (builder *PoemMFBuilder) Build(verbosity jpf.Verbosity, pPenalty float64) jpf.MapFunc[string, string] {
 	model := builder.ModelBuilder.Build(verbosity, pPenalty)
 	enc := jpf.NewRawStringMessageEncoder(builder.SystemPrompt)
-	dec := jpf.NewRawStringResponseDecoder()
+	dec := jpf.NewRawStringResponseDecoder[string]()
 	return jpf.NewOneShotMapFunc(enc, dec, model)
 }
