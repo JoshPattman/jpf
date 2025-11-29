@@ -6,17 +6,17 @@ import (
 	"testing"
 )
 
-func buildTestingSubstringRespDec() ResponseDecoder[string] {
+func buildTestingSubstringRespDec() ResponseDecoder[struct{}, string] {
 	return NewSubstringResponseDecoder(
-		NewRawStringResponseDecoder(),
+		NewRawStringResponseDecoder[struct{}](),
 		SubstringAfter("::"),
 	)
 }
 
-func buildTestingValidatorRespDec() ResponseDecoder[string] {
+func buildTestingValidatorRespDec() ResponseDecoder[struct{}, string] {
 	return NewValidatingResponseDecoder(
-		NewRawStringResponseDecoder(),
-		func(x string) error {
+		NewRawStringResponseDecoder[struct{}](),
+		func(_ struct{}, x string) error {
 			if x == "abc" {
 				return nil
 			} else {
@@ -28,7 +28,7 @@ func buildTestingValidatorRespDec() ResponseDecoder[string] {
 
 type RDCase[T comparable] struct {
 	ID            string
-	Build         func() ResponseDecoder[T]
+	Build         func() ResponseDecoder[struct{}, T]
 	Input         string
 	Expected      T
 	ExpectedError bool
@@ -38,7 +38,7 @@ func (testCase RDCase[T]) Name() string { return testCase.ID }
 
 func (testCase RDCase[T]) Test() error {
 	rd := testCase.Build()
-	result, err := rd.ParseResponseText(testCase.Input)
+	result, err := rd.ParseResponseText(struct{}{}, testCase.Input)
 	if testCase.ExpectedError {
 		if err == nil {
 			return fmt.Errorf("expected error, got none")
@@ -57,43 +57,43 @@ func (testCase RDCase[T]) Test() error {
 var RDCases = []TestCase{
 	RDCase[TestStruct]{
 		ID:            "json/no_response",
-		Build:         NewJsonResponseDecoder[TestStruct],
+		Build:         NewJsonResponseDecoder[struct{}, TestStruct],
 		Input:         "",
 		ExpectedError: true,
 	},
 	RDCase[TestStruct]{
 		ID:       "json/empty_valid_json",
-		Build:    NewJsonResponseDecoder[TestStruct],
+		Build:    NewJsonResponseDecoder[struct{}, TestStruct],
 		Input:    `{}`,
 		Expected: TestStruct{},
 	},
 	RDCase[TestStruct]{
 		ID:       "json/valid_json",
-		Build:    NewJsonResponseDecoder[TestStruct],
+		Build:    NewJsonResponseDecoder[struct{}, TestStruct],
 		Input:    `{"a":5, "b": "xyz"}`,
 		Expected: TestStruct{A: 5, B: "xyz"},
 	},
 	RDCase[TestStruct]{
 		ID:       "json/valid_json_within_decoration",
-		Build:    NewJsonResponseDecoder[TestStruct],
+		Build:    NewJsonResponseDecoder[struct{}, TestStruct],
 		Input:    "Here is my answer:\n```" + `{"a":5, "b": "xyz"}` + "```",
 		Expected: TestStruct{A: 5, B: "xyz"},
 	},
 	RDCase[string]{
 		ID:       "string/empty_string",
-		Build:    NewRawStringResponseDecoder,
+		Build:    NewRawStringResponseDecoder[struct{}],
 		Input:    "",
 		Expected: "",
 	},
 	RDCase[string]{
 		ID:       "string/random_string",
-		Build:    NewRawStringResponseDecoder,
+		Build:    NewRawStringResponseDecoder[struct{}],
 		Input:    "hdvdihiuhdibdb",
 		Expected: "hdvdihiuhdibdb",
 	},
 	RDCase[string]{
 		ID:       "string/random_string_with_whitespace",
-		Build:    NewRawStringResponseDecoder,
+		Build:    NewRawStringResponseDecoder[struct{}],
 		Input:    "  hdvdihiuhdibdb  \n",
 		Expected: "  hdvdihiuhdibdb  \n",
 	},
@@ -131,4 +131,21 @@ var RDCases = []TestCase{
 
 func TestResponseDecoder(t *testing.T) {
 	RunTests(t, RDCases)
+}
+
+func TestValidatingResponseDecoderReceivesInput(t *testing.T) {
+	respDec := NewRawStringResponseDecoder[string]()
+	respDec = NewValidatingResponseDecoder(respDec, func(input, response string) error {
+		if input != "input data" {
+			t.Fatalf("expected 'input data' but got '%s'", input)
+		}
+		if response != "output data" {
+			t.Fatalf("expected 'output data' but got '%s'", response)
+		}
+		return nil
+	})
+	_, err := respDec.ParseResponseText("input data", "output data")
+	if err != nil {
+		t.Fatal(err)
+	}
 }

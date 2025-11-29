@@ -12,7 +12,7 @@ import (
 // This is useful, for example, to try a second time with a model that overwrites the cache.
 func NewModelFallbackOneShotMapFunc[T, U any](
 	enc MessageEncoder[T],
-	dec ResponseDecoder[U],
+	dec ResponseDecoder[T, U],
 	models ...Model,
 ) MapFunc[T, U] {
 	return &modelFallbackOneShotMapFunc[T, U]{
@@ -24,7 +24,7 @@ func NewModelFallbackOneShotMapFunc[T, U any](
 
 type modelFallbackOneShotMapFunc[T, U any] struct {
 	enc    MessageEncoder[T]
-	dec    ResponseDecoder[U]
+	dec    ResponseDecoder[T, U]
 	models []Model
 }
 
@@ -54,7 +54,7 @@ func (mf *modelFallbackOneShotMapFunc[T, U]) callOne(ctx context.Context, t T, m
 	if err != nil {
 		return zero, resp.Usage, wrap(err, "failed to get model response")
 	}
-	result, err := mf.dec.ParseResponseText(resp.PrimaryMessage.Content)
+	result, err := mf.dec.ParseResponseText(t, resp.PrimaryMessage.Content)
 	if err != nil {
 		return zero, resp.Usage, wrap(err, "failed to parse model response")
 	}

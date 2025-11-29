@@ -5,7 +5,7 @@ import "context"
 // NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
 func NewOneShotMapFunc[T, U any](
 	enc MessageEncoder[T],
-	dec ResponseDecoder[U],
+	dec ResponseDecoder[T, U],
 	model Model,
 ) MapFunc[T, U] {
 	return &oneShotMapFunc[T, U]{
@@ -17,7 +17,7 @@ func NewOneShotMapFunc[T, U any](
 
 type oneShotMapFunc[T, U any] struct {
 	enc   MessageEncoder[T]
-	pars  ResponseDecoder[U]
+	pars  ResponseDecoder[T, U]
 	model Model
 }
 
@@ -31,7 +31,7 @@ func (mf *oneShotMapFunc[T, U]) Call(ctx context.Context, t T) (U, Usage, error)
 	if err != nil {
 		return zero, resp.Usage, wrap(err, "failed to get model response")
 	}
-	result, err := mf.pars.ParseResponseText(resp.PrimaryMessage.Content)
+	result, err := mf.pars.ParseResponseText(t, resp.PrimaryMessage.Content)
 	if err != nil {
 		return zero, resp.Usage, wrap(err, "failed to parse model response")
 	}

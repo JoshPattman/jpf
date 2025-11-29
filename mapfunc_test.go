@@ -40,7 +40,7 @@ var MFCases = []TestCase{
 		ID: "oneshot/nominal",
 		Build: func() MapFunc[string, string] {
 			enc := NewRawStringMessageEncoder("")
-			dec := NewRawStringResponseDecoder()
+			dec := NewRawStringResponseDecoder[string]()
 			model := &TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
@@ -53,7 +53,7 @@ var MFCases = []TestCase{
 		ID: "feedback/nominal",
 		Build: func() MapFunc[string, TestStruct] {
 			enc := NewRawStringMessageEncoder("")
-			dec := NewJsonResponseDecoder[TestStruct]()
+			dec := NewJsonResponseDecoder[string, TestStruct]()
 			feedback := NewRawMessageFeedbackGenerator()
 			model := &TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
@@ -68,7 +68,7 @@ var MFCases = []TestCase{
 		ID: "fallback/nominal",
 		Build: func() MapFunc[string, TestStruct] {
 			enc := NewRawStringMessageEncoder("")
-			dec := NewJsonResponseDecoder[TestStruct]()
+			dec := NewJsonResponseDecoder[string, TestStruct]()
 			model1 := &TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
@@ -84,7 +84,7 @@ var MFCases = []TestCase{
 		ID: "fallback/fail",
 		Build: func() MapFunc[string, TestStruct] {
 			enc := NewRawStringMessageEncoder("")
-			dec := NewJsonResponseDecoder[TestStruct]()
+			dec := NewJsonResponseDecoder[string, TestStruct]()
 			model1 := &TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
