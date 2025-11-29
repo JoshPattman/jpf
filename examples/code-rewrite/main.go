@@ -142,6 +142,6 @@ func (builder *CodeConvertMFBuilder) Build(useGemini bool) jpf.MapFunc[CodeConve
 	model := builder.ModelBuilder.Build(useGemini)
 
 	formatter := jpf.NewTemplateMessageEncoder[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
-	parser := jpf.NewRawStringResponseDecoder()
+	parser := jpf.NewRawStringResponseDecoder[CodeConversionInput]()
 	return jpf.NewOneShotMapFunc(formatter, parser, model)
 }
