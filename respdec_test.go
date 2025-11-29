@@ -133,7 +133,7 @@ func TestResponseDecoder(t *testing.T) {
 	RunTests(t, RDCases)
 }
 
-func TestValidatingResponseDecoderRecievesInput(t *testing.T) {
+func TestValidatingResponseDecoderReceivesInput(t *testing.T) {
 	respDec := NewRawStringResponseDecoder[string]()
 	respDec = NewValidatingResponseDecoder(respDec, func(input, response string) error {
 		if input != "input data" {

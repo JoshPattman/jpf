@@ -178,11 +178,12 @@ func NewSequentialMessageEncoder[T any](msgEncs ...MessageEncoder[T]) MessageEnc
 
 - A `ResponseDecoder` parses the output of an LLM into structured data.
 - As with message encoders, they do not make any LLM calls.
+- The decoder receives both the input data (type `T`) and the LLM response, allowing it to validate or parse the response in context of the original input.
 ```go
-// ResponseDecoder converts an LLM response into a structured piece of data.
+// ResponseDecoder converts an input to an LLM and the LLM response into a structured piece of output data.
 // When the LLM response is invalid, it should return ErrInvalidResponse (or an error joined on that).
-type ResponseDecoder[T any] interface {
-	ParseResponseText(string) (T, error)
+type ResponseDecoder[T, U any] interface {
+	ParseResponseText(T, string) (U, error)
 }
 ```
 - You may choose to implement your own response decoder, however in my experience a json object is usually sufficient output.
@@ -190,21 +191,24 @@ type ResponseDecoder[T any] interface {
 - There are some pre-defined response decoders inculded with jpf:
 ```go
 // NewRawStringResponseDecoder creates a ResponseDecoder that returns the response as a raw string without modification.
-func NewRawStringResponseDecoder() ResponseDecoder[string] {...}
+// The type parameter T represents the input type that will be passed through (but ignored by this decoder).
+func NewRawStringResponseDecoder[T any]() ResponseDecoder[T, string] {...}
 
 // NewJsonResponseDecoder creates a ResponseDecoder that tries to parse a json object from the response.
 // It can ONLY parse json objects with an OBJECT as top level (i.e. it cannot parse a list directly).
-func NewJsonResponseDecoder[T any]() ResponseDecoder[T] {...}
+// The type parameter T represents the input type, and U represents the output type.
+func NewJsonResponseDecoder[T, U any]() ResponseDecoder[T, U] {...}
 
 // Wrap an existing response decoder with one that takes only the part of interest of the response into account.
 // The part of interest is determined by the substring function.
 // If an error is detected when getting the substring, ErrInvalidResponse is raised.
-func NewSubstringResponseDecoder[T any](decoder ResponseDecoder[T], substring func(string) (string, error)) ResponseDecoder[T] {...}
+func NewSubstringResponseDecoder[T, U any](decoder ResponseDecoder[T, U], substring func(string) (string, error)) ResponseDecoder[T, U] {...}
 
 // Creates a response decoder that wraps the provided one,
 // but then performs an extra validation step on the parsed response.
 // If an error is found during validation, the error is wrapped with ErrInvalidResponse and returned.
-func NewValidatingResponseDecoder[T any](decoder ResponseDecoder[T], validate func(T) error) ResponseDecoder[T] {...}
+// The validation function receives both the input and the parsed output, allowing for context-aware validation.
+func NewValidatingResponseDecoder[T, U any](decoder ResponseDecoder[T, U], validate func(T, U) error) ResponseDecoder[T, U] {...}
 ```
 
 </details>
@@ -228,14 +232,14 @@ type MapFunc[T, U any] interface {
 
 ```go
 // NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
-func NewOneShotMapFunc[T, U any](enc MessageEncoder[T], pars ResponseDecoder[U], model Model) MapFunc[T, U] {...}
+func NewOneShotMapFunc[T, U any](enc MessageEncoder[T], dec ResponseDecoder[T, U], model Model) MapFunc[T, U] {...}
 
 // NewFeedbackMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
 // However, it adds feedback to the conversation when errors are detected.
 // It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
 func NewFeedbackMapFunc[T, U any](
 	enc MessageEncoder[T],
-	pars ResponseDecoder[U],
+	pars ResponseDecoder[T, U],
 	fed FeedbackGenerator,
 	model Model,
 	feedbackRole Role,
@@ -248,7 +252,7 @@ func NewFeedbackMapFunc[T, U any](
 // This is useful, for example, to try a second time with a model that overwrites the cache.
 func NewModelFallbackOneShotMapFunc[T, U any](
 	enc MessageEncoder[T],
-	dec ResponseDecoder[U],
+	dec ResponseDecoder[T, U],
 	models ...Model,
 ) MapFunc[T, U] {...}
 ```
