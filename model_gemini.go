@@ -18,7 +18,7 @@ func NewGeminiModel(key, modelName string, opts ...GeminiModelOpt) Model {
 	model := &geminiModel{
 		key:          key,
 		model:        modelName,
-		url:          fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", modelName),
+		url:          "https://generativelanguage.googleapis.com/v1beta/models",
 		extraHeaders: make(map[string]string),
 	}
 	for _, o := range opts {
@@ -266,12 +266,6 @@ func (c *geminiModel) createBodyData(msgs []Message) (io.Reader, error) {
 		bodyMap["generationConfig"].(map[string]any)["maxOutputTokens"] = c.maxOutput
 	}
 
-	if c.streamCallbacks != nil {
-		// request streaming and ask for usage to be included in stream
-		bodyMap["stream"] = true
-		bodyMap["streamOptions"] = map[string]any{"includeUsage": true}
-	}
-
 	body, err := json.Marshal(bodyMap)
 	if err != nil {
 		return nil, wrap(err, "could not encode request body")
@@ -280,7 +274,14 @@ func (c *geminiModel) createBodyData(msgs []Message) (io.Reader, error) {
 }
 
 func (c *geminiModel) createRequest(ctx context.Context, body io.Reader) (*http.Request, error) {
-	req, err := http.NewRequest("POST", fmt.Sprintf("%s?key=%s", c.url, c.key), body)
+	var modelUrl, extraStreamParam string
+	if c.streamCallbacks == nil {
+		modelUrl = fmt.Sprintf("%s/%s:generateContent", c.url, c.model)
+	} else {
+		modelUrl = fmt.Sprintf("%s/%s:streamGenerateContent", c.url, c.model)
+		extraStreamParam = "&alt=sse"
+	}
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s?key=%s%s", modelUrl, c.key, extraStreamParam), body)
 	if err != nil {
 		return nil, wrap(err, "could not create request")
 	}

@@ -17,8 +17,8 @@ func main() {
 	}
 	// Create the model.
 	// We can still use normal encoders, decoders, and retry logic (do be aware that retries will call the onBegin callback again).
-	// model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4.1", jpf.WithStreamResponse{OnText: onStream})
-	model := jpf.NewGeminiModel(os.Getenv("GEMINI_KEY"), "gemini-2.5-flash", jpf.WithStreamResponse{OnText: onStream})
+	model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4.1", jpf.WithStreamResponse{OnText: onStream})
+	// model := jpf.NewGeminiModel(os.Getenv("GEMINI_KEY"), "gemini-2.5-flash", jpf.WithStreamResponse{OnText: onStream})
 	enc := jpf.NewRawStringMessageEncoder("Write 5 haikus about the topic")
 	dec := jpf.NewRawStringResponseDecoder[string]()
 	mf := jpf.NewOneShotMapFunc(enc, dec, model)
