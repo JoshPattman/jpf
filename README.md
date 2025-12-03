@@ -28,6 +28,7 @@ jpf is aimed at using AI as a tool - not as a chatbot (this is not to say you ca
 - **Retry and Feedback Handling**: Resilient mechanisms for retrying tasks and incorporating feedback into interactions.
 - **Customizable Models**: Seamlessly integrate LLMs, including reasoning chains and hybrid models.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
+- **Stream Responses**: Keep your users engaged with streamed responses.
 - **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.
 - **Out-of-the-box Logging**: Simply add logging messages to your models, helping you track down issues.
 - **Industry Standard Context Management**: All potentially slow interfaces support Go's context.Context for timeouts and cancellation.
@@ -49,8 +50,6 @@ This project is licensed under the MIT License. See the [LICENSE](./LICENSE) fil
 Contributions are welcome! Open an issue or submit a pull request on GitHub.
 
 ## FAQ
-- Will streaming (token-by-token) ever be supported?
-    - No. This framework is designed to be more of a back-end tool, and character streaming would add extra complexity that most applications of this package would not benefit from (in my opinion).
 - Are there any pre-built formatters / parsers?
     - There are a few built in implementations, however the aim of this package is to create the framework, not the functionality.
     - If you have any ideas of useful functions, feel free to put them on an issue, and if enough arise, I can make a new repo for these.
@@ -140,6 +139,9 @@ if cache != nil {
 // We now have a model that may/may not be gemini / openai, with retrying and cache.
 // However, the client code does not need to know about any of this - to it we are still just calling a model!
 ```
+
+- Note that even though models can stream back text, it is only intended as a temporary and unreliable way to distract users while waiting fore requests.
+	- You should always aim to make your code work without streaming, and add it in as an add-in later on to improve the UX - this is more robust.
 
 </details>
 

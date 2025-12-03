@@ -100,6 +100,13 @@ type WithReasoningAs struct {
 	TransformContent func(string) string
 }
 
+type WithStreamResponse struct {
+	// Called when the stream begins, may be called multiple times if retries occur.
+	OnBegin func()
+	// Called when a new chunk of text is received.
+	OnText func(string)
+}
+
 func TransformByPrefix(prefix string) func(string) string {
 	return func(s string) string {
 		return prefix + s
