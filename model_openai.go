@@ -95,6 +95,18 @@ func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelRespons
 		return failedResp, wrap(err, "could not execute request")
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var errResp openAIErrorResponse
+		respData, _ := io.ReadAll(resp.Body)
+		if err := json.Unmarshal(respData, &errResp); err != nil {
+			return failedResp, wrap(fmt.Errorf("http status %d", resp.StatusCode), "request failed: %s", string(respData))
+		}
+		return failedResp, &openAIError{
+			errResp.Error.Message,
+			errResp.Error.Type,
+			errResp.Error.Code,
+		}
+	}
 	var respTyped openAIAPIStaticResponse
 	var rawRespBytes []byte
 	if c.streamCallbacks != nil {
@@ -235,6 +247,13 @@ func (c *openAIModel) parseStreamResponse(ctx context.Context, respBody io.ReadC
 		if err := json.Unmarshal(data, &chunk); err != nil {
 			return openAIAPIStaticResponse{}, nil, wrap(err, "failed to unmarshal stream chunk")
 		}
+		if chunk.Error.Code != "" {
+			return openAIAPIStaticResponse{}, nil, &openAIError{
+				chunk.Error.Message,
+				chunk.Error.Type,
+				chunk.Error.Code,
+			}
+		}
 		if len(chunk.Choices) > 0 {
 			content := chunk.Choices[0].Delta.Content
 			fullContent.WriteString(content)
@@ -368,6 +387,14 @@ func jsonSchemaToOpenAI(schema map[string]any) map[string]any {
 	}
 }
 
+type openAIErrorResponse struct {
+	Error struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+		Code    string `json:"code"`
+	} `json:"error"`
+}
+
 type openAIStreamChunk struct {
 	Choices []struct {
 		Delta struct {
@@ -378,6 +405,11 @@ type openAIStreamChunk struct {
 		PromptTokens     int `json:"prompt_tokens"`
 		CompletionTokens int `json:"completion_tokens"`
 	} `json:"usage"`
+	Error struct {
+		Message string `json:"message"`
+		Type    string `json:"type"`
+		Code    string `json:"code"`
+	} `json:"error"`
 }
 
 type openAIAPIStaticResponse struct {
@@ -394,7 +426,7 @@ type openAIAPIStaticResponse struct {
 		Message string `json:"message"`
 		Type    string `json:"type"`
 		Code    string `json:"code"`
-	}
+	} `json:"error"`
 }
 
 type openAIError struct {
