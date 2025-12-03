@@ -79,6 +79,196 @@ type openAIModel struct {
 	streamCallbacks    *streamCallbacks
 }
 
+func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
+	failedUsage := Usage{FailedCalls: 1}
+	failedResp := ModelResponse{Usage: failedUsage}
+	body, err := c.createBodyData(msgs)
+	if err != nil {
+		return failedResp, wrap(err, "could not encode body")
+	}
+	req, err := c.createRequest(ctx, body)
+	if err != nil {
+		return failedResp, wrap(err, "could not create request")
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return failedResp, wrap(err, "could not execute request")
+	}
+	defer resp.Body.Close()
+	var respTyped openAIAPIStaticResponse
+	var rawRespBytes []byte
+	if c.streamCallbacks != nil {
+		respTyped, rawRespBytes, err = c.parseStreamResponse(ctx, resp.Body)
+	} else {
+		respTyped, rawRespBytes, err = c.parseStaticResponse(ctx, resp.Body)
+	}
+	usage := Usage{
+		InputTokens:  respTyped.Usage.InputTokens,
+		OutputTokens: respTyped.Usage.OutputTokens,
+	}
+	if err != nil {
+		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "failed to parse response: %s", string(rawRespBytes))
+	}
+	if respTyped.Error.Code != "" {
+		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, &openAIError{
+			respTyped.Error.Message,
+			respTyped.Error.Type,
+			respTyped.Error.Code,
+		}
+	}
+	if len(respTyped.Choices) == 0 {
+		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "response had no choices: %s", string(rawRespBytes))
+	}
+	content := respTyped.Choices[0].Message.Content
+	return ModelResponse{
+		PrimaryMessage: Message{Role: AssistantRole, Content: content},
+		Usage:          usage.Add(Usage{SuccessfulCalls: 1}),
+	}, nil
+}
+
+// Create the body reader for an openai request.
+func (c *openAIModel) createBodyData(msgs []Message) (io.Reader, error) {
+	openAIMsgs, err := c.messagesToOpenAI(msgs)
+	if err != nil {
+		return nil, wrap(err, "could not convert messages to OpenAI format")
+	}
+	bodyMap := map[string]any{
+		"model":    c.model,
+		"messages": openAIMsgs,
+	}
+	if c.temperature != nil {
+		bodyMap["temperature"] = *c.temperature
+	}
+	if c.reasoningEffort != nil {
+		bodyMap["reasoning_effort"] = reasoningEffortToOpenAI(*c.reasoningEffort)
+	}
+	if c.verbosity != nil {
+		bodyMap["verbosity"] = verbosityToOpenAI(*c.verbosity)
+	}
+	if c.topP != nil {
+		bodyMap["top_p"] = *c.topP
+	}
+	if c.presencePenalty != nil {
+		bodyMap["presence_penalty"] = *c.presencePenalty
+	}
+	if c.prediction != nil {
+		bodyMap["prediction"] = *c.prediction
+	}
+	if c.maxOutput != 0 {
+		bodyMap["max_completion_tokens"] = c.maxOutput
+	}
+	if c.jsonSchema != nil {
+		bodyMap["response_format"] = jsonSchemaToOpenAI(c.jsonSchema)
+	}
+	if c.streamCallbacks != nil {
+		bodyMap["stream"] = true
+		bodyMap["stream_options"] = map[string]any{"include_usage": true}
+	}
+	body, err := json.Marshal(bodyMap)
+	if err != nil {
+		return nil, wrap(err, "could not encode body")
+	}
+	return bytes.NewBuffer(body), nil
+}
+
+// Wrap the openai request body up as an http.Request, with headers and context.
+func (c *openAIModel) createRequest(ctx context.Context, body io.Reader) (*http.Request, error) {
+	req, err := http.NewRequest("POST", c.url, body)
+	if err != nil {
+		return nil, wrap(err, "could not create request")
+	}
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.key))
+	req.Header.Add("Content-Type", "application/json")
+	for k, v := range c.extraHeaders {
+		req.Header.Add(k, v)
+	}
+	return req.WithContext(ctx), nil
+}
+
+// Parse a non-streaming response from OpenAI.
+func (c *openAIModel) parseStaticResponse(ctx context.Context, respBody io.ReadCloser) (openAIAPIStaticResponse, []byte, error) {
+	go func() {
+		<-ctx.Done()
+		respBody.Close()
+	}()
+	respTyped := openAIAPIStaticResponse{}
+	respData, err := io.ReadAll(respBody)
+	if err != nil {
+		return openAIAPIStaticResponse{}, respData, wrap(err, "could not read response body")
+	}
+	err = json.Unmarshal(respData, &respTyped)
+	if err != nil {
+		return openAIAPIStaticResponse{}, respData, wrap(err, "could not unmarshal response body: %s", string(respData))
+	}
+	return respTyped, respData, nil
+}
+
+// Parse a streaming response from OpenAI, calling callbacks as data arrives.
+func (c *openAIModel) parseStreamResponse(ctx context.Context, respBody io.ReadCloser) (openAIAPIStaticResponse, []byte, error) {
+	go func() {
+		<-ctx.Done()
+		respBody.Close()
+	}()
+	scanner := bufio.NewScanner(respBody)
+	var fullContent strings.Builder
+	var inputTokens, outputTokens int
+
+	if c.streamCallbacks != nil && c.streamCallbacks.onBegin != nil {
+		c.streamCallbacks.onBegin()
+	}
+
+	for scanner.Scan() {
+		line := scanner.Bytes()
+		if len(line) == 0 {
+			continue
+		}
+		if !bytes.HasPrefix(line, []byte("data: ")) {
+			continue
+		}
+		data := line[6:]
+		if bytes.Equal(data, []byte("[DONE]")) {
+			break
+		}
+
+		var chunk openAIStreamChunk
+
+		if err := json.Unmarshal(data, &chunk); err != nil {
+			return openAIAPIStaticResponse{}, nil, wrap(err, "failed to unmarshal stream chunk")
+		}
+		if len(chunk.Choices) > 0 {
+			content := chunk.Choices[0].Delta.Content
+			fullContent.WriteString(content)
+			if c.streamCallbacks != nil && c.streamCallbacks.onText != nil {
+				c.streamCallbacks.onText(content)
+			}
+		}
+		if chunk.Usage.PromptTokens > 0 {
+			inputTokens = chunk.Usage.PromptTokens
+		}
+		if chunk.Usage.CompletionTokens > 0 {
+			outputTokens = chunk.Usage.CompletionTokens
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return openAIAPIStaticResponse{}, nil, wrap(err, "error reading stream")
+	}
+
+	// Build the response in the same format as parseStaticResponse
+	response := openAIAPIStaticResponse{
+		Choices: make([]struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		}, 1),
+	}
+	response.Choices[0].Message.Content = fullContent.String()
+	response.Usage.InputTokens = inputTokens
+	response.Usage.OutputTokens = outputTokens
+
+	return response, nil, nil
+}
+
 func roleToOpenAI(role Role) (string, error) {
 	switch role {
 	case SystemRole:
@@ -178,141 +368,6 @@ func jsonSchemaToOpenAI(schema map[string]any) map[string]any {
 	}
 }
 
-func (c *openAIModel) createBodyData(msgs []Message) (io.Reader, error) {
-	openAIMsgs, err := c.messagesToOpenAI(msgs)
-	if err != nil {
-		return nil, wrap(err, "could not convert messages to OpenAI format")
-	}
-	bodyMap := map[string]any{
-		"model":    c.model,
-		"messages": openAIMsgs,
-	}
-	if c.temperature != nil {
-		bodyMap["temperature"] = *c.temperature
-	}
-	if c.reasoningEffort != nil {
-		bodyMap["reasoning_effort"] = reasoningEffortToOpenAI(*c.reasoningEffort)
-	}
-	if c.verbosity != nil {
-		bodyMap["verbosity"] = verbosityToOpenAI(*c.verbosity)
-	}
-	if c.topP != nil {
-		bodyMap["top_p"] = *c.topP
-	}
-	if c.presencePenalty != nil {
-		bodyMap["presence_penalty"] = *c.presencePenalty
-	}
-	if c.prediction != nil {
-		bodyMap["prediction"] = *c.prediction
-	}
-	if c.maxOutput != 0 {
-		bodyMap["max_completion_tokens"] = c.maxOutput
-	}
-	if c.jsonSchema != nil {
-		bodyMap["response_format"] = jsonSchemaToOpenAI(c.jsonSchema)
-	}
-	if c.streamCallbacks != nil {
-		bodyMap["stream"] = true
-		bodyMap["stream_options"] = map[string]any{"include_usage": true}
-	}
-	body, err := json.Marshal(bodyMap)
-	if err != nil {
-		return nil, wrap(err, "could not encode body")
-	}
-	return bytes.NewBuffer(body), nil
-}
-
-func (c *openAIModel) createRequest(ctx context.Context, body io.Reader) (*http.Request, error) {
-	req, err := http.NewRequest("POST", c.url, body)
-	if err != nil {
-		return nil, wrap(err, "could not create request")
-	}
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", c.key))
-	req.Header.Add("Content-Type", "application/json")
-	for k, v := range c.extraHeaders {
-		req.Header.Add(k, v)
-	}
-	return req.WithContext(ctx), nil
-}
-
-func (c *openAIModel) parseStaticResponse(ctx context.Context, respBody io.Reader) (openAIAPIStaticResponse, []byte, error) {
-	respTyped := openAIAPIStaticResponse{}
-	respData, err := io.ReadAll(respBody)
-	if err != nil {
-		return openAIAPIStaticResponse{}, respData, wrap(err, "could not read response body")
-	}
-	err = json.Unmarshal(respData, &respTyped)
-	if err != nil {
-		return openAIAPIStaticResponse{}, respData, wrap(err, "could not unmarshal response body: %s", string(respData))
-	}
-	return respTyped, respData, nil
-}
-
-func (c *openAIModel) parseStreamResponse(ctx context.Context, respBody io.ReadCloser) (openAIAPIStaticResponse, []byte, error) {
-	go func() {
-		<-ctx.Done()
-		respBody.Close()
-	}()
-	scanner := bufio.NewScanner(respBody)
-	var fullContent strings.Builder
-	var inputTokens, outputTokens int
-
-	if c.streamCallbacks != nil && c.streamCallbacks.onBegin != nil {
-		c.streamCallbacks.onBegin()
-	}
-
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			continue
-		}
-		if !bytes.HasPrefix(line, []byte("data: ")) {
-			continue
-		}
-		data := line[6:]
-		if bytes.Equal(data, []byte("[DONE]")) {
-			break
-		}
-
-		var chunk openAIStreamChunk
-
-		if err := json.Unmarshal(data, &chunk); err != nil {
-			return openAIAPIStaticResponse{}, nil, wrap(err, "failed to unmarshal stream chunk")
-		}
-		if len(chunk.Choices) > 0 {
-			content := chunk.Choices[0].Delta.Content
-			fullContent.WriteString(content)
-			if c.streamCallbacks != nil && c.streamCallbacks.onText != nil {
-				c.streamCallbacks.onText(content)
-			}
-		}
-		if chunk.Usage.PromptTokens > 0 {
-			inputTokens = chunk.Usage.PromptTokens
-		}
-		if chunk.Usage.CompletionTokens > 0 {
-			outputTokens = chunk.Usage.CompletionTokens
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return openAIAPIStaticResponse{}, nil, wrap(err, "error reading stream")
-	}
-
-	// Build the response in the same format as parseStaticResponse
-	response := openAIAPIStaticResponse{
-		Choices: make([]struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		}, 1),
-	}
-	response.Choices[0].Message.Content = fullContent.String()
-	response.Usage.InputTokens = inputTokens
-	response.Usage.OutputTokens = outputTokens
-
-	return response, nil, nil
-}
-
 type openAIStreamChunk struct {
 	Choices []struct {
 		Delta struct {
@@ -340,53 +395,6 @@ type openAIAPIStaticResponse struct {
 		Type    string `json:"type"`
 		Code    string `json:"code"`
 	}
-}
-
-func (c *openAIModel) Respond(ctx context.Context, msgs []Message) (ModelResponse, error) {
-	failedUsage := Usage{FailedCalls: 1}
-	failedResp := ModelResponse{Usage: failedUsage}
-	body, err := c.createBodyData(msgs)
-	if err != nil {
-		return failedResp, wrap(err, "could not encode body")
-	}
-	req, err := c.createRequest(ctx, body)
-	if err != nil {
-		return failedResp, wrap(err, "could not create request")
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return failedResp, wrap(err, "could not execute request")
-	}
-	defer resp.Body.Close()
-	var respTyped openAIAPIStaticResponse
-	var rawRespBytes []byte
-	if c.streamCallbacks != nil {
-		respTyped, rawRespBytes, err = c.parseStreamResponse(ctx, resp.Body)
-	} else {
-		respTyped, rawRespBytes, err = c.parseStaticResponse(ctx, resp.Body)
-	}
-	usage := Usage{
-		InputTokens:  respTyped.Usage.InputTokens,
-		OutputTokens: respTyped.Usage.OutputTokens,
-	}
-	if err != nil {
-		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "failed to parse response: %s", string(rawRespBytes))
-	}
-	if respTyped.Error.Code != "" {
-		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, &openAIError{
-			respTyped.Error.Message,
-			respTyped.Error.Type,
-			respTyped.Error.Code,
-		}
-	}
-	if len(respTyped.Choices) == 0 {
-		return ModelResponse{Usage: usage.Add(Usage{FailedCalls: 1})}, wrap(err, "response had no choices: %s", string(rawRespBytes))
-	}
-	content := respTyped.Choices[0].Message.Content
-	return ModelResponse{
-		PrimaryMessage: Message{Role: AssistantRole, Content: content},
-		Usage:          usage.Add(Usage{SuccessfulCalls: 1}),
-	}, nil
 }
 
 type openAIError struct {
