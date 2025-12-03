@@ -168,7 +168,7 @@ func (c *openAIModel) createBodyData(msgs []Message) (io.Reader, error) {
 	if err != nil {
 		return nil, wrap(err, "could not encode body")
 	}
-	return bytes.NewBuffer(body), nil
+	return bytes.NewReader(body), nil
 }
 
 // Wrap the openai request body up as an http.Request, with headers and context.
