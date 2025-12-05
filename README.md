@@ -90,7 +90,7 @@ if useGemini {
     model = jpf.NewOpenAIModel(apiKey, modelName, jpf.WithTemperature{X: temperature})
 }
 
-// Add retrying on API fails to the model.
+// Add retrying on API failures to the model.
 // This will retry calling the child model multiple times upon an error.
 if retries > 0 {
     model = jpf.NewRetryModel(model, retries, jpf.WithDelay{X: time.Second})
@@ -106,7 +106,7 @@ if cache != nil {
 // However, the client code does not need to know about any of this - to it we are still just calling a model!
 ```
 
-- Note that even though models can stream back text, it is only intended as a temporary and unreliable way to distract users while waiting fore requests.
+- Note that even though models can stream back text, it is only intended as a temporary and unreliable way to distract users while waiting for requests.
 	- You should always aim to make your code work without streaming, and add it in as an add-in later on to improve the UX - this is more robust.
 
 </details>
@@ -154,7 +154,7 @@ type ResponseDecoder[T, U any] interface {
 	ParseResponseText(T, string) (U, error)
 }
 ```
-- You may choose to implement your own response decoder, however in my experience a json object is usually sufficient output.
+ - You may choose to implement your own response decoder, however in my experience a JSON object is usually sufficient output.
 - When an error in response format is detected, the response decoder must return an error that, at some point in its chain, is an `ErrInvalidResponse` (this will be explained in the Map Func section).
 - There are some pre-defined response decoders included with jpf:
 ```go
@@ -162,8 +162,8 @@ type ResponseDecoder[T, U any] interface {
 // The type parameter T represents the input type that will be passed through (but ignored by this decoder).
 func NewRawStringResponseDecoder[T any]() ResponseDecoder[T, string] {...}
 
-// NewJsonResponseDecoder creates a ResponseDecoder that tries to parse a json object from the response.
-// It can ONLY parse json objects with an OBJECT as top level (i.e. it cannot parse a list directly).
+// NewJsonResponseDecoder creates a ResponseDecoder that tries to parse a JSON object from the response.
+// It can ONLY parse JSON objects with an OBJECT as top level (i.e. it cannot parse a list directly).
 // The type parameter T represents the input type, and U represents the output type.
 func NewJsonResponseDecoder[T, U any]() ResponseDecoder[T, U] {...}
 
@@ -233,16 +233,16 @@ func NewModelFallbackOneShotMapFunc[T, U any](
 </details>
 
 ## FAQ
-- I want to change my models temperature/structured output/output tokens/... after I have built it!
-    - The intention is to provide functions that need to use an LLM with a builder function instead of a built object. This way, you can use the builder function multiple times with different parameters.
-	- Take a look at the example to see this concept.
-    - This design descision was made as it prevents you from injecting unnesescary llm-related data into buisness logic.
+- I want to change my model's temperature/structured output/output tokens/... after I have built it!
+	- The intention is to provide functions that need to use an LLM with a builder function instead of a built object. This way, you can use the builder function multiple times with different parameters.
+	- Take a look at the examples to see this concept.
+	- This design decision was made as it prevents you from injecting unnecessary LLM-related data into business logic.
 - Where are the agents?
-    - Agents are built on top of LLMs, but this package is designed for LLM handling, so lives at the level below agents.
-	- Take a look at [JChat](github.com/JoshPattman/agent/cmd/jchat) to see how you can build an agent ontop of JPF.
-- Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API feature?
-    - Relying on API features like tool calling, MCP tools, or vector stores is not ideal for two reasons: (a) it makes it harder to move between API/model providers (b) it gives you less flexibility and control.
-    - These features are not particularly hard to add locally, so you should aim to do so to ensure your application is as robust as possible to API change.
+	- Agents are built on top of LLMs, but this package is designed for LLM handling, so it lives at the level below agents.
+	- Take a look at [JChat](github.com/JoshPattman/agent/cmd/jchat) to see how you can build an agent on top of JPF.
+- Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API features?
+	- Relying on API features like tool calling, MCP tools, or vector stores is not ideal for two reasons: (a) it makes it harder to move between API/model providers (b) it gives you less flexibility and control.
+	- These features are not particularly hard to add locally, so you should aim to do so to ensure your application is as robust as possible to API change.
 
 ## Author
 
