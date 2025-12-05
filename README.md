@@ -33,7 +33,7 @@ Learn more about JPF in the [Core Concepts](#core-concepts) section.
 
 ## Examples
 
-There are multiple examples available in the [examples](github.com/JoshPattman/jpf/examples) directory.
+There are multiple examples available in the [examples](https://github.com/JoshPattman/jpf/examples) directory.
 
 ## Core Concepts
 
