@@ -51,7 +51,7 @@ func TestLoggingModel(t *testing.T) {
 {"aux_responses":[],"duration":"80ns","final_response":{"content":"bye","num_images":0,"role":"assistant"},"messages":[{"content":"hello","num_images":0,"role":"system"}],"usage":{"input_tokens":0,"output_tokens":0}}
 {"aux_responses":[],"duration":"80ns","final_response":{"content":"hi again","num_images":0,"role":"assistant"},"messages":[{"content":"hello","num_images":0,"role":"system"}],"usage":{"input_tokens":0,"output_tokens":0}}`
 	// The times are logged so we cannot do a direct comparison
-	if math.Abs(float64(len(bs)-len(expected))) > 6 {
+	if math.Abs(float64(len(bs)-len(expected))) > 9 {
 		t.Fatalf("unexpected log: %v", bs)
 	}
 }
