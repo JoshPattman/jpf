@@ -1,13 +1,12 @@
 <p align="center">
-  <img src="res/icon.webp" height="150px">
+  <img src="res/banner.webp" width="100%">
 </p>
 
-# `jpf` - A Batteries-Included Framework for AI-Powered Applications
 [![Go Report Card](https://goreportcard.com/badge/github.com/JoshPattman/jpf)](https://goreportcard.com/report/github.com/JoshPattman/jpf)
 [![Go Ref](https://pkg.go.dev/static/frontend/badge/badge.svg)](https://pkg.go.dev/github.com/JoshPattman/jpf)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-jpf is a Go library for building AI-powered applications with ease. It provides essential building blocks and robust LLM interaction interfaces, enabling you to craft custom solutions without the bloat.
+Providing essential building blocks and robust LLM interaction interfaces, **jpf** enables you to craft custom AI solutions without the bloat.
 
 ## Features
 
