@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestTemplateMessageEncoder_BuildInputMessages(t *testing.T) {
+func TestTemplateEncoder_BuildInputMessages(t *testing.T) {
 	type Person struct {
 		Name string
 		Age  int
@@ -54,7 +54,7 @@ func TestTemplateMessageEncoder_BuildInputMessages(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			encoder := NewTemplateMessageEncoder[Person](tt.systemTemplate, tt.userTemplate)
+			encoder := NewTemplateEncoder[Person](tt.systemTemplate, tt.userTemplate)
 			got, err := encoder.BuildInputMessages(tt.data)
 
 			// Check error
@@ -71,19 +71,19 @@ func TestTemplateMessageEncoder_BuildInputMessages(t *testing.T) {
 	}
 }
 
-func TestTemplateMessageEncoder_BuildInputMessages_Error(t *testing.T) {
+func TestTemplateEncoder_BuildInputMessages_Error(t *testing.T) {
 	// Test with invalid template
-	encoder := NewTemplateMessageEncoder[struct{}]("{{ .MissingField }}", "")
+	encoder := NewTemplateEncoder[struct{}]("{{ .MissingField }}", "")
 	_, err := encoder.BuildInputMessages(struct{}{})
 	if err == nil {
 		t.Errorf("Expected error for missing field in template, got nil")
 	}
 }
 
-func TestTemplateMessageEncoder_DifferentTypes(t *testing.T) {
+func TestTemplateEncoder_DifferentTypes(t *testing.T) {
 	// Test with map type
 	t.Run("map type", func(t *testing.T) {
-		encoder := NewTemplateMessageEncoder[map[string]string]("Hello {{.name}}", "")
+		encoder := NewTemplateEncoder[map[string]string]("Hello {{.name}}", "")
 		got, err := encoder.BuildInputMessages(map[string]string{"name": "Josh"})
 
 		if err != nil {
@@ -102,7 +102,7 @@ func TestTemplateMessageEncoder_DifferentTypes(t *testing.T) {
 
 	// Test with primitive type (requires special handling in templates)
 	t.Run("string type with dot value", func(t *testing.T) {
-		encoder := NewTemplateMessageEncoder[string]("You said: {{.}}", "")
+		encoder := NewTemplateEncoder[string]("You said: {{.}}", "")
 		got, err := encoder.BuildInputMessages("hello world")
 
 		if err != nil {

@@ -83,3 +83,9 @@ func (s *SlowTestingModel) Respond(ctx context.Context, msgs []Message) (ModelRe
 		return ModelResponse{}, ctx.Err()
 	}
 }
+
+type alwaysFailValidator[T, U any] struct{}
+
+func (*alwaysFailValidator[T, U]) ValidateParsedResponse(T, U) error {
+	return errors.Join(errors.New("expected fail"), ErrInvalidResponse)
+}
