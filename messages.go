@@ -17,6 +17,7 @@ const (
 	UserRole
 	AssistantRole
 	ReasoningRole
+	DeveloperRole
 )
 
 func (r Role) String() string {
@@ -29,6 +30,8 @@ func (r Role) String() string {
 		return "assistant"
 	case ReasoningRole:
 		return "reasoning"
+	case DeveloperRole:
+		return "developer"
 	}
 	panic("not a valid role")
 }

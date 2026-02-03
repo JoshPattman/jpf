@@ -296,6 +296,8 @@ func roleToOpenAI(role Role) (string, error) {
 		return "user", nil
 	case AssistantRole:
 		return "assistant", nil
+	case DeveloperRole:
+		return "developer", nil
 	default:
 		return "", fmt.Errorf("openai does not support that role: %s", role.String())
 	}
