@@ -319,7 +319,7 @@ func roleToGemini(role Role) (string, error) {
 	case UserRole:
 		return "user", nil
 	case AssistantRole:
-		return "assistant", nil
+		return "model", nil
 	default:
 		return "", fmt.Errorf("gemini does not support that role: %s", role.String())
 	}
