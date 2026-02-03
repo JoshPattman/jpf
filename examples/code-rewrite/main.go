@@ -55,13 +55,13 @@ func main() {
 		Retries:           5,
 		APIRequestTimeout: time.Second * 30,
 	}
-	codeConnvertBuilder := &CodeConvertMFBuilder{
+	pipelineBuilder := &CodeConvertPipelineBuilder{
 		ModelBuilder: modelBuilder,
 		SystemPrompt: systemPrompt,
 	}
 
 	// Build the code converter
-	codeConverter := codeConnvertBuilder.Build(*useGemini)
+	pipeline := pipelineBuilder.Build(*useGemini)
 
 	// Read the input file
 	data, err := os.ReadFile(*inputFile)
@@ -71,7 +71,7 @@ func main() {
 	}
 
 	// Rewrite the code
-	rewritten, _, err := codeConverter.Call(context.Background(), CodeConversionInput{
+	rewritten, _, err := pipeline.Call(context.Background(), CodeConversionInput{
 		Language: *targetLang,
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),
@@ -130,18 +130,18 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 	return model
 }
 
-// CodeConvertMFBuilder builds a code converting jpf.MapFunc.
+// CodeConvertPipelineBuilder builds a code converting jpf.Pipeline.
 // It uses the provided model builder to build the model, and wraps it with an encoder and decoder.
-// You may choose to build an openAI or gemini based map func at build time.
-type CodeConvertMFBuilder struct {
+// You may choose to build an openAI or gemini based pipeline at build time.
+type CodeConvertPipelineBuilder struct {
 	ModelBuilder *ModelBuilder
 	SystemPrompt string
 }
 
-func (builder *CodeConvertMFBuilder) Build(useGemini bool) jpf.MapFunc[CodeConversionInput, string] {
+func (builder *CodeConvertPipelineBuilder) Build(useGemini bool) jpf.Pipeline[CodeConversionInput, string] {
 	model := builder.ModelBuilder.Build(useGemini)
 
-	formatter := jpf.NewTemplateMessageEncoder[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
-	parser := jpf.NewRawStringResponseDecoder[CodeConversionInput]()
-	return jpf.NewOneShotMapFunc(formatter, parser, model)
+	formatter := jpf.NewTemplateEncoder[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
+	parser := jpf.NewStringParser()
+	return jpf.NewOneShotPipeline(formatter, parser, nil, model)
 }

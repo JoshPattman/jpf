@@ -112,123 +112,79 @@ if cache != nil {
 </details>
 
 <details>
-<summary>Message Encoder</summary>
+<summary>Encoder</summary>
 
-- A `MessageEncoder` provides an interface to take a specific typed object and produce some messages for the LLM.
+- An `Encoder` provides an interface to take a specific typed object and produce some messages for the LLM.
   - It does not actually make a call to the `Model`, and it does not decode the response.
 
 ```go
-// MessageEncoder encodes a structured piece of data into a set of messages for an LLM.
-type MessageEncoder[T any] interface {
+// Encoder encodes a structured piece of data into a set of messages for an LLM.
+type Encoder[T any] interface {
 	BuildInputMessages(T) ([]Message, error)
 }
 ```
 
-- For more complex tasks, you may choose to implement this yourself, however there are some useful encoders built in (or use a combination of both built-in and custom):
-  
-```go
-// NewRawStringMessageEncoder creates a MessageEncoder that encodes a system prompt and user input as raw string messages.
-func NewRawStringMessageEncoder(systemPrompt string) MessageEncoder[string] {...}
-
-// NewTemplateMessageEncoder creates a MessageEncoder that uses Go's text/template for formatting messages.
-// It accepts templates for both system and user messages, allowing dynamic content insertion.
-func NewTemplateMessageEncoder[T any](systemTemplate, userTemplate string) MessageEncoder[T] {...}
-
-// Create a new message encoder that appends the results of running each message encoder sequentially.
-// Useful, for example, to have a templating system / user message encoder, and a custom agent history message encoder after.
-func NewSequentialMessageEncoder[T any](msgEncs ...MessageEncoder[T]) MessageEncoder[T] {...}
-```
+- For more complex tasks, you may choose to implement this yourself, however there are some useful encoders built in.
 
 </details>
 
 <details>
-<summary>Response Decoder</summary>
+<summary>Parser</summary>
 
-- A `ResponseDecoder` parses the output of an LLM into structured data.
-- As with message encoders, they do not make any LLM calls.
-- The decoder receives both the input data (type `T`) and the LLM response, allowing it to validate or parse the response in context of the original input.
+- A `Parser` parses the output of an LLM into structured data.
+- As with encoders, they do not make any LLM calls.
 ```go
-// ResponseDecoder converts an input to an LLM and the LLM response into a structured piece of output data.
-// When the LLM response is invalid, it should return ErrInvalidResponse (or an error joined on that).
-type ResponseDecoder[T, U any] interface {
-	ParseResponseText(T, string) (U, error)
+// Parser converts the LLM response into a structured piece of output data.
+// When the LLM response is invalid, it should return [ErrInvalidResponse] (or an error joined on that).
+type Parser[U any] interface {
+	ParseResponseText(string) (U, error)
 }
 ```
- - You may choose to implement your own response decoder, however in my experience a JSON object is usually sufficient output.
-- When an error in response format is detected, the response decoder must return an error that, at some point in its chain, is an `ErrInvalidResponse` (this will be explained in the Map Func section).
-- There are some pre-defined response decoders included with jpf:
-```go
-// NewRawStringResponseDecoder creates a ResponseDecoder that returns the response as a raw string without modification.
-// The type parameter T represents the input type that will be passed through (but ignored by this decoder).
-func NewRawStringResponseDecoder[T any]() ResponseDecoder[T, string] {...}
-
-// NewJsonResponseDecoder creates a ResponseDecoder that tries to parse a JSON object from the response.
-// It can ONLY parse JSON objects with an OBJECT as top level (i.e. it cannot parse a list directly).
-// The type parameter T represents the input type, and U represents the output type.
-func NewJsonResponseDecoder[T, U any]() ResponseDecoder[T, U] {...}
-
-// Wrap an existing response decoder with one that takes only the part of interest of the response into account.
-// The part of interest is determined by the substring function.
-// If an error is detected when getting the substring, ErrInvalidResponse is raised.
-func NewSubstringResponseDecoder[T, U any](decoder ResponseDecoder[T, U], substring func(string) (string, error)) ResponseDecoder[T, U] {...}
-
-// Creates a response decoder that wraps the provided one,
-// but then performs an extra validation step on the parsed response.
-// If an error is found during validation, the error is wrapped with ErrInvalidResponse and returned.
-// The validation function receives both the input and the parsed output, allowing for context-aware validation.
-func NewValidatingResponseDecoder[T, U any](decoder ResponseDecoder[T, U], validate func(T, U) error) ResponseDecoder[T, U] {...}
-```
+ - You may choose to implement your own parser, however in my experience a JSON object is usually sufficient output.
+- When an error in response format is detected, the response decoder must return an error that, at some point in its chain, is an `ErrInvalidResponse` (this will be explained in the pipeline section).
 
 </details>
 
 <details>
-<summary>Map Func</summary>
+<summary>Validator</summary>
 
-- A `MapFunc` is a collection of a `MessageEncoder`, `ResponseDecoder`, `Model`, and some additional logic.
-- Your business logic should only ever be interacting with LLMs through a Map Func.
+- A `Validator` checks the parsed output of an LLM against the input to validate it.
+- These are optional in all pipelines (can be passed as nil if no further validation is required).
+```go
+// Validator takes a parsed LLM response and validates it against the input.
+// When the LLM response is invalid, it should return [ErrInvalidResponse] (or an error joined on that).
+type Validator[T, U any] interface {
+	ValidateParsedResponse(T, U) error
+}
+```
+ - There are no implementations of this in jpf due to how usage-specific the validation would be - you should impolement your own.
+- As with the above, validation errors should return an `ErrInvalidResponse`.
+
+</details>
+
+<details>
+<summary>Pipeline</summary>
+
+- A `Pipeline` is a collection of a `Encoder`, `Parser`, `Validator` (optional), `Model`, and some additional logic.
+- Your business logic should only ever be interacting with LLMs through a pipeline.
 - It is a very generic interface, but it is intended to only ever be used for LLM-based functionality.
 ```go
-// MapFunc transforms input of type T into output of type U using an LLM.
+// Pipeline transforms input of type T into output of type U using an LLM.
 // It handles the encoding of input, interaction with the LLM, and decoding of output.
-type MapFunc[T, U any] interface {
-	Call(ctx context.Context, input T) (U, Usage, error)
+type Pipeline[T, U any] interface {
+	Call(context.Context, T) (U, Usage, error)
 }
 ```
 
-- It is not really expected that users will implement their own Map Funcs, but that is absolutely possible.
-- jpf ships with three built-in Map Funcs:
-
-```go
-// NewOneShotMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
-func NewOneShotMapFunc[T, U any](enc MessageEncoder[T], dec ResponseDecoder[T, U], model Model) MapFunc[T, U] {...}
-
-// NewFeedbackMapFunc creates a MapFunc that first runs the encoder, then the model, finally parsing the response with the decoder.
-// However, it adds feedback to the conversation when errors are detected.
-// It will only add to the conversation if the error returned from the parser is an ErrInvalidResponse (using errors.Is).
-func NewFeedbackMapFunc[T, U any](
-	enc MessageEncoder[T],
-	pars ResponseDecoder[T, U],
-	fed FeedbackGenerator,
-	model Model,
-	feedbackRole Role,
-	maxRetries int,
-) MapFunc[T, U] {...}
-
-// Creates a map func that first tries to ask the first model,
-// and if that produces an invalid format will try to ask the next models
-// until a valid format is found.
-// This is useful, for example, to try a second time with a model that overwrites the cache.
-func NewModelFallbackOneShotMapFunc[T, U any](
-	enc MessageEncoder[T],
-	dec ResponseDecoder[T, U],
-	models ...Model,
-) MapFunc[T, U] {...}
-```
-
+- It is not really expected that users will implement their own pipelines, but that is absolutely possible.
+- jpf ships with three built-in pipelines:
+	- `NewOneShotPipeline`: No retries on validation fails, return errors immediately.
+	- `NewFeedbackPipeline`: On `ErrInvalidResponse`, add the error to the conversation and try again.
+	- `NewFallbackPipeline`: On `ErrInvalidResponse`, try again with the next model option.
 - Notice in the above, we have introduced a second place for retries to occur - this is intentional.
   - API-level errors should be retried at the `Model` level - these are errors that are not the fault of the LLM.
-  - LLM response errors should be retried at the `MapFunc` level - these are errors where the LLM has responded with an invalid response, and we would like to tell it what it did wrong and ask again.
-- However, if you choose not to use these higher-level retries, you can simply use the one-shot map func.
+  - LLM response errors should be retried at the `Pipeline` level - these are errors where the LLM has responded with an invalid response, and we would like to tell it what it did wrong and ask again.
+- However, if you choose not to use these higher-level retries, you can simply use the one-shot pipeline.
 
 </details>
 
@@ -239,7 +195,7 @@ func NewModelFallbackOneShotMapFunc[T, U any](
 	- This design decision was made as it prevents you from injecting unnecessary LLM-related data into business logic.
 - Where are the agents?
 	- Agents are built on top of LLMs, but this package is designed for LLM handling, so it lives at the level below agents.
-	- Take a look at [JChat](github.com/JoshPattman/agent/cmd/jchat) to see how you can build an agent on top of JPF.
+	- Take a look at [JChat](https://github.com/JoshPattman/agent/cmd/jchat) or [react](https://github.com/JoshPattman/react) to see how you can build an agent on top of JPF.
 - Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API features?
 	- Relying on API features like tool calling, MCP tools, or vector stores is not ideal for two reasons: (a) it makes it harder to move between API/model providers (b) it gives you less flexibility and control.
 	- These features are not particularly hard to add locally, so you should aim to do so to ensure your application is as robust as possible to API change.

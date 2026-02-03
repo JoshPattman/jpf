@@ -19,16 +19,16 @@ func main() {
 	// We can still use normal encoders, decoders, and retry logic (do be aware that retries will call the onBegin callback again).
 	model := jpf.NewOpenAIModel(os.Getenv("OPENAI_KEY"), "gpt-4.1", jpf.WithStreamResponse{OnText: onStream})
 	// model := jpf.NewGeminiModel(os.Getenv("GEMINI_KEY"), "gemini-2.5-flash", jpf.WithStreamResponse{OnText: onStream})
-	enc := jpf.NewRawStringMessageEncoder("Write 5 haikus about the topic")
-	dec := jpf.NewRawStringResponseDecoder[string]()
-	mf := jpf.NewOneShotMapFunc(enc, dec, model)
+	encoder := jpf.NewFixedEncoder("Write 5 haikus about the topic")
+	parser := jpf.NewStringParser()
+	pipeline := jpf.NewOneShotPipeline(encoder, parser, nil, model)
 
 	fmt.Println("===== Stream =====")
 	// When we call the model, the callback will be called as the stream comes in.
 	// In this case, we are ignoring the final response. However, we really should not do this!
 	// In a production system, we should wipe any text that has been streamed and replace it with this final response,
 	// because we cannot trust that the stream actually happened.
-	_, usage, err := mf.Call(context.Background(), "Dogs")
+	_, usage, err := pipeline.Call(context.Background(), "Dogs")
 	fmt.Println()
 	fmt.Println()
 

@@ -59,11 +59,11 @@ func main() {
 	}
 }
 
-// Builds a MapFunc that answers a question with a typed struct.
+// Builds a Pipeline that answers a question with a typed struct.
 // Uses OpenAI gpt 4o, with 5 retries on API failiure.
 // IMO this is not as powerful a pattern as the building structs in the other examples,
 // but I have added this here to show that it can be simplified.
-func BuildStructuredQuerier[T any]() (jpf.MapFunc[string, T], error) {
+func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 	var example T
 	schema, err := getSchema(example)
 	if err != nil {
@@ -75,9 +75,9 @@ func BuildStructuredQuerier[T any]() (jpf.MapFunc[string, T], error) {
 		jpf.WithJsonSchema{X: schema},
 	)
 	model = jpf.NewRetryModel(model, 5)
-	enc := jpf.NewRawStringMessageEncoder("Answer the users question in a json format.")
-	dec := jpf.NewJsonResponseDecoder[string, T]()
-	return jpf.NewOneShotMapFunc(enc, dec, model), nil
+	enc := jpf.NewFixedEncoder("Answer the users question in a json format.")
+	dec := jpf.NewJsonParser[T]()
+	return jpf.NewOneShotPipeline(enc, dec, nil, model), nil
 }
 
 // Generates a json schema from an example struct.
