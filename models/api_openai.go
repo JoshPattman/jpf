@@ -319,6 +319,8 @@ func (m *apiOpenAIModel) reasoningEffort(re ReasoningEffort) string {
 		return "medium"
 	case HighReasoning:
 		return "high"
+	case XHighReasoning:
+		return "xhigh"
 	default:
 		panic("not possible")
 	}
