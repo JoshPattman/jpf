@@ -1,0 +1,63 @@
+package models
+
+import (
+	"context"
+	"time"
+
+	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/utils"
+)
+
+// Log wraps a Model with logging functionality.
+// It logs all interactions with the model using the provided ModelLogger.
+// Each model call is logged with input messages, output messages, usage statistics, and timing information.
+func Log(model jpf.Model, logger ModelLogger) jpf.Model {
+	return &loggingModel{
+		model:  model,
+		logger: logger,
+	}
+}
+
+type loggingModel struct {
+	logger ModelLogger
+	model  jpf.Model
+}
+
+// Respond implements Model.
+func (l *loggingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+	tStart := time.Now()
+	resp, err := l.model.Respond(ctx, msgs)
+	dur := time.Since(tStart)
+	lmp := ModelLoggingInfo{
+		Messages:             msgs,
+		ResponseAuxMessages:  resp.AuxiliaryMessages,
+		ResponseFinalMessage: resp.PrimaryMessage,
+		Usage:                resp.Usage,
+		Err:                  err,
+		Duration:             dur,
+	}
+	logErr := l.logger.ModelLog(lmp)
+	if err != nil {
+		// There was an error with the original mode, do nothing
+	} else if logErr != nil {
+		// There was not an original model error, but we got a logging error
+		err = utils.Wrap(logErr, "failed to execute logging")
+	}
+	return resp, err
+}
+
+// ModelLoggingInfo contains all information about a model interaction to be logged.
+// It includes input messages, output messages, usage statistics, and any error that occurred.
+type ModelLoggingInfo struct {
+	Messages             []jpf.Message
+	ResponseAuxMessages  []jpf.Message
+	ResponseFinalMessage jpf.Message
+	Usage                jpf.Usage
+	Err                  error
+	Duration             time.Duration
+}
+
+// ModelLogger specifies a method of logging a call to a model.
+type ModelLogger interface {
+	ModelLog(ModelLoggingInfo) error
+}
