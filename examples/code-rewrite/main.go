@@ -54,7 +54,7 @@ func main() {
 		OpenAIKey:         os.Getenv("OPENAI_KEY"),
 		OpenAIModelName:   "gpt-4o-mini",
 		GeminiKey:         os.Getenv("GEMINI_KEY"),
-		GeminiModelName:   "gemini-2.0-flash",
+		GeminiModelName:   "gemini-2.5-flash",
 		Cache:             cache,
 		Retries:           5,
 		APIRequestTimeout: time.Second * 30,
