@@ -6,6 +6,10 @@ import (
 	"os"
 
 	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/encoders"
+	"github.com/JoshPattman/jpf/models"
+	"github.com/JoshPattman/jpf/parsers"
+	"github.com/JoshPattman/jpf/pipelines"
 )
 
 func main() {
@@ -20,12 +24,12 @@ func main() {
 
 	topic := "Dogs"
 	params := []struct {
-		verbosity jpf.Verbosity
+		verbosity models.Verbosity
 		pPenalty  float64
 	}{
-		{jpf.LowVerbosity, 0},
-		{jpf.MediumVerbosity, 0},
-		{jpf.HighVerbosity, 0},
+		{models.LowVerbosity, 0},
+		{models.MediumVerbosity, 0},
+		{models.HighVerbosity, 0},
 	}
 
 	for _, param := range params {
@@ -47,12 +51,12 @@ type ModelBuilder struct {
 	OpenAIModelName string
 }
 
-func (builder *ModelBuilder) Build(verbosity jpf.Verbosity, pPenalty float64) jpf.Model {
-	return jpf.NewOpenAIModel(
+func (builder *ModelBuilder) Build(verbosity models.Verbosity, pPenalty float64) jpf.Model {
+	return models.NewOpenAIModel(
 		builder.OpenAIKey,
 		builder.OpenAIModelName,
-		jpf.WithVerbosity{X: verbosity},
-		jpf.WithPresencePenalty{X: pPenalty},
+		models.WithVerbosity{X: verbosity},
+		models.WithPresencePenalty{X: pPenalty},
 	)
 }
 
@@ -61,9 +65,9 @@ type PoemPipelineBuilder struct {
 	SystemPrompt string
 }
 
-func (builder *PoemPipelineBuilder) Build(verbosity jpf.Verbosity, pPenalty float64) jpf.Pipeline[string, string] {
+func (builder *PoemPipelineBuilder) Build(verbosity models.Verbosity, pPenalty float64) jpf.Pipeline[string, string] {
 	model := builder.ModelBuilder.Build(verbosity, pPenalty)
-	encoder := jpf.NewFixedEncoder(builder.SystemPrompt)
-	parser := jpf.NewStringParser()
-	return jpf.NewOneShotPipeline(encoder, parser, nil, model)
+	encoder := encoders.NewFixedEncoder(builder.SystemPrompt)
+	parser := parsers.NewStringParser()
+	return pipelines.NewOneShotPipeline(encoder, parser, nil, model)
 }

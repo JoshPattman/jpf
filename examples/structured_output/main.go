@@ -8,6 +8,10 @@ import (
 	"os"
 
 	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/encoders"
+	"github.com/JoshPattman/jpf/models"
+	"github.com/JoshPattman/jpf/parsers"
+	"github.com/JoshPattman/jpf/pipelines"
 	"github.com/invopop/jsonschema"
 )
 
@@ -69,15 +73,15 @@ func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 	if err != nil {
 		return nil, errors.Join(errors.New("failed to create schema"), err)
 	}
-	model := jpf.NewOpenAIModel(
+	model := models.NewOpenAIModel(
 		os.Getenv("OPENAI_KEY"),
 		"gpt-4o",
-		jpf.WithJsonSchema{X: schema},
+		models.WithJsonSchema{X: schema},
 	)
-	model = jpf.NewRetryModel(model, 5)
-	enc := jpf.NewFixedEncoder("Answer the users question in a json format.")
-	dec := jpf.NewJsonParser[T]()
-	return jpf.NewOneShotPipeline(enc, dec, nil, model), nil
+	model = models.NewRetryModel(model, 5)
+	enc := encoders.NewFixedEncoder("Answer the users question in a json format.")
+	dec := parsers.NewJsonParser[T]()
+	return pipelines.NewOneShotPipeline(enc, dec, nil, model), nil
 }
 
 // Generates a json schema from an example struct.

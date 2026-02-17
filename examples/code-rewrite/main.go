@@ -11,6 +11,10 @@ import (
 	"time"
 
 	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/encoders"
+	"github.com/JoshPattman/jpf/models"
+	"github.com/JoshPattman/jpf/parsers"
+	"github.com/JoshPattman/jpf/pipelines"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -39,7 +43,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	cache, err := jpf.NewSQLCache(context.Background(), db)
+	cache, err := models.NewSQLCache(context.Background(), db)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -99,7 +103,7 @@ type ModelBuilder struct {
 	OpenAIModelName   string
 	GeminiModelName   string
 	GeminiKey         string
-	Cache             jpf.ModelResponseCache
+	Cache             models.ModelResponseCache
 	Retries           int
 	APIRequestTimeout time.Duration
 }
@@ -108,24 +112,24 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 	var model jpf.Model
 	var saltName string
 	if useGemini {
-		model = jpf.NewGeminiModel(builder.GeminiKey, builder.GeminiModelName)
+		model = models.NewGeminiModel(builder.GeminiKey, builder.GeminiModelName)
 		saltName = builder.GeminiModelName
 	} else {
-		model = jpf.NewOpenAIModel(builder.OpenAIKey, builder.OpenAIModelName)
+		model = models.NewOpenAIModel(builder.OpenAIKey, builder.OpenAIModelName)
 		saltName = builder.OpenAIModelName
 	}
 	if builder.APIRequestTimeout != 0 {
-		model = jpf.NewTimeoutModel(model, builder.APIRequestTimeout)
+		model = models.NewTimeoutModel(model, builder.APIRequestTimeout)
 	}
 	if builder.Retries > 0 {
-		model = jpf.NewRetryModel(model, builder.Retries, jpf.WithDelay{X: time.Second})
+		model = models.NewRetryModel(model, builder.Retries, models.WithDelay{X: time.Second})
 	}
 	if builder.Cache != nil {
 		// We will share cache if:
 		// - the model has the same model name
 		// - is from the same provider
 		salt := fmt.Sprintf("%v%s", useGemini, saltName)
-		model = jpf.NewCachedModel(model, builder.Cache, jpf.WithSalt{X: salt})
+		model = models.NewCachedModel(model, builder.Cache, models.WithSalt{X: salt})
 	}
 	return model
 }
@@ -141,7 +145,7 @@ type CodeConvertPipelineBuilder struct {
 func (builder *CodeConvertPipelineBuilder) Build(useGemini bool) jpf.Pipeline[CodeConversionInput, string] {
 	model := builder.ModelBuilder.Build(useGemini)
 
-	formatter := jpf.NewTemplateEncoder[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
-	parser := jpf.NewStringParser()
-	return jpf.NewOneShotPipeline(formatter, parser, nil, model)
+	formatter := encoders.NewTemplateEncoder[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
+	parser := parsers.NewStringParser()
+	return pipelines.NewOneShotPipeline(formatter, parser, nil, model)
 }
