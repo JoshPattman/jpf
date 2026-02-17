@@ -109,27 +109,31 @@ type ModelBuilder struct {
 }
 
 func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
-	var model jpf.Model
-	var saltName string
+	var mode models.APIFormat
+	var name string
+	var key string
 	if useGemini {
-		model = models.NewGeminiModel(builder.GeminiKey, builder.GeminiModelName)
-		saltName = builder.GeminiModelName
+		mode = models.Google
+		name = builder.GeminiModelName
+		key = builder.GeminiKey
 	} else {
-		model = models.NewOpenAIModel(builder.OpenAIKey, builder.OpenAIModelName)
-		saltName = builder.OpenAIModelName
+		mode = models.OpenAI
+		name = builder.OpenAIModelName
+		key = builder.OpenAIKey
 	}
+	model := models.NewAPIModel(mode, name, key)
 	if builder.APIRequestTimeout != 0 {
-		model = models.NewTimeoutModel(model, builder.APIRequestTimeout)
+		model = models.Timeout(model, builder.APIRequestTimeout)
 	}
 	if builder.Retries > 0 {
-		model = models.NewRetryModel(model, builder.Retries, models.WithDelay{X: time.Second})
+		model = models.Retry(model, builder.Retries, models.WithDelay{X: time.Second})
 	}
 	if builder.Cache != nil {
 		// We will share cache if:
 		// - the model has the same model name
 		// - is from the same provider
-		salt := fmt.Sprintf("%v%s", useGemini, saltName)
-		model = models.NewCachedModel(model, builder.Cache, models.WithSalt{X: salt})
+		salt := fmt.Sprintf("%v%s", useGemini, name)
+		model = models.Cache(model, builder.Cache, models.WithSalt{X: salt})
 	}
 	return model
 }

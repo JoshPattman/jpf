@@ -7,12 +7,12 @@ import (
 	"github.com/JoshPattman/jpf/utils"
 )
 
-// NewFakeReasoningModel creates a model that uses two underlying models to simulate reasoning.
+// TwoStageReason creates a model that uses two underlying models to simulate reasoning.
 // It first calls the reasoner model to generate reasoning about the input messages,
 // then passes that reasoning along with the original messages to the answerer model.
 // The reasoning is included as a ReasoningRole message in the auxiliary messages output.
 // Optional parameters allow customization of the reasoning prompt.
-func NewFakeReasoningModel(reasoner jpf.Model, answerer jpf.Model, opts ...FakeReasoningModelOpt) jpf.Model {
+func TwoStageReason(reasoner jpf.Model, answerer jpf.Model, opts ...FakeReasoningModelOpt) jpf.Model {
 	m := &fakeReasoningModel{
 		reasoner:        reasoner,
 		answerer:        answerer,

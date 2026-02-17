@@ -73,12 +73,13 @@ func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 	if err != nil {
 		return nil, errors.Join(errors.New("failed to create schema"), err)
 	}
-	model := models.NewOpenAIModel(
+	model := models.NewAPIModel(
+		models.OpenAI,
 		os.Getenv("OPENAI_KEY"),
 		"gpt-4o",
-		models.WithJsonSchema{X: schema},
+		models.WithJSONSchema(schema),
 	)
-	model = models.NewRetryModel(model, 5)
+	model = models.Retry(model, 5)
 	enc := encoders.NewFixedEncoder("Answer the users question in a json format.")
 	dec := parsers.NewJsonParser[T]()
 	return pipelines.NewOneShotPipeline(enc, dec, nil, model), nil

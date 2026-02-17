@@ -7,10 +7,10 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewTimeoutModel creates a new model that will cause the context of the child to timeout,
+// Timeout creates a new model that will cause the context of the child to timeout,
 // a specified duration after Respond is called.
 // Caution: It only tells the context to timeout - it will not forecfully stop the child model if it does not respect the context.
-func NewTimeoutModel(model jpf.Model, timeout time.Duration) jpf.Model {
+func Timeout(model jpf.Model, timeout time.Duration) jpf.Model {
 	return &timeoutModel{
 		Model:   model,
 		timeout: timeout,

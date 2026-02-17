@@ -13,19 +13,19 @@ import (
 )
 
 func TestConstructOtherModels(t *testing.T) {
-	model := NewOpenAIModel("abc", "123", WithHTTPHeader{K: "A", V: "B"}, WithReasoningEffort{X: HighReasoning}, WithTemperature{X: 0.5}, WithURL{X: "abc.com"})
-	model = NewConcurrentLimitedModel(model, NewOneConcurrentLimiter())
-	model = NewFakeReasoningModel(model, model, WithReasoningPrompt{X: "Reason please"})
-	model = NewLoggingModel(model, NewJsonModelLogger(os.Stdout))
-	model = NewRetryModel(model, 10, WithDelay{X: time.Second})
-	NewRetryChainModel([]jpf.Model{model, model})
+	model := NewAPIModel(OpenAI, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
+	model = LimitConcurrency(model, NewOneConcurrentLimiter())
+	model = TwoStageReason(model, model, WithReasoningPrompt{X: "Reason please"})
+	model = Log(model, NewJsonModelLogger(os.Stdout))
+	model = Retry(model, 10, WithDelay{X: time.Second})
+	RetryChain([]jpf.Model{model, model})
 }
 
 func TestCachedModel(t *testing.T) {
 	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
 		"hello": {"hi", "bye"},
 	}}
-	model = NewCachedModel(model, NewInMemoryCache())
+	model = Cache(model, NewInMemoryCache())
 	for i := range 5 {
 		resp1, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
 		if err != nil {
@@ -42,7 +42,7 @@ func TestLoggingModel(t *testing.T) {
 		"hello": {"hi", "bye", "hi again"},
 	}}
 	buf := bytes.NewBuffer(nil)
-	model = NewLoggingModel(model, NewJsonModelLogger(buf))
+	model = Log(model, NewJsonModelLogger(buf))
 	for range 3 {
 		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
 		if err != nil {
@@ -66,7 +66,7 @@ func TestRetryModel(t *testing.T) {
 		},
 		NFails: 3,
 	}
-	model = NewRetryModel(model, 3)
+	model = Retry(model, 3)
 	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)
@@ -78,7 +78,7 @@ func TestRetryModel(t *testing.T) {
 
 func TestRetryChainModel(t *testing.T) {
 	t.Run("first model succeeds", func(t *testing.T) {
-		model := NewRetryChainModel([]jpf.Model{
+		model := RetryChain([]jpf.Model{
 			&utils.TestingModel{
 				Responses: map[string][]string{
 					"hello": {"first response"},
@@ -100,7 +100,7 @@ func TestRetryChainModel(t *testing.T) {
 	})
 
 	t.Run("first model fails, second succeeds", func(t *testing.T) {
-		model := NewRetryChainModel([]jpf.Model{
+		model := RetryChain([]jpf.Model{
 			&utils.TestingModel{
 				Responses: map[string][]string{},
 				NFails:    1,
@@ -121,7 +121,7 @@ func TestRetryChainModel(t *testing.T) {
 	})
 
 	t.Run("all models fail", func(t *testing.T) {
-		model := NewRetryChainModel([]jpf.Model{
+		model := RetryChain([]jpf.Model{
 			&utils.TestingModel{
 				Responses: map[string][]string{},
 				NFails:    1,
@@ -147,7 +147,7 @@ func TestRetryChainModel(t *testing.T) {
 	})
 
 	t.Run("third model succeeds", func(t *testing.T) {
-		model := NewRetryChainModel([]jpf.Model{
+		model := RetryChain([]jpf.Model{
 			&utils.TestingModel{NFails: 1},
 			&utils.TestingModel{NFails: 1},
 			&utils.TestingModel{
@@ -177,7 +177,7 @@ func TestTimeoutModel(t *testing.T) {
 		}
 
 		// Wrap with 50ms timeout
-		model := NewTimeoutModel(slowModel, 50*time.Millisecond)
+		model := Timeout(slowModel, 50*time.Millisecond)
 
 		start := time.Now()
 		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
@@ -207,7 +207,7 @@ func TestTimeoutModel(t *testing.T) {
 		}
 
 		// Wrap with 100ms timeout (plenty of time)
-		model := NewTimeoutModel(fastModel, 100*time.Millisecond)
+		model := Timeout(fastModel, 100*time.Millisecond)
 
 		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
 		if err != nil {
@@ -228,7 +228,7 @@ func TestTimeoutModel(t *testing.T) {
 		}
 
 		// Model configured with 100ms timeout
-		model := NewTimeoutModel(slowModel, 100*time.Millisecond)
+		model := Timeout(slowModel, 100*time.Millisecond)
 
 		// But parent context has 30ms timeout (shorter)
 		parentCtx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)

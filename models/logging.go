@@ -8,10 +8,10 @@ import (
 	"github.com/JoshPattman/jpf/utils"
 )
 
-// NewLoggingModel wraps a Model with logging functionality.
+// Log wraps a Model with logging functionality.
 // It logs all interactions with the model using the provided ModelLogger.
 // Each model call is logged with input messages, output messages, usage statistics, and timing information.
-func NewLoggingModel(model jpf.Model, logger ModelLogger) jpf.Model {
+func Log(model jpf.Model, logger ModelLogger) jpf.Model {
 	return &loggingModel{
 		model:  model,
 		logger: logger,

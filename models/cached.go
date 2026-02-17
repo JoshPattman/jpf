@@ -15,10 +15,10 @@ type ModelResponseCache interface {
 	SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, aux []jpf.Message, out jpf.Message) error
 }
 
-// NewCachedModel wraps a Model with response caching functionality.
+// Cache wraps a Model with response caching functionality.
 // It stores responses in the provided ModelResponseCache implementation,
 // returning cached results for identical input messages and salts to avoid redundant model calls.
-func NewCachedModel(model jpf.Model, cache ModelResponseCache, opts ...CachedModelOpt) jpf.Model {
+func Cache(model jpf.Model, cache ModelResponseCache, opts ...CachedModelOpt) jpf.Model {
 	m := &cachedModel{
 		model: model,
 		cache: cache,

@@ -9,10 +9,10 @@ import (
 	"github.com/JoshPattman/jpf/utils"
 )
 
-// NewRetryChainModel creates a Model that tries a list of models in order,
+// RetryChain creates a Model that tries a list of models in order,
 // returning the result from the first one that doesn't fail.
 // If all models fail, it returns a joined error containing all the errors.
-func NewRetryChainModel(models []jpf.Model) jpf.Model {
+func RetryChain(models []jpf.Model) jpf.Model {
 	if len(models) == 0 {
 		panic("NewRetryChainModel requires at least one model")
 	}

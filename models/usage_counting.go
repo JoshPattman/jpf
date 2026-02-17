@@ -7,10 +7,10 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewUsageCountingModel wraps a Model with token usage tracking functionality.
+// CountUsage wraps a Model with token usage tracking functionality.
 // It aggregates token usage statistics in the provided UsageCounter,
 // which allows monitoring total token consumption across multiple model calls.
-func NewUsageCountingModel(model jpf.Model, counter *UsageCounter) jpf.Model {
+func CountUsage(model jpf.Model, counter *UsageCounter) jpf.Model {
 	return &usageCountingModel{
 		counter: counter,
 		model:   model,

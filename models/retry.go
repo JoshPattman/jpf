@@ -8,10 +8,10 @@ import (
 	"github.com/JoshPattman/jpf/utils"
 )
 
-// NewRetryModel wraps a Model with retry functionality.
+// Retry wraps a Model with retry functionality.
 // If the underlying model returns an error, this wrapper will retry the operation
 // up to a configurable number of times with an optional delay between retries.
-func NewRetryModel(model jpf.Model, maxRetries int, opts ...RetryModelOpt) jpf.Model {
+func Retry(model jpf.Model, maxRetries int, opts ...RetryModelOpt) jpf.Model {
 	m := &retryModel{
 		Model:   model,
 		retries: maxRetries,

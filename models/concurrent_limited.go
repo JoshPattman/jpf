@@ -6,10 +6,10 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewConcurrentLimitedModel wraps a Model with concurrency control.
+// LimitConcurrency wraps a Model with concurrency control.
 // It ensures that only a limited number of concurrent calls can be made to the underlying model,
 // using the provided ConcurrentLimiter to manage access.
-func NewConcurrentLimitedModel(model jpf.Model, limiter ConcurrentLimiter) jpf.Model {
+func LimitConcurrency(model jpf.Model, limiter ConcurrentLimiter) jpf.Model {
 	return &concurrentLimitedModel{
 		model: model,
 		uses:  limiter,

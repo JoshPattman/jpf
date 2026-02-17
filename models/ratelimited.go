@@ -8,7 +8,7 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func NewRateLimitedModel(model jpf.Model, limiter *rate.Limiter) jpf.Model {
+func RateLimit(model jpf.Model, limiter *rate.Limiter) jpf.Model {
 	return &rateLimitedModel{
 		limiter: limiter,
 		model:   model,
