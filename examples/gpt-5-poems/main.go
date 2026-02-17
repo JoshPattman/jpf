@@ -54,8 +54,8 @@ type ModelBuilder struct {
 func (builder *ModelBuilder) Build(verbosity models.Verbosity, pPenalty float64) jpf.Model {
 	return models.NewAPIModel(
 		models.OpenAI,
-		builder.OpenAIKey,
 		builder.OpenAIModelName,
+		builder.OpenAIKey,
 		models.WithVerbosity(verbosity),
 		models.WithPresencePenalty(pPenalty),
 	)

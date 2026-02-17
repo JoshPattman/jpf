@@ -75,8 +75,8 @@ func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 	}
 	model := models.NewAPIModel(
 		models.OpenAI,
-		os.Getenv("OPENAI_KEY"),
 		"gpt-4o",
+		os.Getenv("OPENAI_KEY"),
 		models.WithJSONSchema(schema),
 	)
 	model = models.Retry(model, 5)
