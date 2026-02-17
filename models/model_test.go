@@ -15,9 +15,9 @@ import (
 func TestConstructOtherModels(t *testing.T) {
 	model := NewAPIModel(OpenAI, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
 	model = LimitConcurrency(model, NewOneConcurrentLimiter())
-	model = TwoStageReason(model, model, WithReasoningPrompt{X: "Reason please"})
+	model = TwoStageReason(model, model, WithReasoningPrompt("Reason please"))
 	model = Log(model, NewJsonModelLogger(os.Stdout))
-	model = Retry(model, 10, WithDelay{X: time.Second})
+	model = Retry(model, 10, WithDelay(time.Second))
 	RetryChain([]jpf.Model{model, model})
 }
 

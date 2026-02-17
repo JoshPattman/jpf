@@ -24,16 +24,16 @@ func Cache(model jpf.Model, cache ModelResponseCache, opts ...CachedModelOpt) jp
 		cache: cache,
 	}
 	for _, o := range opts {
-		o.applyCachedModel(m)
+		o(m)
 	}
 	return m
 }
 
-type CachedModelOpt interface {
-	applyCachedModel(*cachedModel)
-}
+type CachedModelOpt func(*cachedModel)
 
-func (o WithSalt) applyCachedModel(m *cachedModel) { m.salt = o.X }
+func WithSalt(salt string) func(m *cachedModel) {
+	return func(m *cachedModel) { m.salt = salt }
+}
 
 type cachedModel struct {
 	model jpf.Model

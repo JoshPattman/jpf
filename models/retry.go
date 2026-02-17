@@ -11,23 +11,23 @@ import (
 // Retry wraps a Model with retry functionality.
 // If the underlying model returns an error, this wrapper will retry the operation
 // up to a configurable number of times with an optional delay between retries.
-func Retry(model jpf.Model, maxRetries int, opts ...RetryModelOpt) jpf.Model {
+func Retry(model jpf.Model, maxRetries int, opts ...RetryOpt) jpf.Model {
 	m := &retryModel{
 		Model:   model,
 		retries: maxRetries,
 		delay:   0,
 	}
 	for _, o := range opts {
-		o.applyRetry(m)
+		o(m)
 	}
 	return m
 }
 
-type RetryModelOpt interface {
-	applyRetry(*retryModel)
-}
+type RetryOpt func(*retryModel)
 
-func (o WithDelay) applyRetry(m *retryModel) { m.delay = o.X }
+func WithDelay(delay time.Duration) func(*retryModel) {
+	return func(rm *retryModel) { rm.delay = delay }
+}
 
 type retryModel struct {
 	jpf.Model

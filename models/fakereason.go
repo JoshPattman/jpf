@@ -12,23 +12,23 @@ import (
 // then passes that reasoning along with the original messages to the answerer model.
 // The reasoning is included as a ReasoningRole message in the auxiliary messages output.
 // Optional parameters allow customization of the reasoning prompt.
-func TwoStageReason(reasoner jpf.Model, answerer jpf.Model, opts ...FakeReasoningModelOpt) jpf.Model {
+func TwoStageReason(reasoner jpf.Model, answerer jpf.Model, opts ...TwoStageReasonOpt) jpf.Model {
 	m := &fakeReasoningModel{
 		reasoner:        reasoner,
 		answerer:        answerer,
 		reasoningPrompt: defaultFakeReasoningPromptA,
 	}
 	for _, o := range opts {
-		o.applyFakeReasoning(m)
+		o(m)
 	}
 	return m
 }
 
-type FakeReasoningModelOpt interface {
-	applyFakeReasoning(*fakeReasoningModel)
-}
+type TwoStageReasonOpt func(*fakeReasoningModel)
 
-func (o WithReasoningPrompt) applyFakeReasoning(m *fakeReasoningModel) { m.reasoningPrompt = o.X }
+func WithReasoningPrompt(prompt string) func(m *fakeReasoningModel) {
+	return func(m *fakeReasoningModel) { m.reasoningPrompt = prompt }
+}
 
 const defaultFakeReasoningPromptA = `
 - You are a specialised reasoning AI, tasked with reasoning about another AIs task.

@@ -126,14 +126,14 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 		model = models.Timeout(model, builder.APIRequestTimeout)
 	}
 	if builder.Retries > 0 {
-		model = models.Retry(model, builder.Retries, models.WithDelay{X: time.Second})
+		model = models.Retry(model, builder.Retries, models.WithDelay(time.Second))
 	}
 	if builder.Cache != nil {
 		// We will share cache if:
 		// - the model has the same model name
 		// - is from the same provider
 		salt := fmt.Sprintf("%v%s", useGemini, name)
-		model = models.Cache(model, builder.Cache, models.WithSalt{X: salt})
+		model = models.Cache(model, builder.Cache, models.WithSalt(salt))
 	}
 	return model
 }
