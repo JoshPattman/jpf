@@ -5,14 +5,14 @@ import (
 	"text/template"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-// NewTemplateEncoder creates a [Encoder] that uses Go's text/template for formatting messages.
+// NewTemplate creates a [Encoder] that uses Go's text/template for formatting messages.
 // It accepts templates for both system and user messages, allowing dynamic content insertion.
 // The data parameter to BuildInputMessages should be a struct or map with fields accessible to the template.
 // If either systemTemplate or userTemplate is an empty string, that message will be skipped.
-func NewTemplateEncoder[T any](systemTemplate, userTemplate string) jpf.Encoder[T] {
+func NewTemplate[T any](systemTemplate, userTemplate string) jpf.Encoder[T] {
 	encoder := &templateEncoder[T]{}
 
 	if systemTemplate != "" {

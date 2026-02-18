@@ -80,9 +80,9 @@ func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 		models.WithJSONSchema(schema),
 	)
 	model = models.Retry(model, 5)
-	enc := encoders.NewFixedEncoder("Answer the users question in a json format.")
-	dec := parsers.NewJsonParser[T]()
-	return pipelines.NewOneShotPipeline(enc, dec, nil, model), nil
+	enc := encoders.NewFixed("Answer the users question in a json format.")
+	dec := parsers.NewJson[T]()
+	return pipelines.NewOneShot(enc, dec, nil, model), nil
 }
 
 // Generates a json schema from an example struct.

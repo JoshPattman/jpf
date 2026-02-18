@@ -6,11 +6,19 @@ import (
 	"testing"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 func buildTestingSubstringRespDec() jpf.Parser[string] {
-	return NewSubstringAfterParser(NewStringParser(), "::")
+	return SubstringAfter(NewRaw(), "::")
+}
+
+func buildTestingSubstringJsonRespDec() jpf.Parser[string] {
+	return SubstringJsonObject(NewRaw())
+}
+
+func buildTestingSubstringAfterRespDec() jpf.Parser[string] {
+	return SubstringAfter(NewRaw(), ">>>")
 }
 
 type RDCase[T comparable] struct {
@@ -44,43 +52,43 @@ func (testCase RDCase[T]) Test() error {
 var RDCases = []utils.TestCase{
 	RDCase[utils.TestStruct]{
 		ID:            "json/no_response",
-		Build:         NewJsonParser[utils.TestStruct],
+		Build:         NewJson[utils.TestStruct],
 		Input:         "",
 		ExpectedError: true,
 	},
 	RDCase[utils.TestStruct]{
 		ID:       "json/empty_valid_json",
-		Build:    NewJsonParser[utils.TestStruct],
+		Build:    NewJson[utils.TestStruct],
 		Input:    `{}`,
 		Expected: utils.TestStruct{},
 	},
 	RDCase[utils.TestStruct]{
 		ID:       "json/valid_json",
-		Build:    NewJsonParser[utils.TestStruct],
+		Build:    NewJson[utils.TestStruct],
 		Input:    `{"a":5, "b": "xyz"}`,
 		Expected: utils.TestStruct{A: 5, B: "xyz"},
 	},
 	RDCase[utils.TestStruct]{
 		ID:       "json/valid_json_within_decoration",
-		Build:    NewJsonParser[utils.TestStruct],
+		Build:    NewJson[utils.TestStruct],
 		Input:    "Here is my answer:\n```" + `{"a":5, "b": "xyz"}` + "```",
 		Expected: utils.TestStruct{A: 5, B: "xyz"},
 	},
 	RDCase[string]{
 		ID:       "string/empty_string",
-		Build:    NewStringParser,
+		Build:    NewRaw,
 		Input:    "",
 		Expected: "",
 	},
 	RDCase[string]{
 		ID:       "string/random_string",
-		Build:    NewStringParser,
+		Build:    NewRaw,
 		Input:    "hdvdihiuhdibdb",
 		Expected: "hdvdihiuhdibdb",
 	},
 	RDCase[string]{
 		ID:       "string/random_string_with_whitespace",
-		Build:    NewStringParser,
+		Build:    NewRaw,
 		Input:    "  hdvdihiuhdibdb  \n",
 		Expected: "  hdvdihiuhdibdb  \n",
 	},
@@ -101,6 +109,30 @@ var RDCases = []utils.TestCase{
 		Build:    buildTestingSubstringRespDec,
 		Input:    "abcdefg::1234::xyz",
 		Expected: "xyz",
+	},
+	RDCase[string]{
+		ID:       "substringafter/normal",
+		Build:    buildTestingSubstringAfterRespDec,
+		Input:    `abc>>>def`,
+		Expected: `def`,
+	},
+	RDCase[string]{
+		ID:       "substringafter/nopresent",
+		Build:    buildTestingSubstringAfterRespDec,
+		Input:    `abc???def`,
+		Expected: "abc???def",
+	},
+	RDCase[string]{
+		ID:       "substringjson/normal",
+		Build:    buildTestingSubstringJsonRespDec,
+		Input:    `abc{"def":"123}ldsfmkdflkfm`,
+		Expected: `{"def":"123}`,
+	},
+	RDCase[string]{
+		ID:            "substringjson/nopresent",
+		Build:         buildTestingSubstringJsonRespDec,
+		Input:         `abc{"def":"123ldsfmkdflkfm`,
+		ExpectedError: true,
 	},
 }
 

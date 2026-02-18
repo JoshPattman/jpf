@@ -1,4 +1,4 @@
-package models
+package caches
 
 import (
 	"context"
@@ -9,10 +9,10 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewFilePersistCache creates an in-memory cache that persists to the given filename.
+// NewFile creates an in-memory cache that persists to the given filename.
 // On creation, it loads the cache from the file (if it exists). Whenever SetCachedResponse
 // is called, the entire cache is saved back to the file.
-func NewFilePersistCache(filename string) (ModelResponseCache, error) {
+func NewFile(filename string) (jpf.ModelResponseCache, error) {
 	cache := &filePersistCache{
 		resps:    make(map[string]memoryCachePacket),
 		filename: filename,

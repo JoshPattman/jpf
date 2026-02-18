@@ -5,13 +5,13 @@ import (
 	"errors"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-// NewFeedbackPipeline creates a [Pipeline] that first runs the encoder, then the model, finally parsing the response with the decoder.
+// NewFeedbackRetry creates a [Pipeline] that first runs the encoder, then the model, finally parsing the response with the decoder.
 // However, it adds feedback to the conversation when errors are detected.
 // It will only add to the conversation if the error returned from the parser is an [ErrInvalidResponse] (using errors.Is).
-func NewFeedbackPipeline[T, U any](
+func NewFeedbackRetry[T, U any](
 	encoder jpf.Encoder[T],
 	parser jpf.Parser[U],
 	validator jpf.Validator[T, U],

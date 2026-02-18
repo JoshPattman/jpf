@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 // RetryChain creates a Model that tries a list of models in order,

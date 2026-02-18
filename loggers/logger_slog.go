@@ -1,8 +1,10 @@
-package models
+package loggers
+
+import "github.com/JoshPattman/jpf"
 
 // Logs calls made to the model to a slog-style logging function.
 // Can optionally log the model messages too (this is very spammy).
-func NewSlogModelLogger(logFunc func(string, ...any), logMessages bool) ModelLogger {
+func NewSlog(logFunc func(string, ...any), logMessages bool) jpf.ModelLogger {
 	return &slogModelLogger{
 		logFunc:     logFunc,
 		logMessages: logMessages,
@@ -14,7 +16,7 @@ type slogModelLogger struct {
 	logMessages bool
 }
 
-func (ml *slogModelLogger) ModelLog(mli ModelLoggingInfo) error {
+func (ml *slogModelLogger) ModelLog(mli jpf.ModelLoggingInfo) error {
 	args := []any{}
 	args = append(args, "input_tokens", mli.Usage.InputTokens)
 	args = append(args, "output_tokens", mli.Usage.OutputTokens)

@@ -10,10 +10,6 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-func Wrap(err error, msg string, args ...any) error {
-	return errors.Join(fmt.Errorf(msg, args...), err)
-}
-
 type TestCase interface {
 	Name() string
 	Test() error

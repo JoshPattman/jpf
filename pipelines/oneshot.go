@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-// NewOneShotPipeline creates a [Pipeline] that runs without retries.
+// NewOneShot creates a [Pipeline] that runs without retries.
 // The validator may be nil.
-func NewOneShotPipeline[T, U any](
+func NewOneShot[T, U any](
 	encoder jpf.Encoder[T],
 	parser jpf.Parser[U],
 	validator jpf.Validator[T, U],

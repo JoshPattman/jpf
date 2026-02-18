@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 type MECase[T any] struct {
@@ -46,7 +46,7 @@ var MECases = []utils.TestCase{
 	MECase[string]{
 		ID: "rawstring",
 		Build: func() jpf.Encoder[string] {
-			return NewFixedEncoder("1234")
+			return NewFixed("1234")
 		},
 		Input:    "abcd",
 		Expected: []string{"1234", "abcd"},
@@ -54,7 +54,7 @@ var MECases = []utils.TestCase{
 	MECase[utils.TestStruct]{
 		ID: "template/empty",
 		Build: func() jpf.Encoder[utils.TestStruct] {
-			return NewTemplateEncoder[utils.TestStruct]("", "")
+			return NewTemplate[utils.TestStruct]("", "")
 		},
 		Input:    utils.TestStruct{},
 		Expected: []string{},
@@ -62,7 +62,7 @@ var MECases = []utils.TestCase{
 	MECase[utils.TestStruct]{
 		ID: "template/system",
 		Build: func() jpf.Encoder[utils.TestStruct] {
-			return NewTemplateEncoder[utils.TestStruct]("Data (A): {{.A}}", "")
+			return NewTemplate[utils.TestStruct]("Data (A): {{.A}}", "")
 		},
 		Input:    utils.TestStruct{A: 5},
 		Expected: []string{"Data (A): 5"},
@@ -70,7 +70,7 @@ var MECases = []utils.TestCase{
 	MECase[utils.TestStruct]{
 		ID: "template/user",
 		Build: func() jpf.Encoder[utils.TestStruct] {
-			return NewTemplateEncoder[utils.TestStruct]("", "Data (B): {{.B}}")
+			return NewTemplate[utils.TestStruct]("", "Data (B): {{.B}}")
 		},
 		Input:    utils.TestStruct{B: "x"},
 		Expected: []string{"Data (B): x"},
@@ -78,7 +78,7 @@ var MECases = []utils.TestCase{
 	MECase[utils.TestStruct]{
 		ID: "template/both",
 		Build: func() jpf.Encoder[utils.TestStruct] {
-			return NewTemplateEncoder[utils.TestStruct]("Data (A): {{.A}}", "Data (B): {{.B}}")
+			return NewTemplate[utils.TestStruct]("Data (A): {{.A}}", "Data (B): {{.B}}")
 		},
 		Input:    utils.TestStruct{A: 5, B: "x"},
 		Expected: []string{"Data (A): 5", "Data (B): x"},

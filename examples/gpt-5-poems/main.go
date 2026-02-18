@@ -68,7 +68,7 @@ type PoemPipelineBuilder struct {
 
 func (builder *PoemPipelineBuilder) Build(verbosity models.Verbosity, pPenalty float64) jpf.Pipeline[string, string] {
 	model := builder.ModelBuilder.Build(verbosity, pPenalty)
-	encoder := encoders.NewFixedEncoder(builder.SystemPrompt)
-	parser := parsers.NewStringParser()
-	return pipelines.NewOneShotPipeline(encoder, parser, nil, model)
+	encoder := encoders.NewFixed(builder.SystemPrompt)
+	parser := parsers.NewRaw()
+	return pipelines.NewOneShot(encoder, parser, nil, model)
 }

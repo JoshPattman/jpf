@@ -9,8 +9,8 @@ import (
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/encoders"
 	"github.com/JoshPattman/jpf/feedbacks"
+	"github.com/JoshPattman/jpf/internal/utils"
 	"github.com/JoshPattman/jpf/parsers"
-	"github.com/JoshPattman/jpf/utils"
 )
 
 type alwaysFailValidator[T, U any] struct{}
@@ -51,12 +51,12 @@ var MFCases = []utils.TestCase{
 	MFCase[string, string]{
 		ID: "oneshot/nominal",
 		Build: func() jpf.Pipeline[string, string] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewStringParser()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewRaw()
 			model := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
-			return NewOneShotPipeline(enc, dec, nil, model)
+			return NewOneShot(enc, dec, nil, model)
 		},
 		Input:    "ping",
 		Expected: "pong",
@@ -64,13 +64,13 @@ var MFCases = []utils.TestCase{
 	MFCase[string, string]{
 		ID: "oneshot/validate",
 		Build: func() jpf.Pipeline[string, string] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewStringParser()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewRaw()
 			val := &alwaysFailValidator[string, string]{}
 			model := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
-			return NewOneShotPipeline(enc, dec, val, model)
+			return NewOneShot(enc, dec, val, model)
 		},
 		Input:         "ping",
 		ExpectedError: true,
@@ -78,14 +78,14 @@ var MFCases = []utils.TestCase{
 	MFCase[string, utils.TestStruct]{
 		ID: "feedback/nominal",
 		Build: func() jpf.Pipeline[string, utils.TestStruct] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewJsonParser[utils.TestStruct]()
-			feedback := feedbacks.NewRawMessageFeedbackGenerator()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewJson[utils.TestStruct]()
+			feedback := feedbacks.NewErrString()
 			model := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackPipeline(enc, dec, nil, feedback, model, jpf.SystemRole, 1)
+			return NewFeedbackRetry(enc, dec, nil, feedback, model, jpf.SystemRole, 1)
 		},
 		Input:    "ping",
 		Expected: utils.TestStruct{A: 5},
@@ -93,15 +93,15 @@ var MFCases = []utils.TestCase{
 	MFCase[string, utils.TestStruct]{
 		ID: "feedback/validate",
 		Build: func() jpf.Pipeline[string, utils.TestStruct] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewJsonParser[utils.TestStruct]()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewJson[utils.TestStruct]()
 			val := &alwaysFailValidator[string, utils.TestStruct]{}
-			feedback := feedbacks.NewRawMessageFeedbackGenerator()
+			feedback := feedbacks.NewErrString()
 			model := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":5}`},
 				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackPipeline(enc, dec, val, feedback, model, jpf.SystemRole, 1)
+			return NewFeedbackRetry(enc, dec, val, feedback, model, jpf.SystemRole, 1)
 		},
 		Input:         "ping",
 		ExpectedError: true,
@@ -109,15 +109,15 @@ var MFCases = []utils.TestCase{
 	MFCase[string, utils.TestStruct]{
 		ID: "fallback/nominal",
 		Build: func() jpf.Pipeline[string, utils.TestStruct] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewJsonParser[utils.TestStruct]()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewJson[utils.TestStruct]()
 			model1 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
 			model2 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":5}`},
 			}}
-			return NewFallbackPipeline(enc, dec, nil, model1, model2)
+			return NewFallbackRetry(enc, dec, nil, model1, model2)
 		},
 		Input:    "ping",
 		Expected: utils.TestStruct{A: 5},
@@ -125,15 +125,15 @@ var MFCases = []utils.TestCase{
 	MFCase[string, utils.TestStruct]{
 		ID: "fallback/fail",
 		Build: func() jpf.Pipeline[string, utils.TestStruct] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewJsonParser[utils.TestStruct]()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewJson[utils.TestStruct]()
 			model1 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
 			model2 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":"x"}`},
 			}}
-			return NewFallbackPipeline(enc, dec, nil, model1, model2)
+			return NewFallbackRetry(enc, dec, nil, model1, model2)
 		},
 		Input:         "ping",
 		ExpectedError: true,
@@ -141,8 +141,8 @@ var MFCases = []utils.TestCase{
 	MFCase[string, utils.TestStruct]{
 		ID: "fallback/validate",
 		Build: func() jpf.Pipeline[string, utils.TestStruct] {
-			enc := encoders.NewFixedEncoder("")
-			dec := parsers.NewJsonParser[utils.TestStruct]()
+			enc := encoders.NewFixed("")
+			dec := parsers.NewJson[utils.TestStruct]()
 			val := &alwaysFailValidator[string, utils.TestStruct]{}
 			model1 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
@@ -150,7 +150,7 @@ var MFCases = []utils.TestCase{
 			model2 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":5}`},
 			}}
-			return NewFallbackPipeline(enc, dec, val, model1, model2)
+			return NewFallbackRetry(enc, dec, val, model1, model2)
 		},
 		Input:         "ping",
 		ExpectedError: true,

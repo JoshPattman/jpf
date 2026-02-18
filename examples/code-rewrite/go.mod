@@ -1,6 +1,6 @@
 module code-rewrite
 
-go 1.23.1
+go 1.24.0
 
 require (
 	github.com/JoshPattman/jpf v0.8.0
