@@ -54,8 +54,8 @@ func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.Mod
 	resp, remaining := resps[0], resps[1:]
 	t.Responses[req] = remaining
 	return jpf.ModelResponse{
-		PrimaryMessage: jpf.Message{Role: jpf.AssistantRole, Content: resp},
-		Usage:          jpf.Usage{},
+		Message: jpf.Message{Role: jpf.AssistantRole, Content: resp},
+		Usage:   jpf.Usage{},
 	}, nil
 }
 

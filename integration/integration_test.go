@@ -43,8 +43,8 @@ func testHelloModel(t *testing.T, model jpf.Model) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(resp.PrimaryMessage.Content) == 0 {
+	if len(resp.Message.Content) == 0 {
 		t.Fatal("primary message was empty")
 	}
-	t.Log(resp.PrimaryMessage.Content)
+	t.Log(resp.Message.Content)
 }

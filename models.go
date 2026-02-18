@@ -7,7 +7,6 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
-	"slices"
 )
 
 // Usage defines how many tokens were used when making calls to LLMs.
@@ -28,13 +27,8 @@ func (u Usage) Add(u2 Usage) Usage {
 }
 
 type ModelResponse struct {
-	// Extra messages that are not the final response,
-	// but were used to build up the final response.
-	// For example, reasoning messages.
-	AuxiliaryMessages []Message
-	// The primary response to the users query.
-	// Usually the only response that matters.
-	PrimaryMessage Message
+	// The response to the input messages.
+	Message Message
 	// The usage of making this call.
 	// This may be the sum of multiple LLM calls.
 	Usage Usage
@@ -48,9 +42,8 @@ func (r ModelResponse) OnlyUsage() ModelResponse {
 // Utility to include another usage object in this response object
 func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
 	return ModelResponse{
-		AuxiliaryMessages: slices.Clone(r.AuxiliaryMessages),
-		PrimaryMessage:    r.PrimaryMessage,
-		Usage:             r.Usage.Add(u),
+		Message: r.Message,
+		Usage:   r.Usage.Add(u),
 	}
 }
 

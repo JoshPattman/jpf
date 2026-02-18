@@ -63,7 +63,7 @@ func (mf *fallbackPipeline[T, U]) callOne(ctx context.Context, t T, model jpf.Mo
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to get model response")
 	}
-	result, err := mf.decoder.ParseResponseText(resp.PrimaryMessage.Content)
+	result, err := mf.decoder.ParseResponseText(resp.Message.Content)
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to parse model response")
 	}

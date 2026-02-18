@@ -30,8 +30,7 @@ func (l *loggingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.Mod
 	dur := time.Since(tStart)
 	lmp := jpf.ModelLoggingInfo{
 		Messages:             msgs,
-		ResponseAuxMessages:  resp.AuxiliaryMessages,
-		ResponseFinalMessage: resp.PrimaryMessage,
+		ResponseFinalMessage: resp.Message,
 		Usage:                resp.Usage,
 		Err:                  err,
 		Duration:             dur,

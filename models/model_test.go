@@ -31,7 +31,6 @@ func (m *mockLogger) Infos() []jpf.ModelLoggingInfo {
 func TestConstructOtherModels(t *testing.T) {
 	model := NewAPIModel(OpenAI, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
 	model = LimitConcurrency(model, semaphore.NewWeighted(1))
-	model = TwoStageReason(model, model, WithReasoningPrompt("Reason please"))
 	model = Log(model, NewMockLogger())
 	model = Retry(model, 10, WithDelay(time.Second))
 	RetryChain([]jpf.Model{model, model})
@@ -47,8 +46,8 @@ func TestCachedModel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resp1.PrimaryMessage.Content != "hi" {
-			t.Fatalf("expected 'hi' but got '%v' on iteration %v", resp1.PrimaryMessage.Content, i)
+		if resp1.Message.Content != "hi" {
+			t.Fatalf("expected 'hi' but got '%v' on iteration %v", resp1.Message.Content, i)
 		}
 	}
 }
@@ -89,8 +88,8 @@ func TestRetryModel(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if resp.PrimaryMessage.Content != "hi" {
-		t.Fatalf("expected 'hi' but got '%v'", resp.PrimaryMessage.Content)
+	if resp.Message.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", resp.Message.Content)
 	}
 }
 
@@ -112,8 +111,8 @@ func TestRetryChainModel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resp.PrimaryMessage.Content != "first response" {
-			t.Fatalf("expected 'first response' but got '%v'", resp.PrimaryMessage.Content)
+		if resp.Message.Content != "first response" {
+			t.Fatalf("expected 'first response' but got '%v'", resp.Message.Content)
 		}
 	})
 
@@ -133,8 +132,8 @@ func TestRetryChainModel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resp.PrimaryMessage.Content != "second response" {
-			t.Fatalf("expected 'second response' but got '%v'", resp.PrimaryMessage.Content)
+		if resp.Message.Content != "second response" {
+			t.Fatalf("expected 'second response' but got '%v'", resp.Message.Content)
 		}
 	})
 
@@ -178,8 +177,8 @@ func TestRetryChainModel(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resp.PrimaryMessage.Content != "third response" {
-			t.Fatalf("expected 'third response' but got '%v'", resp.PrimaryMessage.Content)
+		if resp.Message.Content != "third response" {
+			t.Fatalf("expected 'third response' but got '%v'", resp.Message.Content)
 		}
 	})
 }
@@ -190,7 +189,7 @@ func TestTimeoutModel(t *testing.T) {
 		slowModel := &utils.SlowTestingModel{
 			Delay: 200 * time.Millisecond,
 			Response: jpf.ModelResponse{
-				PrimaryMessage: jpf.Message{Role: jpf.AssistantRole, Content: "response"},
+				Message: jpf.Message{Role: jpf.AssistantRole, Content: "response"},
 			},
 		}
 
@@ -220,7 +219,7 @@ func TestTimeoutModel(t *testing.T) {
 		fastModel := &utils.SlowTestingModel{
 			Delay: 10 * time.Millisecond,
 			Response: jpf.ModelResponse{
-				PrimaryMessage: jpf.Message{Role: jpf.AssistantRole, Content: "fast response"},
+				Message: jpf.Message{Role: jpf.AssistantRole, Content: "fast response"},
 			},
 		}
 
@@ -231,8 +230,8 @@ func TestTimeoutModel(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if resp.PrimaryMessage.Content != "fast response" {
-			t.Fatalf("expected 'fast response' but got '%v'", resp.PrimaryMessage.Content)
+		if resp.Message.Content != "fast response" {
+			t.Fatalf("expected 'fast response' but got '%v'", resp.Message.Content)
 		}
 	})
 
@@ -241,7 +240,7 @@ func TestTimeoutModel(t *testing.T) {
 		slowModel := &utils.SlowTestingModel{
 			Delay: 200 * time.Millisecond,
 			Response: jpf.ModelResponse{
-				PrimaryMessage: jpf.Message{Role: jpf.AssistantRole, Content: "response"},
+				Message: jpf.Message{Role: jpf.AssistantRole, Content: "response"},
 			},
 		}
 
@@ -288,7 +287,6 @@ func newRamCache() jpf.ModelResponseCache {
 }
 
 type memoryCachePacket struct {
-	Aux   []jpf.Message
 	Final jpf.Message
 }
 
@@ -296,18 +294,17 @@ type inMemoryCache struct {
 	Resps map[string]memoryCachePacket
 }
 
-func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, []jpf.Message, jpf.Message, error) {
+func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.Message, error) {
 	msgsHash := msgs[0].Content
 	if cp, ok := i.Resps[msgsHash]; ok {
-		return true, cp.Aux, cp.Final, nil
+		return true, cp.Final, nil
 	}
-	return false, nil, jpf.Message{}, nil
+	return false, jpf.Message{}, nil
 }
 
-func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, aux []jpf.Message, out jpf.Message) error {
+func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.Message) error {
 	msgsHash := inputs[0].Content
 	i.Resps[msgsHash] = memoryCachePacket{
-		Aux:   aux,
 		Final: out,
 	}
 	return nil

@@ -60,7 +60,7 @@ type ModelResponse struct {
 	AuxiliaryMessages []Message
 	// The primary response to the users query.
 	// Usually the only response that matters.
-	PrimaryMessage Message
+	Message Message
 	// The usage of making this call.
 	// This may be the sum of multiple LLM calls.
 	Usage Usage

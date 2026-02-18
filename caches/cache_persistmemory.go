@@ -60,22 +60,21 @@ func (f *filePersistCache) save() error {
 	return encoder.Encode(f.resps)
 }
 
-func (f *filePersistCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, []jpf.Message, jpf.Message, error) {
+func (f *filePersistCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.Message, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 
 	msgsHash := HashMessages(salt, msgs)
 	if cp, ok := f.resps[msgsHash]; ok {
-		return true, cp.Aux, cp.Final, nil
+		return true, cp.Final, nil
 	}
-	return false, nil, jpf.Message{}, nil
+	return false, jpf.Message{}, nil
 }
 
-func (f *filePersistCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, aux []jpf.Message, out jpf.Message) error {
+func (f *filePersistCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.Message) error {
 	f.mu.Lock()
 	msgsHash := HashMessages(salt, inputs)
 	f.resps[msgsHash] = memoryCachePacket{
-		Aux:   aux,
 		Final: out,
 	}
 	f.mu.Unlock()

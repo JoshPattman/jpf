@@ -35,21 +35,20 @@ type cachedModel struct {
 
 // Respond implements Model.
 func (c *cachedModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
-	ok, aux, final, err := c.cache.GetCachedResponse(ctx, c.salt, msgs)
+	ok, final, err := c.cache.GetCachedResponse(ctx, c.salt, msgs)
 	if err != nil {
 		return jpf.ModelResponse{}, utils.Wrap(err, "failed to query cache")
 	}
 	if ok {
 		return jpf.ModelResponse{
-			AuxiliaryMessages: aux,
-			PrimaryMessage:    final,
+			Message: final,
 		}, nil
 	}
 	resp, err := c.model.Respond(ctx, msgs)
 	if err != nil {
 		return resp.OnlyUsage(), err
 	}
-	err = c.cache.SetCachedResponse(ctx, c.salt, msgs, resp.AuxiliaryMessages, resp.PrimaryMessage)
+	err = c.cache.SetCachedResponse(ctx, c.salt, msgs, resp.Message)
 	if err != nil {
 		return resp.OnlyUsage(), utils.Wrap(err, "failed to set cache")
 	}

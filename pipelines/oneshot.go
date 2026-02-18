@@ -40,7 +40,7 @@ func (mf *oneShotPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, e
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to get model response")
 	}
-	result, err := mf.parser.ParseResponseText(resp.PrimaryMessage.Content)
+	result, err := mf.parser.ParseResponseText(resp.Message.Content)
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to parse model response")
 	}

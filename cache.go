@@ -5,6 +5,6 @@ import (
 )
 
 type ModelResponseCache interface {
-	GetCachedResponse(ctx context.Context, salt string, inputs []Message) (bool, []Message, Message, error)
-	SetCachedResponse(ctx context.Context, salt string, inputs []Message, aux []Message, out Message) error
+	GetCachedResponse(ctx context.Context, salt string, inputs []Message) (bool, Message, error)
+	SetCachedResponse(ctx context.Context, salt string, inputs []Message, out Message) error
 }
