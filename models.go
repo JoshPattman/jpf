@@ -61,7 +61,6 @@ const (
 	SystemRole Role = iota
 	UserRole
 	AssistantRole
-	ReasoningRole
 	DeveloperRole
 )
 
@@ -73,8 +72,6 @@ func (r Role) String() string {
 		return "user"
 	case AssistantRole:
 		return "assistant"
-	case ReasoningRole:
-		return "reasoning"
 	case DeveloperRole:
 		return "developer"
 	}
