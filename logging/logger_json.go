@@ -1,4 +1,4 @@
-package models
+package logging
 
 import (
 	"encoding/json"
@@ -8,10 +8,10 @@ import (
 	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-// NewJsonModelLogger creates a ModelLogger that outputs logs in JSON format.
+// NewJson creates a ModelLogger that outputs logs in JSON format.
 // The logs are written to the provided io.Writer, with each log entry
 // being a JSON object containing the model interaction details.
-func NewJsonModelLogger(to io.Writer) ModelLogger {
+func NewJson(to io.Writer) jpf.ModelLogger {
 	return &jsonModelLogger{enc: json.NewEncoder(to)}
 }
 
@@ -20,7 +20,7 @@ type jsonModelLogger struct {
 }
 
 // ModelLog implements ModelLogger.
-func (j *jsonModelLogger) ModelLog(lmp ModelLoggingInfo) error {
+func (j *jsonModelLogger) ModelLog(lmp jpf.ModelLoggingInfo) error {
 	res := map[string]any{
 		"messages":       messagesToLoggingJson(lmp.Messages),
 		"aux_responses":  messagesToLoggingJson(lmp.ResponseAuxMessages),

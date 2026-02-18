@@ -1,10 +1,8 @@
 package models
 
 import (
-	"bytes"
 	"context"
-	"math"
-	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -12,11 +10,28 @@ import (
 	"github.com/JoshPattman/jpf/internal/utils"
 )
 
+func NewMockLogger() *mockLogger {
+	return &mockLogger{}
+}
+
+type mockLogger struct {
+	infos []jpf.ModelLoggingInfo
+}
+
+func (m *mockLogger) ModelLog(info jpf.ModelLoggingInfo) error {
+	m.infos = append(m.infos, info)
+	return nil
+}
+
+func (m *mockLogger) Infos() []jpf.ModelLoggingInfo {
+	return slices.Clone(m.infos)
+}
+
 func TestConstructOtherModels(t *testing.T) {
 	model := NewAPIModel(OpenAI, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
 	model = LimitConcurrency(model, NewOneConcurrentLimiter())
 	model = TwoStageReason(model, model, WithReasoningPrompt("Reason please"))
-	model = Log(model, NewJsonModelLogger(os.Stdout))
+	model = Log(model, NewMockLogger())
 	model = Retry(model, 10, WithDelay(time.Second))
 	RetryChain([]jpf.Model{model, model})
 }
@@ -38,24 +53,26 @@ func TestCachedModel(t *testing.T) {
 }
 
 func TestLoggingModel(t *testing.T) {
+	responseSeq := []string{"hi", "bye", "hi again"}
 	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
-		"hello": {"hi", "bye", "hi again"},
+		"hello": responseSeq,
 	}}
-	buf := bytes.NewBuffer(nil)
-	model = Log(model, NewJsonModelLogger(buf))
+	logger := NewMockLogger()
+	model = Log(model, logger)
 	for range 3 {
 		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
-	bs := buf.String()
-	expected := `{"aux_responses":[],"duration":"420ns","final_response":{"content":"hi","num_images":0,"role":"assistant"},"messages":[{"content":"hello","num_images":0,"role":"system"}],"usage":{"input_tokens":0,"output_tokens":0}}
-{"aux_responses":[],"duration":"80ns","final_response":{"content":"bye","num_images":0,"role":"assistant"},"messages":[{"content":"hello","num_images":0,"role":"system"}],"usage":{"input_tokens":0,"output_tokens":0}}
-{"aux_responses":[],"duration":"80ns","final_response":{"content":"hi again","num_images":0,"role":"assistant"},"messages":[{"content":"hello","num_images":0,"role":"system"}],"usage":{"input_tokens":0,"output_tokens":0}}`
-	// The times are logged so we cannot do a direct comparison
-	if math.Abs(float64(len(bs)-len(expected))) > 9 {
-		t.Fatalf("unexpected log: %v", bs)
+
+	if len(logger.Infos()) != 3 {
+		t.Fatalf("expected 3 logs got %d", len(logger.Infos()))
+	}
+	for i := range responseSeq {
+		if logger.Infos()[i].ResponseFinalMessage.Content != responseSeq[i] {
+			t.Fatalf("expected '%s' got '%s'", logger.Infos()[i].ResponseFinalMessage.Content, responseSeq[i])
+		}
 	}
 }
 
