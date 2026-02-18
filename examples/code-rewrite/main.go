@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/caches"
 	"github.com/JoshPattman/jpf/encoders"
 	"github.com/JoshPattman/jpf/models"
 	"github.com/JoshPattman/jpf/parsers"
@@ -43,7 +44,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
-	cache, err := models.NewSQLCache(context.Background(), db)
+	cache, err := caches.NewSQL(context.Background(), db)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -103,7 +104,7 @@ type ModelBuilder struct {
 	OpenAIModelName   string
 	GeminiModelName   string
 	GeminiKey         string
-	Cache             models.ModelResponseCache
+	Cache             jpf.ModelResponseCache
 	Retries           int
 	APIRequestTimeout time.Duration
 }

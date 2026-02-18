@@ -8,6 +8,7 @@ import (
 
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/internal/utils"
+	"golang.org/x/sync/semaphore"
 )
 
 func NewMockLogger() *mockLogger {
@@ -29,7 +30,7 @@ func (m *mockLogger) Infos() []jpf.ModelLoggingInfo {
 
 func TestConstructOtherModels(t *testing.T) {
 	model := NewAPIModel(OpenAI, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
-	model = LimitConcurrency(model, NewOneConcurrentLimiter())
+	model = LimitConcurrency(model, semaphore.NewWeighted(1))
 	model = TwoStageReason(model, model, WithReasoningPrompt("Reason please"))
 	model = Log(model, NewMockLogger())
 	model = Retry(model, 10, WithDelay(time.Second))
@@ -40,7 +41,7 @@ func TestCachedModel(t *testing.T) {
 	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
 		"hello": {"hi", "bye"},
 	}}
-	model = Cache(model, NewInMemoryCache())
+	model = Cache(model, newRamCache())
 	for i := range 5 {
 		resp1, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
 		if err != nil {
@@ -278,4 +279,36 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
+}
+
+func newRamCache() jpf.ModelResponseCache {
+	return &inMemoryCache{
+		Resps: make(map[string]memoryCachePacket),
+	}
+}
+
+type memoryCachePacket struct {
+	Aux   []jpf.Message
+	Final jpf.Message
+}
+
+type inMemoryCache struct {
+	Resps map[string]memoryCachePacket
+}
+
+func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, []jpf.Message, jpf.Message, error) {
+	msgsHash := msgs[0].Content
+	if cp, ok := i.Resps[msgsHash]; ok {
+		return true, cp.Aux, cp.Final, nil
+	}
+	return false, nil, jpf.Message{}, nil
+}
+
+func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, aux []jpf.Message, out jpf.Message) error {
+	msgsHash := inputs[0].Content
+	i.Resps[msgsHash] = memoryCachePacket{
+		Aux:   aux,
+		Final: out,
+	}
+	return nil
 }

@@ -1,4 +1,4 @@
-package logging
+package loggers
 
 import "github.com/JoshPattman/jpf"
 

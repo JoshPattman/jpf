@@ -1,4 +1,4 @@
-package models
+package caches
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewInMemoryCache creates an in-memory implementation of ModelResponseCache.
+// NewRAM creates an in-memory implementation of ModelResponseCache.
 // It stores model responses in memory using a hash of the input messages as a key.
-func NewInMemoryCache() ModelResponseCache {
+func NewRAM() jpf.ModelResponseCache {
 	return &inMemoryCache{
 		Resps: make(map[string]memoryCachePacket),
 	}

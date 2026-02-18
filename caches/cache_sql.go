@@ -1,4 +1,4 @@
-package models
+package caches
 
 import (
 	"bytes"
@@ -11,7 +11,7 @@ import (
 	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-func NewSQLCache(ctx context.Context, db *sql.DB) (ModelResponseCache, error) {
+func NewSQL(ctx context.Context, db *sql.DB) (jpf.ModelResponseCache, error) {
 	c := &sqlCache{
 		db: db,
 	}
