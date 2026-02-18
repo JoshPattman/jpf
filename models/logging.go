@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 // Log wraps a Model with logging functionality.

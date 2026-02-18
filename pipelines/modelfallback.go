@@ -6,14 +6,14 @@ import (
 	"slices"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 // Creates a [Pipeline] that first tries to ask the first model,
 // and if that produces an invalid format will try to ask the next models
 // until a valid format is found.
 // This is useful, for example, to try a second time with a model that overwrites the cache.
-func NewFallbackPipeline[T, U any](
+func NewFallbackRetry[T, U any](
 	encoder jpf.Encoder[T],
 	parser jpf.Parser[U],
 	validator jpf.Validator[T, U],

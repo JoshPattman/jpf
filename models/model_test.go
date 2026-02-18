@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 func TestConstructOtherModels(t *testing.T) {

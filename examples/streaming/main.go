@@ -22,9 +22,9 @@ func main() {
 	// We can still use normal encoders, decoders, and retry logic (do be aware that retries will call the onBegin callback again).
 	model := models.NewAPIModel(models.OpenAI, "gpt-4.1", os.Getenv("OPENAI_KEY"), models.WithStreamCallbacks(nil, onStream))
 	//model := models.NewAPIModel(models.Google, "gemini-2.5-flash", os.Getenv("GEMINI_KEY"), models.WithStreamCallbacks(nil, onStream))
-	encoder := encoders.NewFixedEncoder("Write 5 haikus about the topic")
-	parser := parsers.NewStringParser()
-	pipeline := pipelines.NewOneShotPipeline(encoder, parser, nil, model)
+	encoder := encoders.NewFixed("Write 5 haikus about the topic")
+	parser := parsers.NewRaw()
+	pipeline := pipelines.NewOneShot(encoder, parser, nil, model)
 
 	fmt.Println("===== Stream =====")
 	// When we call the model, the callback will be called as the stream comes in.

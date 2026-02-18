@@ -7,12 +7,12 @@ import (
 	"regexp"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-// NewJsonParser creates a [Parser] that tries to parse a json object from the response.
+// NewJson creates a [Parser] that tries to parse a json object from the response.
 // It can ONLY parse json objects with an OBJECT as top level (i.e. it cannot parse a list directly).
-func NewJsonParser[T any]() jpf.Parser[T] {
+func NewJson[T any]() jpf.Parser[T] {
 	var zero T
 	// Ensure T is either a struct or a map at runtime using reflection
 	{

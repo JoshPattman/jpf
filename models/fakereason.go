@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 // TwoStageReason creates a model that uses two underlying models to simulate reasoning.

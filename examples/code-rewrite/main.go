@@ -149,7 +149,7 @@ type CodeConvertPipelineBuilder struct {
 func (builder *CodeConvertPipelineBuilder) Build(useGemini bool) jpf.Pipeline[CodeConversionInput, string] {
 	model := builder.ModelBuilder.Build(useGemini)
 
-	formatter := encoders.NewTemplateEncoder[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
-	parser := parsers.NewStringParser()
-	return pipelines.NewOneShotPipeline(formatter, parser, nil, model)
+	formatter := encoders.NewTemplate[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
+	parser := parsers.NewRaw()
+	return pipelines.NewOneShot(formatter, parser, nil, model)
 }

@@ -2,8 +2,8 @@ package parsers
 
 import "github.com/JoshPattman/jpf"
 
-// NewStringParser creates a [Parser] that returns the response as a raw string without modification.
-func NewStringParser() jpf.Parser[string] {
+// NewRaw creates a [Parser] that returns the response as a raw string without modification.
+func NewRaw() jpf.Parser[string] {
 	return &rawStringParser{}
 }
 

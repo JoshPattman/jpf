@@ -4,8 +4,8 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewFixedEncoder creates an [Encoder] that encodes a static system prompt and raw user input as messages.
-func NewFixedEncoder(systemPrompt string) jpf.Encoder[string] {
+// NewFixed creates an [Encoder] that encodes a static system prompt and raw user input as messages.
+func NewFixed(systemPrompt string) jpf.Encoder[string] {
 	return &fixedEncoder{
 		systemPrompt: systemPrompt,
 	}

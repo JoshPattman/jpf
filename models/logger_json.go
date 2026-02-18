@@ -5,7 +5,7 @@ import (
 	"io"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 // NewJsonModelLogger creates a ModelLogger that outputs logs in JSON format.

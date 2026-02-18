@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 type FGCase struct {
@@ -31,7 +31,7 @@ func (testCase FGCase) Test() error {
 var FGCases = []utils.TestCase{
 	FGCase{
 		ID:           "rawmessage/errormessage",
-		Build:        NewRawMessageFeedbackGenerator,
+		Build:        NewErrString,
 		InputMessage: jpf.Message{},
 		InputError:   errors.New("abcdef"),
 		Expected:     "abcdef",

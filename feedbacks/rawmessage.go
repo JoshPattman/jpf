@@ -4,13 +4,13 @@ import (
 	"github.com/JoshPattman/jpf"
 )
 
-// NewRawMessageFeedbackGenerator creates a FeedbackGenerator that formats feedback by returning the error message as a string.
-func NewRawMessageFeedbackGenerator() jpf.FeedbackGenerator {
-	return &rawMessageFeedbackGenerator{}
+// NewErrString creates a FeedbackGenerator that formats feedback by returning the error message as a string.
+func NewErrString() jpf.FeedbackGenerator {
+	return &errStringFG{}
 }
 
-type rawMessageFeedbackGenerator struct{}
+type errStringFG struct{}
 
-func (g *rawMessageFeedbackGenerator) FormatFeedback(_ jpf.Message, err error) string {
+func (g *errStringFG) FormatFeedback(_ jpf.Message, err error) string {
 	return err.Error()
 }

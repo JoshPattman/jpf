@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	"github.com/JoshPattman/jpf"
-	"github.com/JoshPattman/jpf/utils"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
 type apiGeminiModel struct {
