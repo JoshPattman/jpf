@@ -66,8 +66,8 @@ func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.M
 	}
 	content := respTyped.Choices[0].Message.Content
 	return jpf.ModelResponse{
-		PrimaryMessage: jpf.Message{Role: jpf.AssistantRole, Content: content},
-		Usage:          usage.Add(jpf.Usage{SuccessfulCalls: 1}),
+		Message: jpf.Message{Role: jpf.AssistantRole, Content: content},
+		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
 

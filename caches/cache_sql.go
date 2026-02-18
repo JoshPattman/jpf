@@ -26,31 +26,28 @@ type sqlCache struct {
 	db *sql.DB
 }
 
-func (cache *sqlCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, []jpf.Message, jpf.Message, error) {
+func (cache *sqlCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.Message, error) {
 	h := HashMessages(salt, msgs)
 	row := cache.db.QueryRowContext(ctx, `SELECT resp FROM model_cache WHERE hash=?;`, h)
 	blob := []byte{}
 	err := row.Scan(&blob)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil, jpf.Message{}, nil
+		return false, jpf.Message{}, nil
 	} else if err != nil {
-		return false, nil, jpf.Message{}, utils.Wrap(err, "failed to query database")
+		return false, jpf.Message{}, utils.Wrap(err, "failed to query database")
 	}
-	var outputs []jpf.Message
-	err = gob.NewDecoder(bytes.NewBuffer(blob)).Decode(&outputs)
+	var output jpf.Message
+	err = gob.NewDecoder(bytes.NewBuffer(blob)).Decode(&output)
 	if err != nil {
-		return false, nil, jpf.Message{}, utils.Wrap(err, "failed to decode cached data")
+		return false, jpf.Message{}, utils.Wrap(err, "failed to decode cached data")
 	}
-	if len(outputs) == 0 {
-		return false, nil, jpf.Message{}, errors.New("cached messages have 0 length")
-	}
-	return true, outputs[:len(outputs)-1], outputs[len(outputs)-1], nil
+	return true, output, nil
 }
 
-func (cache *sqlCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, aux []jpf.Message, out jpf.Message) error {
+func (cache *sqlCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.Message) error {
 	h := HashMessages(salt, inputs)
 	blob := bytes.NewBuffer(nil)
-	err := gob.NewEncoder(blob).Encode(append(aux, out))
+	err := gob.NewEncoder(blob).Encode(out)
 	if err != nil {
 		return utils.Wrap(err, "failed to encode messages to binary data")
 	}

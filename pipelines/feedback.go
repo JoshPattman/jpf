@@ -55,7 +55,7 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, 
 		if err != nil {
 			return u, totalUsage, utils.Wrap(err, "failed to get model response")
 		}
-		result, err := mf.parser.ParseResponseText(resp.PrimaryMessage.Content)
+		result, err := mf.parser.ParseResponseText(resp.Message.Content)
 		// If there was no parse error and we have a validator, validate
 		if err == nil && mf.validator != nil {
 			err = mf.validator.ValidateParsedResponse(t, result)
@@ -65,9 +65,9 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, 
 			return result, totalUsage, nil
 		} else if errors.Is(err, jpf.ErrInvalidResponse) {
 			// If it was a parse error, add to the conversation history and continue looping
-			feedback := mf.feedbackGenerator.FormatFeedback(resp.PrimaryMessage, err)
+			feedback := mf.feedbackGenerator.FormatFeedback(resp.Message, err)
 			lastErr = err
-			history = append(history, resp.PrimaryMessage)
+			history = append(history, resp.Message)
 			history = append(history, jpf.Message{
 				Role:    mf.feedbackRole,
 				Content: feedback,

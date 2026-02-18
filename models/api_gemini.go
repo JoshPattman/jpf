@@ -65,8 +65,8 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.M
 
 	content := respTyped.Candidates[0].Content.Parts[0].Text
 	return jpf.ModelResponse{
-		PrimaryMessage: jpf.Message{Role: jpf.AssistantRole, Content: content},
-		Usage:          usage.Add(jpf.Usage{SuccessfulCalls: 1}),
+		Message: jpf.Message{Role: jpf.AssistantRole, Content: content},
+		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
 
