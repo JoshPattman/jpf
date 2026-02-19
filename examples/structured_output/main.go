@@ -73,7 +73,7 @@ func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 	if err != nil {
 		return nil, errors.Join(errors.New("failed to create schema"), err)
 	}
-	model := models.NewAPIModel(
+	model := models.NewRemote(
 		models.OpenAI,
 		"gpt-4o",
 		os.Getenv("OPENAI_KEY"),

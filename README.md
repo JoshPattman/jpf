@@ -30,162 +30,97 @@ go get github.com/JoshPattman/jpf
 
 Learn more about JPF in the [Core Concepts](#core-concepts) section.
 
-## Examples
+## Quickstart
 
 There are multiple examples available in the [examples](https://github.com/JoshPattman/jpf/examples) directory.
 
-## Core Concepts
-
-- jpf aims to separate the various components of building a robust interaction with an LLM for three main reasons:
-  - **Reusability**: Build up a set of components you find useful, and write less repeated code.
-  - **Flexibility**: Write code in a way that easily allows you to extend the LLM's capabilities - for example you can add cache to an LLM without changing a single line of business logic.
-  - **Testability**: Each component being an atomic piece of logic allows you to unit test and mock each and every piece of logic in isolation.
-- Below are the core components you will need to understand to write code with jpf:
-
-<details>
-<summary>Model</summary>
-
-- `Model`s are the core component of jpf - they wrap an LLM with some additional logic in a consistent interface.
-```go
-// Model defines an interface to an LLM.
-type Model interface {
-	// Responds to a set of input messages.
-	Respond(ctx context.Context, messages []Message) (ModelResponse, error)
-}
-
-type ModelResponse struct {
-	// Extra messages that are not the final response,
-	// but were used to build up the final response.
-	// For example, reasoning messages.
-	AuxiliaryMessages []Message
-	// The primary response to the users query.
-	// Usually the only response that matters.
-	Message Message
-	// The usage of making this call.
-	// This may be the sum of multiple LLM calls.
-	Usage Usage
-}
-
-// Message defines a text message to/from an LLM.
-type Message struct {
-	Role    Role
-	Content string
-	Images  []ImageAttachment
-}
-```
-- Models are built using composition - you can produce a very powerful model by stacking up multiple less powerful models together.
-  - The power with this approach is you can abstract away a lot of the complexity from your client code, allowing it to focus primarily on business logic.
+### Build a model
+- A model is capable of responding to a set of messages.
+- Models are built through composition, adding functionality that runs on your machine.
 
 ```go
-// All model constructors in jpf return the Model interface,
-// we can re-use our variable as we build it up.
-var model jpf.Model
-
-// Switch, based on a boolean variable, if we should use Gemini or OpenAI.
-// If using Gemini, we will scale the temperature down a bit (NOT useful - just for demonstration).
-if useGemini {
-    model = jpf.NewGeminiModel(apiKey, modelName, jpf.WithTemperature{X: temperature*0.8})
-} else {
-    model = jpf.NewOpenAIModel(apiKey, modelName, jpf.WithTemperature{X: temperature})
-}
-
-// Add retrying on API failures to the model.
-// This will retry calling the child model multiple times upon an error.
-if retries > 0 {
-    model = jpf.NewRetryModel(model, retries, jpf.WithDelay{X: time.Second})
-}
-
-// Add cache to the model.
-// This will skip calling out to the model if the same messages are requested a second time.
-if cache != nil {
-    model = jpf.NewCachedModel(model, cache)
-}
-
-// We now have a model that may/may not be gemini / openai, with retrying and cache.
-// However, the client code does not need to know about any of this - to it we are still just calling a model!
-```
-
-- Note that even though models can stream back text, it is only intended as a temporary and unreliable way to distract users while waiting for requests.
-	- You should always aim to make your code work without streaming, and add it in as an add-in later on to improve the UX - this is more robust.
-
-</details>
-
-<details>
-<summary>Encoder</summary>
-
-- An `Encoder` provides an interface to take a specific typed object and produce some messages for the LLM.
-  - It does not actually make a call to the `Model`, and it does not decode the response.
-
-```go
-// Encoder encodes a structured piece of data into a set of messages for an LLM.
-type Encoder[T any] interface {
-	BuildInputMessages(T) ([]Message, error)
+func BuildModel() jpf.Model {
+	// Create a new gpt-4o model attached to the OpenAI API.
+	model := models.NewRemote(
+		models.OpenAI, // Defines the API format and the default URL (URL can be overriden)
+		"gpt-4o", // Model name on API
+		os.Getenv("OPENAI_KEY"), // API key
+		models.WithTemperature(0.5) // Optional params - many more are supported
+	)
+	// Locally rate limit the model calls to 1 every 5 seconds
+	model = models.RateLimit(model, rate.NewLimiter(rate.Every(time.Second*5), 1))
+	// Make the model retry non-200 requests up to 5 times
+	model = models.Retry(model, 5)
+	// Cache model requests in memory - file and database are also supported
+	cache := caches.NewRAM()
+	model = models.Cache(model, cache)
+	return model
 }
 ```
 
-- For more complex tasks, you may choose to implement this yourself, however there are some useful encoders built in.
-
-</details>
-
-<details>
-<summary>Parser</summary>
-
-- A `Parser` parses the output of an LLM into structured data.
-- As with encoders, they do not make any LLM calls.
+### Build a pipeline
+- A pipeline is a wrapper around a model that takes and returns structured data.
+- Pipelines may retry using various strategies when a validation error (attempting to parse the output) occurs.
 ```go
-// Parser converts the LLM response into a structured piece of output data.
-// When the LLM response is invalid, it should return [ErrInvalidResponse] (or an error joined on that).
-type Parser[U any] interface {
-	ParseResponseText(string) (U, error)
+// Define the structured data to provide to the pipeline
+type TaskInput struct {
+	Name string
 }
-```
- - You may choose to implement your own parser, however in my experience a JSON object is usually sufficient output.
-- When an error in response format is detected, the response decoder must return an error that, at some point in its chain, is an `ErrInvalidResponse` (this will be explained in the pipeline section).
-
-</details>
-
-<details>
-<summary>Validator</summary>
-
-- A `Validator` checks the parsed output of an LLM against the input to validate it.
-- These are optional in all pipelines (can be passed as nil if no further validation is required).
-```go
-// Validator takes a parsed LLM response and validates it against the input.
-// When the LLM response is invalid, it should return [ErrInvalidResponse] (or an error joined on that).
-type Validator[T, U any] interface {
-	ValidateParsedResponse(T, U) error
+// Define the structured data to read from the pipeline
+type TaskOutput struct {
+	IsCelebrity bool `json:"is_celebrity"`
 }
-```
- - There are no implementations of this in jpf due to how usage-specific the validation would be - you should impolement your own.
-- As with the above, validation errors should return an `ErrInvalidResponse`.
 
-</details>
+// Define a custom validator that will not accpet that santa is not a celebrity
+type CustomValidator struct{}
 
-<details>
-<summary>Pipeline</summary>
+func (c *CustomValidator) ValidateParsedResponse(in TaskInput, out TaskOutput) error {
+	if strings.ToLower(in.Name) == "santa" && !out.IsCelebrity {
+		return errors.New("santa is a celebrity")
+	}
+	return nil
+}
 
-- A `Pipeline` is a collection of a `Encoder`, `Parser`, `Validator` (optional), `Model`, and some additional logic.
-- Your business logic should only ever be interacting with LLMs through a pipeline.
-- It is a very generic interface, but it is intended to only ever be used for LLM-based functionality.
-```go
-// Pipeline transforms input of type T into output of type U using an LLM.
-// It handles the encoding of input, interaction with the LLM, and decoding of output.
-type Pipeline[T, U any] interface {
-	Call(context.Context, T) (U, Usage, error)
+func BuildPipeline(model jpf.Model) jpf.Pipeline[TaskInput, TaskOutput] {
+	// Encode the data to system/user prompt pair, where both are a text/template
+	encoder := encoders.NewTemplate[TaskInput]("The user will give you a name. Respond with a json object with a single key, 'is_celebrity'.", "{{ .Name }}")
+	// Parse the output message into a struct using json
+	parser := parsers.NewJson[TaskOutput]()
+	// Only provide the text between { and } to the json parser - cut off extra stuff like backticks
+	parser = parsers.SubstringJsonObject(parser)
+	// When retrying, will provide fedback by simply formatting the error
+	feedback := feedbacks.NewErrString()
+	// Create a pipeline that retries up to 5 times on parsing or validation errors, providing feedback as developer
+	return pipelines.NewFeedbackRetry(
+		encoder,
+		parser,
+		&CustomValidator{}, // This is allowed to be nil if no further validation is required
+		feedback,
+		model,
+		jpf.DeveloperRole,
+		5,
+	)
 }
 ```
 
-- It is not really expected that users will implement their own pipelines, but that is absolutely possible.
-- jpf ships with three built-in pipelines:
-	- `NewOneShotPipeline`: No retries on validation fails, return errors immediately.
-	- `NewFeedbackPipeline`: On `ErrInvalidResponse`, add the error to the conversation and try again.
-	- `NewFallbackPipeline`: On `ErrInvalidResponse`, try again with the next model option.
-- Notice in the above, we have introduced a second place for retries to occur - this is intentional.
-  - API-level errors should be retried at the `Model` level - these are errors that are not the fault of the LLM.
-  - LLM response errors should be retried at the `Pipeline` level - these are errors where the LLM has responded with an invalid response, and we would like to tell it what it did wrong and ask again.
-- However, if you choose not to use these higher-level retries, you can simply use the one-shot pipeline.
+### Use the pipeline
+```go
+func IsCelebrity(name string) (bool, error) {
+	// Realistically in production code, you would not build the models here,
+	// instead you would inject them (or at least inject the builders),
+	// as this allows for higher testability and customisability.
+	model := BuildModel()
+	pipeline := BuildPipeline(model)
+	// Calling a pipeline gives result, usage, and error
+	result, usage, err := pipeline.Call(context.Background(), TaskInput{name})
+	if err != nil {
+		return false, err
+	}
+	fmt.Println(usage)
+	return result.IsCelebrity, nil
+}
+```
 
-</details>
 
 ## FAQ
 - I want to change my model's temperature/structured output/output tokens/... after I have built it!

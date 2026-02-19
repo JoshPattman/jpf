@@ -52,7 +52,7 @@ type ModelBuilder struct {
 }
 
 func (builder *ModelBuilder) Build(verbosity models.Verbosity, pPenalty float64) jpf.Model {
-	return models.NewAPIModel(
+	return models.NewRemote(
 		models.OpenAI,
 		builder.OpenAIModelName,
 		builder.OpenAIKey,

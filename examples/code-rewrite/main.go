@@ -122,7 +122,7 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 		name = builder.OpenAIModelName
 		key = builder.OpenAIKey
 	}
-	model := models.NewAPIModel(mode, name, key)
+	model := models.NewRemote(mode, name, key)
 	if builder.APIRequestTimeout != 0 {
 		model = models.Timeout(model, builder.APIRequestTimeout)
 	}

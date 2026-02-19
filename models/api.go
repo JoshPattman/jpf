@@ -103,7 +103,7 @@ func WithURL(u string) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.url = u }
 }
 
-func NewAPIModel(format APIFormat, name string, key string, opts ...APIModelOpt) jpf.Model {
+func NewRemote(format APIFormat, name string, key string, opts ...APIModelOpt) jpf.Model {
 	settings := apiModelSettings{
 		url:     getDefaultURL(format),
 		headers: make(map[string]string),
