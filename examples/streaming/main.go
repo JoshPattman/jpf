@@ -20,7 +20,7 @@ func main() {
 	}
 	// Create the model.
 	// We can still use normal encoders, decoders, and retry logic (do be aware that retries will call the onBegin callback again).
-	model := models.NewAPIModel(models.OpenAI, "gpt-4.1", os.Getenv("OPENAI_KEY"), models.WithStreamCallbacks(nil, onStream))
+	model := models.NewRemote(models.OpenAI, "gpt-4.1", os.Getenv("OPENAI_KEY"), models.WithStreamCallbacks(nil, onStream))
 	//model := models.NewAPIModel(models.Google, "gemini-2.5-flash", os.Getenv("GEMINI_KEY"), models.WithStreamCallbacks(nil, onStream))
 	encoder := encoders.NewFixed("Write 5 haikus about the topic")
 	parser := parsers.NewRaw()

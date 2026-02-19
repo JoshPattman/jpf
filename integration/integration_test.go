@@ -16,15 +16,15 @@ func TestHelloModels(t *testing.T) {
 	oaiKey := os.Getenv("OPENAI_KEY")
 	gemKey := os.Getenv("GEMINI_KEY")
 	modelsToRun := []jpf.Model{
-		models.NewAPIModel(models.OpenAI, "gpt-4.1", oaiKey),
-		models.NewAPIModel(models.OpenAI, "gpt-4.1", oaiKey, models.WithTemperature(0)),
-		models.NewAPIModel(models.OpenAI, "gpt-4.1", oaiKey, models.WithPresencePenalty(1)),
-		models.NewAPIModel(models.Google, "gemini-2.5-flash", gemKey),
-		models.NewAPIModel(models.Google, "gemini-2.5-flash", gemKey, models.WithTemperature(0)),
-		models.NewAPIModel(models.OpenAI, "o3-mini", oaiKey),
-		models.NewAPIModel(models.OpenAI, "o3-mini", oaiKey, models.WithReasoningEffort(models.MediumReasoning)),
-		models.NewAPIModel(models.OpenAI, "gpt-5", oaiKey),
-		models.NewAPIModel(models.OpenAI, "gpt-5", oaiKey, models.WithVerbosity(models.MediumVerbosity)),
+		models.NewRemote(models.OpenAI, "gpt-4.1", oaiKey),
+		models.NewRemote(models.OpenAI, "gpt-4.1", oaiKey, models.WithTemperature(0)),
+		models.NewRemote(models.OpenAI, "gpt-4.1", oaiKey, models.WithPresencePenalty(1)),
+		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
+		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey, models.WithTemperature(0)),
+		models.NewRemote(models.OpenAI, "o3-mini", oaiKey),
+		models.NewRemote(models.OpenAI, "o3-mini", oaiKey, models.WithReasoningEffort(models.MediumReasoning)),
+		models.NewRemote(models.OpenAI, "gpt-5", oaiKey),
+		models.NewRemote(models.OpenAI, "gpt-5", oaiKey, models.WithVerbosity(models.MediumVerbosity)),
 	}
 	for _, model := range modelsToRun {
 		testHelloModel(t, models.Timeout(model, time.Minute))
