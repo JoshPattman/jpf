@@ -21,7 +21,7 @@ type apiGeminiModel struct {
 	settings apiModelSettings
 }
 
-func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	err := m.validateNoUnusableArgs()
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not validate model setup")
@@ -30,7 +30,8 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.M
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
-	req, err := m.createRequest(ctx, body)
+	isStreamed := streamer != nil
+	req, err := m.createRequest(ctx, body, isStreamed)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request")
 	}
@@ -45,8 +46,8 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.M
 
 	var respTyped geminiStaticResponse
 	var rawRespBytes []byte
-	if m.settings.stream != nil {
-		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body)
+	if streamer != nil {
+		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body, streamer)
 	} else {
 		respTyped, rawRespBytes, err = m.parseStaticResponse(ctx, resp.Body)
 	}
@@ -87,7 +88,7 @@ func (m *apiGeminiModel) parseStaticResponse(ctx context.Context, respBody io.Re
 	return respTyped, respData, nil
 }
 
-func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.ReadCloser) (geminiStaticResponse, []byte, error) {
+func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.ReadCloser, streamer jpf.ModelStreamer) (geminiStaticResponse, []byte, error) {
 	go func() {
 		<-ctx.Done()
 		respBody.Close()
@@ -97,9 +98,7 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	var fullText strings.Builder
 	var inputTokens, outputTokens int
 
-	if m.settings.stream != nil && m.settings.stream.onBegin != nil {
-		m.settings.stream.onBegin()
-	}
+	streamer.OnMessageBegin()
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -123,9 +122,7 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 			// concatenate all parts in this chunk
 			for _, p := range chunk.Candidates[0].Content.Parts {
 				fullText.WriteString(p.Text)
-				if m.settings.stream != nil && m.settings.stream.onText != nil {
-					m.settings.stream.onText(p.Text)
-				}
+				streamer.OnMessageText(p.Text)
 			}
 		}
 
@@ -176,9 +173,9 @@ func (m *apiGeminiModel) apiErrorResponse(resp *http.Response) (jpf.ModelRespons
 	return failedResponse(), fmt.Errorf("request failed with status %d: %s", resp.StatusCode, string(respData))
 }
 
-func (m *apiGeminiModel) createRequest(ctx context.Context, body io.Reader) (*http.Request, error) {
+func (m *apiGeminiModel) createRequest(ctx context.Context, body io.Reader, isStreamed bool) (*http.Request, error) {
 	var modelUrl, extraStreamParam string
-	if m.settings.stream == nil {
+	if !isStreamed {
 		modelUrl = fmt.Sprintf("%s/%s:generateContent", m.settings.url, m.name)
 	} else {
 		modelUrl = fmt.Sprintf("%s/%s:streamGenerateContent", m.settings.url, m.name)

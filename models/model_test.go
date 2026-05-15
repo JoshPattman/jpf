@@ -42,7 +42,7 @@ func TestCachedModel(t *testing.T) {
 	}}
 	model = Cache(model, newRamCache())
 	for i := range 5 {
-		resp1, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp1, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,7 +60,7 @@ func TestLoggingModel(t *testing.T) {
 	logger := NewMockLogger()
 	model = Log(model, logger)
 	for range 3 {
-		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -84,7 +84,7 @@ func TestRetryModel(t *testing.T) {
 		NFails: 3,
 	}
 	model = Retry(model, 3)
-	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +107,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +128,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +152,7 @@ func TestRetryChainModel(t *testing.T) {
 				NFails:    1,
 			},
 		})
-		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err == nil {
 			t.Fatal("expected error but got none")
 		}
@@ -173,7 +173,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -197,7 +197,7 @@ func TestTimeoutModel(t *testing.T) {
 		model := Timeout(slowModel, 50*time.Millisecond)
 
 		start := time.Now()
-		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		elapsed := time.Since(start)
 
 		// Should fail with context deadline exceeded
@@ -226,7 +226,7 @@ func TestTimeoutModel(t *testing.T) {
 		// Wrap with 100ms timeout (plenty of time)
 		model := Timeout(fastModel, 100*time.Millisecond)
 
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -252,7 +252,7 @@ func TestTimeoutModel(t *testing.T) {
 		defer cancel()
 
 		start := time.Now()
-		_, err := model.Respond(parentCtx, []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(parentCtx, []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 		elapsed := time.Since(start)
 
 		// Should fail with context deadline exceeded

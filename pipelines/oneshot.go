@@ -36,7 +36,7 @@ func (mf *oneShotPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, e
 	if err != nil {
 		return zero, jpf.Usage{}, utils.Wrap(err, "failed to build input messages")
 	}
-	resp, err := mf.model.Respond(ctx, msgs)
+	resp, err := mf.model.Respond(ctx, msgs, nil)
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to get model response")
 	}

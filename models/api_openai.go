@@ -21,8 +21,9 @@ type apiOpenAIModel struct {
 	settings apiModelSettings
 }
 
-func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
-	body, err := m.createBodyData(msgs)
+func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+	isStreamed := streamer != nil
+	body, err := m.createBodyData(msgs, isStreamed)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
@@ -41,8 +42,8 @@ func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.M
 
 	var respTyped openAIAPIStaticResponse
 	var rawRespBytes []byte
-	if m.settings.stream != nil {
-		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body)
+	if streamer != nil {
+		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body, streamer)
 	} else {
 		respTyped, rawRespBytes, err = m.parseStaticResponse(ctx, resp.Body)
 	}
@@ -88,7 +89,7 @@ func (m *apiOpenAIModel) parseStaticResponse(ctx context.Context, respBody io.Re
 	return respTyped, respData, nil
 }
 
-func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.ReadCloser) (openAIAPIStaticResponse, []byte, error) {
+func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.ReadCloser, streamer jpf.ModelStreamer) (openAIAPIStaticResponse, []byte, error) {
 	go func() {
 		<-ctx.Done()
 		respBody.Close()
@@ -97,9 +98,7 @@ func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	var fullContent strings.Builder
 	var inputTokens, outputTokens int
 
-	if m.settings.stream != nil && m.settings.stream.onBegin != nil {
-		m.settings.stream.onBegin()
-	}
+	streamer.OnMessageBegin()
 
 	for scanner.Scan() {
 		line := scanner.Bytes()
@@ -129,9 +128,7 @@ func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.Re
 		if len(chunk.Choices) > 0 {
 			content := chunk.Choices[0].Delta.Content
 			fullContent.WriteString(content)
-			if m.settings.stream != nil && m.settings.stream.onText != nil {
-				m.settings.stream.onText(content)
-			}
+			streamer.OnMessageText(content)
 		}
 		if chunk.Usage.PromptTokens > 0 {
 			inputTokens = chunk.Usage.PromptTokens
@@ -186,12 +183,12 @@ func (m *apiOpenAIModel) createRequest(ctx context.Context, body io.Reader) (*ht
 	return req.WithContext(ctx), nil
 }
 
-func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message) (io.Reader, error) {
+func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message, isStreamed bool) (io.Reader, error) {
 	apiMessages, err := m.messages(msgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not convert messages to OpenAI format")
 	}
-	body, err := m.body(apiMessages)
+	body, err := m.body(apiMessages, isStreamed)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not create OpenAI format body")
 	}
@@ -264,7 +261,7 @@ func (m *apiOpenAIModel) messageContent(msg jpf.Message) (any, error) {
 	}
 }
 
-func (m *apiOpenAIModel) body(msgs []openAIAPIMessage) (map[string]any, error) {
+func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool) (map[string]any, error) {
 	bodyMap := map[string]any{
 		"model":    m.name,
 		"messages": msgs,
@@ -293,7 +290,7 @@ func (m *apiOpenAIModel) body(msgs []openAIAPIMessage) (map[string]any, error) {
 	if m.settings.jsonSchema != nil {
 		bodyMap["response_format"] = m.schema(m.settings.jsonSchema)
 	}
-	if m.settings.stream != nil {
+	if isStreamed {
 		bodyMap["stream"] = true
 		bodyMap["stream_options"] = map[string]any{"include_usage": true}
 	}

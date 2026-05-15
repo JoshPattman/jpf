@@ -22,11 +22,11 @@ type concurrentLimitedModel struct {
 	sem   *semaphore.Weighted
 }
 
-func (c *concurrentLimitedModel) Respond(ctx context.Context, messages []jpf.Message) (jpf.ModelResponse, error) {
+func (c *concurrentLimitedModel) Respond(ctx context.Context, messages []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	err := c.sem.Acquire(ctx, 1)
 	if err != nil {
 		return jpf.ModelResponse{}, err
 	}
 	defer c.sem.Release(1)
-	return c.model.Respond(ctx, messages)
+	return c.model.Respond(ctx, messages, streamer)
 }

@@ -32,7 +32,6 @@ const (
 
 type apiModelSettings struct {
 	url     string
-	stream  *streamCallbacks
 	headers map[string]string
 
 	temperature     *float64
@@ -44,11 +43,6 @@ type apiModelSettings struct {
 	maxOutput       *int
 
 	jsonSchema map[string]any
-}
-
-type streamCallbacks struct {
-	onBegin func()
-	onText  func(string)
 }
 
 type APIModelOpt func(*apiModelSettings)
@@ -77,9 +71,6 @@ func WithMaxOutput(n int) APIModelOpt {
 }
 func WithJSONSchema(schema map[string]any) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.jsonSchema = schema }
-}
-func WithStreamCallbacks(onBegin func(), onText func(string)) APIModelOpt {
-	return func(kw *apiModelSettings) { kw.stream = &streamCallbacks{onBegin: onBegin, onText: onText} }
 }
 func WithHeader(key, value string) APIModelOpt {
 	return func(kw *apiModelSettings) {

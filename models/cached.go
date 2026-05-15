@@ -34,17 +34,21 @@ type cachedModel struct {
 }
 
 // Respond implements Model.
-func (c *cachedModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+func (c *cachedModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	ok, final, err := c.cache.GetCachedResponse(ctx, c.salt, msgs)
 	if err != nil {
 		return jpf.ModelResponse{}, utils.Wrap(err, "failed to query cache")
 	}
 	if ok {
+		if streamer != nil {
+			streamer.OnMessageBegin()
+			streamer.OnMessageText(final.Content)
+		}
 		return jpf.ModelResponse{
 			Message: final,
 		}, nil
 	}
-	resp, err := c.model.Respond(ctx, msgs)
+	resp, err := c.model.Respond(ctx, msgs, streamer)
 	if err != nil {
 		return resp.OnlyUsage(), err
 	}

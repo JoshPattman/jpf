@@ -50,7 +50,7 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, 
 	totalUsage := jpf.Usage{}
 	var lastErr error
 	for range mf.maxRetries + 1 {
-		resp, err := mf.model.Respond(ctx, history)
+		resp, err := mf.model.Respond(ctx, history, nil)
 		totalUsage = totalUsage.Add(resp.Usage)
 		if err != nil {
 			return u, totalUsage, utils.Wrap(err, "failed to get model response")
