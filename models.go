@@ -50,11 +50,16 @@ func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
 // Model defines an interface to an LLM.
 type Model interface {
 	// Responds to a set of input messages.
-	Respond(context.Context, []Message) (ModelResponse, error)
+	Respond(context.Context, []Message, ModelStreamer) (ModelResponse, error)
+}
+
+type ModelStreamer interface {
+	OnMessageBegin()
+	OnMessageText(text string)
+	OnMessageReset()
 }
 
 // Role is an enum specifying a role for a message.
-// It is not 1:1 with openai roles (i.e. there is a reasoning role here).
 type Role uint8
 
 const (

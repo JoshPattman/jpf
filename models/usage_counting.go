@@ -52,8 +52,8 @@ type usageCountingModel struct {
 	model   jpf.Model
 }
 
-func (c *usageCountingModel) Respond(ctx context.Context, messages []jpf.Message) (jpf.ModelResponse, error) {
-	resp, err := c.model.Respond(ctx, messages)
+func (c *usageCountingModel) Respond(ctx context.Context, messages []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+	resp, err := c.model.Respond(ctx, messages, streamer)
 	c.counter.Add(resp.Usage)
 	return resp, err
 }

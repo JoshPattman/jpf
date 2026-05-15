@@ -38,7 +38,7 @@ type TestingModel struct {
 	NFails    int
 }
 
-func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	if t.NFails > 0 {
 		t.NFails--
 		return jpf.ModelResponse{}, errors.New("deliberate fail")
@@ -53,6 +53,10 @@ func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.Mod
 	}
 	resp, remaining := resps[0], resps[1:]
 	t.Responses[req] = remaining
+	if streamer != nil {
+		streamer.OnMessageBegin()
+		streamer.OnMessageText(resp)
+	}
 	return jpf.ModelResponse{
 		Message: jpf.Message{Role: jpf.AssistantRole, Content: resp},
 		Usage:   jpf.Usage{},
@@ -71,7 +75,7 @@ type SlowTestingModel struct {
 	Response jpf.ModelResponse
 }
 
-func (s *SlowTestingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+func (s *SlowTestingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	// Use a timer that respects context cancellation
 	timer := time.NewTimer(s.Delay)
 	defer timer.Stop()
@@ -79,6 +83,10 @@ func (s *SlowTestingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf
 	select {
 	case <-timer.C:
 		// Delay completed, return response
+		if streamer != nil {
+			streamer.OnMessageBegin()
+			streamer.OnMessageText(s.Response.Message.Content)
+		}
 		return s.Response, nil
 	case <-ctx.Done():
 		// Context cancelled or timed out

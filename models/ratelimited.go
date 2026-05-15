@@ -20,10 +20,10 @@ type rateLimitedModel struct {
 	model   jpf.Model
 }
 
-func (r *rateLimitedModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+func (r *rateLimitedModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	err := r.limiter.Wait(ctx)
 	if err != nil {
 		return jpf.ModelResponse{}, errors.Join(errors.New("failed to wait for rate limiter"), err)
 	}
-	return r.model.Respond(ctx, msgs)
+	return r.model.Respond(ctx, msgs, streamer)
 }

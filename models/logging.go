@@ -24,9 +24,9 @@ type loggingModel struct {
 }
 
 // Respond implements Model.
-func (l *loggingModel) Respond(ctx context.Context, msgs []jpf.Message) (jpf.ModelResponse, error) {
+func (l *loggingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
 	tStart := time.Now()
-	resp, err := l.model.Respond(ctx, msgs)
+	resp, err := l.model.Respond(ctx, msgs, streamer)
 	dur := time.Since(tStart)
 	lmp := jpf.ModelLoggingInfo{
 		Messages:             msgs,
