@@ -267,6 +267,32 @@ func TestTimeoutModel(t *testing.T) {
 	})
 }
 
+func TestMultiDispatchModel(t *testing.T) {
+	slowerModel := &utils.SlowTestingModel{
+		Delay: 200 * time.Millisecond,
+		Response: jpf.ModelResponse{
+			Message: jpf.Message{Role: jpf.AssistantRole, Content: "response_slow"},
+		},
+	}
+	fasterModel := &utils.SlowTestingModel{
+		Delay: 100 * time.Millisecond,
+		Response: jpf.ModelResponse{
+			Message: jpf.Message{Role: jpf.AssistantRole, Content: "response_fast"},
+		},
+	}
+	model := MultiDispatch([]jpf.Model{slowerModel, fasterModel})
+
+	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
+
+	if err != nil {
+		t.Fatal("expected timeout error but got none")
+	}
+
+	if resp.Message.Content != "response_fast" {
+		t.Fatalf("incorrect response received: %v", resp.Message.Content)
+	}
+}
+
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && findSubstring(s, substr))
 }
