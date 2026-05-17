@@ -41,11 +41,10 @@ type feedbackPipeline[T, U any] struct {
 	maxRetries        int
 }
 
-func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, error) {
-	var u U
+func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineResponse[U], error) {
 	history, err := mf.encoder.BuildInputMessages(t)
 	if err != nil {
-		return u, jpf.Usage{}, utils.Wrap(err, "failed to build input messages")
+		return jpf.PipelineResponse[U]{}, utils.Wrap(err, "failed to build input messages")
 	}
 	totalUsage := jpf.Usage{}
 	var lastErr error
@@ -53,7 +52,7 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, 
 		resp, err := mf.model.Respond(ctx, history, nil)
 		totalUsage = totalUsage.Add(resp.Usage)
 		if err != nil {
-			return u, totalUsage, utils.Wrap(err, "failed to get model response")
+			return jpf.PipelineResponse[U]{Usage: totalUsage}, utils.Wrap(err, "failed to get model response")
 		}
 		result, err := mf.parser.ParseResponseText(resp.Message.Content)
 		// If there was no parse error and we have a validator, validate
@@ -62,7 +61,7 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, 
 		}
 		if err == nil {
 			// If the result was ok, return it
-			return result, totalUsage, nil
+			return jpf.PipelineResponse[U]{Result: result, Usage: totalUsage}, nil
 		} else if errors.Is(err, jpf.ErrInvalidResponse) {
 			// If it was a parse error, add to the conversation history and continue looping
 			feedback := mf.feedbackGenerator.FormatFeedback(resp.Message, err)
@@ -74,8 +73,8 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, 
 			})
 		} else {
 			// Otherwise, it was another error so return the error (don't loop)
-			return u, totalUsage, utils.Wrap(err, "failed to parse model response")
+			return jpf.PipelineResponse[U]{Usage: totalUsage}, utils.Wrap(err, "failed to parse model response")
 		}
 	}
-	return u, totalUsage, utils.Wrap(lastErr, "model failed to produce a valid response after trying %d times", mf.maxRetries+1)
+	return jpf.PipelineResponse[U]{Usage: totalUsage}, utils.Wrap(lastErr, "model failed to produce a valid response after trying %d times", mf.maxRetries+1)
 }

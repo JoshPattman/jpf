@@ -39,7 +39,7 @@ func testHelloModel(t *testing.T, model jpf.Model) {
 				Role:    jpf.UserRole,
 				Content: "Hello there!",
 			},
-		})
+		}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

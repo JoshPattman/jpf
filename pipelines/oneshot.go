@@ -30,25 +30,24 @@ type oneShotPipeline[T, U any] struct {
 	model     jpf.Model
 }
 
-func (mf *oneShotPipeline[T, U]) Call(ctx context.Context, t T) (U, jpf.Usage, error) {
-	var zero U
+func (mf *oneShotPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineResponse[U], error) {
 	msgs, err := mf.encoder.BuildInputMessages(t)
 	if err != nil {
-		return zero, jpf.Usage{}, utils.Wrap(err, "failed to build input messages")
+		return jpf.PipelineResponse[U]{}, utils.Wrap(err, "failed to build input messages")
 	}
 	resp, err := mf.model.Respond(ctx, msgs, nil)
 	if err != nil {
-		return zero, resp.Usage, utils.Wrap(err, "failed to get model response")
+		return jpf.PipelineResponse[U]{Usage: resp.Usage}, utils.Wrap(err, "failed to get model response")
 	}
 	result, err := mf.parser.ParseResponseText(resp.Message.Content)
 	if err != nil {
-		return zero, resp.Usage, utils.Wrap(err, "failed to parse model response")
+		return jpf.PipelineResponse[U]{Usage: resp.Usage}, utils.Wrap(err, "failed to parse model response")
 	}
 	if mf.validator != nil {
 		err := mf.validator.ValidateParsedResponse(t, result)
 		if err != nil {
-			return zero, resp.Usage, utils.Wrap(err, "failed to validate model response")
+			return jpf.PipelineResponse[U]{Usage: resp.Usage}, utils.Wrap(err, "failed to validate model response")
 		}
 	}
-	return result, resp.Usage, nil
+	return jpf.PipelineResponse[U]{Result: result, Usage: resp.Usage}, nil
 }
