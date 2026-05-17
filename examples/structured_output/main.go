@@ -38,11 +38,11 @@ func main() {
 		"Who is the president of the US?",
 	}
 	for _, q := range questions {
-		person, _, err := personQ.Call(context.Background(), q)
+		response, err := personQ.Call(context.Background(), q)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("%s   >   %s %s, %d years old\n", q, person.FirstName, person.LastName, person.Age)
+		fmt.Printf("%s   >   %s %s, %d years old\n", q, response.Result.FirstName, response.Result.LastName, response.Result.Age)
 	}
 
 	// Ask some questions about animals
@@ -55,11 +55,11 @@ func main() {
 		"What is the fastest bird?",
 	}
 	for _, q := range questions {
-		animal, _, err := animalQ.Call(context.Background(), q)
+		response, err := animalQ.Call(context.Background(), q)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Printf("%s   >   %s (%s), mammal=%v\n", q, animal.Name, animal.Family, animal.IsMammal)
+		fmt.Printf("%s   >   %s (%s), mammal=%v\n", q, response.Result.Name, response.Result.Family, response.Result.IsMammal)
 	}
 }
 

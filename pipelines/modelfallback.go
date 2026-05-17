@@ -34,23 +34,22 @@ type fallbackPipeline[T, U any] struct {
 	models    []jpf.Model
 }
 
-func (m *fallbackPipeline[T, U]) Call(ctx context.Context, input T) (U, jpf.Usage, error) {
-	var zero U
+func (m *fallbackPipeline[T, U]) Call(ctx context.Context, input T) (jpf.PipelineResponse[U], error) {
 	totalUsage := jpf.Usage{}
 	errs := make([]error, 0)
 	for _, model := range m.models {
 		result, usage, err := m.callOne(ctx, input, model)
 		totalUsage = totalUsage.Add(usage)
 		if err == nil {
-			return result, totalUsage, nil
+			return jpf.PipelineResponse[U]{Result: result, Usage: totalUsage}, nil
 		} else if !errors.Is(err, jpf.ErrInvalidResponse) {
 			// Only non-expected errors go here
-			return zero, totalUsage, err
+			return jpf.PipelineResponse[U]{Usage: totalUsage}, err
 		}
 		errs = append(errs, err)
 	}
 	errs = slices.Insert(errs, 0, errors.New("all models failed to produce valid outputs"))
-	return zero, totalUsage, errors.Join(errs...)
+	return jpf.PipelineResponse[U]{Usage: totalUsage}, errors.Join(errs...)
 }
 
 func (mf *fallbackPipeline[T, U]) callOne(ctx context.Context, t T, model jpf.Model) (U, jpf.Usage, error) {

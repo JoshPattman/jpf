@@ -35,13 +35,13 @@ func main() {
 	for _, param := range params {
 		fmt.Println("Verbosity", param.verbosity, "PPenalty", param.pPenalty)
 		pipeline := pipelineBuilder.Build(param.verbosity, param.pPenalty)
-		poem, usage, err := pipeline.Call(context.Background(), topic)
-		fmt.Println("Used", usage)
+		response, err := pipeline.Call(context.Background(), topic)
+		fmt.Println("Used", response.Usage)
 		if err != nil {
 			fmt.Println(err)
 			continue
 		}
-		fmt.Println(poem)
+		fmt.Println(response.Result)
 		fmt.Println()
 	}
 }

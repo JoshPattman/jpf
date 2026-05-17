@@ -76,7 +76,7 @@ func main() {
 	}
 
 	// Rewrite the code
-	rewritten, _, err := pipeline.Call(context.Background(), CodeConversionInput{
+	response, err := pipeline.Call(context.Background(), CodeConversionInput{
 		Language: *targetLang,
 		Pointers: strings.Split(*pointers, ";"),
 		Code:     string(data),
@@ -93,7 +93,7 @@ func main() {
 		return
 	}
 	defer f2.Close()
-	fmt.Fprint(f2, rewritten)
+	fmt.Fprint(f2, response.Result)
 }
 
 // ModelBuilder can build up jpf.Models with various behaviour.

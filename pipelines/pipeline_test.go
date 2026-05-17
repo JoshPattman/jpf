@@ -31,7 +31,7 @@ func (testCase MFCase[T, U]) Name() string { return testCase.ID }
 
 func (testCase MFCase[T, U]) Test() error {
 	mf := testCase.Build()
-	result, _, err := mf.Call(context.Background(), testCase.Input)
+	response, err := mf.Call(context.Background(), testCase.Input)
 	if testCase.ExpectedError {
 		if err == nil {
 			return errors.New("expected an error but got none")
@@ -40,8 +40,8 @@ func (testCase MFCase[T, U]) Test() error {
 		if err != nil {
 			return errors.Join(errors.New("got error when expecting none"), err)
 		}
-		if result != testCase.Expected {
-			return errors.Join(fmt.Errorf("expected and observed did not match. Expected %v but got %v", testCase.Expected, result))
+		if response.Result != testCase.Expected {
+			return errors.Join(fmt.Errorf("expected and observed did not match. Expected %v but got %v", testCase.Expected, response.Result))
 		}
 	}
 	return nil
