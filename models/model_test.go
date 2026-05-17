@@ -285,11 +285,49 @@ func TestMultiDispatchModel(t *testing.T) {
 	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
 
 	if err != nil {
-		t.Fatal("expected timeout error but got none")
+		t.Fatal(err)
 	}
 
 	if resp.Message.Content != "response_fast" {
 		t.Fatalf("incorrect response received: %v", resp.Message.Content)
+	}
+}
+
+func TestMultiDispatchModelWithSomeFails(t *testing.T) {
+	slowerModel := &utils.SlowTestingModel{
+		Delay: 200 * time.Millisecond,
+		Response: jpf.ModelResponse{
+			Message: jpf.Message{Role: jpf.AssistantRole, Content: "response_slow"},
+		},
+	}
+	failingModel := &utils.TestingModel{
+		NFails: 1,
+	}
+	model := MultiDispatch([]jpf.Model{slowerModel, failingModel})
+
+	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if resp.Message.Content != "response_slow" {
+		t.Fatalf("incorrect response received: %v", resp.Message.Content)
+	}
+}
+
+func TestMultiDispatchModelWithAllFails(t *testing.T) {
+	failingModelA := &utils.TestingModel{
+		NFails: 1,
+	}
+	failingModelB := &utils.TestingModel{
+		NFails: 1,
+	}
+	model := MultiDispatch([]jpf.Model{failingModelA, failingModelB})
+
+	_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}}, nil)
+	if err == nil {
+		t.Fatal("expected error but got none")
 	}
 }
 
