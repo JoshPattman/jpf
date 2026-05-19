@@ -41,8 +41,6 @@ type apiModelSettings struct {
 	presencePenalty *float64
 	prediction      *string
 	maxOutput       *int
-
-	jsonSchema map[string]any
 }
 
 type APIModelOpt func(*apiModelSettings)
@@ -68,9 +66,6 @@ func WithPrediction(pred string) APIModelOpt {
 }
 func WithMaxOutput(n int) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.maxOutput = &n }
-}
-func WithJSONSchema(schema map[string]any) APIModelOpt {
-	return func(kw *apiModelSettings) { kw.jsonSchema = schema }
 }
 func WithHeader(key, value string) APIModelOpt {
 	return func(kw *apiModelSettings) {

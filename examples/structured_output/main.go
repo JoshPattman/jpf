@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 
@@ -68,21 +67,15 @@ func main() {
 // IMO this is not as powerful a pattern as the building structs in the other examples,
 // but I have added this here to show that it can be simplified.
 func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
-	var example T
-	schema, err := getSchema(example)
-	if err != nil {
-		return nil, errors.Join(errors.New("failed to create schema"), err)
-	}
 	model := models.NewRemote(
 		models.OpenAI,
 		"gpt-4o",
 		os.Getenv("OPENAI_KEY"),
-		models.WithJSONSchema(schema),
 	)
 	model = models.Retry(model, 5)
 	enc := encoders.NewFixed("Answer the users question in a json format.")
 	dec := parsers.NewJson[T]()
-	return pipelines.NewOneShot(enc, dec, nil, model), nil
+	return pipelines.NewOneShot(enc, dec, model, pipelines.WithDefualtOutputFormat[string, T]()), nil
 }
 
 // Generates a json schema from an example struct.

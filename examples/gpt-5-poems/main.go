@@ -70,5 +70,5 @@ func (builder *PoemPipelineBuilder) Build(verbosity models.Verbosity, pPenalty f
 	model := builder.ModelBuilder.Build(verbosity, pPenalty)
 	encoder := encoders.NewFixed(builder.SystemPrompt)
 	parser := parsers.NewRaw()
-	return pipelines.NewOneShot(encoder, parser, nil, model)
+	return pipelines.NewOneShot(encoder, parser, model)
 }

@@ -54,23 +54,34 @@ type Model interface {
 }
 
 type ModelResponseKwargs struct {
-	Streamer ModelStreamer
+	Streamer     ModelStreamer
+	OutputFormat any
 }
 
 type ModelResponseOpt func(*ModelResponseKwargs)
 
+// Stream the model's response to the streamer.
+// This will override any previously set streamers.
 func WithStreamResponse(streamer ModelStreamer) ModelResponseOpt {
 	return func(mrk *ModelResponseKwargs) {
 		mrk.Streamer = streamer
 	}
 }
 
-func GetModelResponseKwargs(opts ...ModelResponseOpt) *ModelResponseKwargs {
+// Set the output format (structured output).
+// This should be a struct, as it will be processed into the correct API model output format by the model itself.
+func WithOutputFormat(format any) ModelResponseOpt {
+	return func(mrk *ModelResponseKwargs) {
+		mrk.OutputFormat = format
+	}
+}
+
+func GetModelResponseKwargs(opts ...ModelResponseOpt) ModelResponseKwargs {
 	kw := &ModelResponseKwargs{}
 	for _, o := range opts {
 		o(kw)
 	}
-	return kw
+	return *kw
 }
 
 type ModelStreamer interface {

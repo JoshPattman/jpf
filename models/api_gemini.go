@@ -23,7 +23,7 @@ type apiGeminiModel struct {
 
 func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
 	kwargs := jpf.GetModelResponseKwargs(opts...)
-	err := m.validateNoUnusableArgs()
+	err := m.validateNoUnusableArgs(kwargs)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not validate model setup")
 	}
@@ -304,7 +304,7 @@ func (m *apiGeminiModel) body(systemMessage string, msgs []any) (map[string]any,
 	return body, nil
 }
 
-func (m *apiGeminiModel) validateNoUnusableArgs() error {
+func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
 	if m.settings.reasoning != nil {
 		return errUnsupportedSetting("reasoning", m.settings.reasoning)
 	}
@@ -317,8 +317,8 @@ func (m *apiGeminiModel) validateNoUnusableArgs() error {
 	if m.settings.prediction != nil {
 		return errUnsupportedSetting("prediction", m.settings.prediction)
 	}
-	if m.settings.jsonSchema != nil {
-		return errUnsupportedSetting("jsonSchema", m.settings.jsonSchema)
+	if kwargs.OutputFormat != nil {
+		return errUnsupportedSetting("WithOutputFormat", fmt.Sprintf("%T", kwargs.OutputFormat))
 	}
 	return nil
 }

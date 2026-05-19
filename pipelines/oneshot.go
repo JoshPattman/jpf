@@ -12,22 +12,25 @@ import (
 func NewOneShot[T, U any](
 	encoder jpf.Encoder[T],
 	parser jpf.Parser[U],
-	validator jpf.Validator[T, U],
 	model jpf.Model,
+	opts ...ConstructionOpt[T, U],
 ) jpf.Pipeline[T, U] {
+	kwargs := GetConstructionKwargs(opts...)
 	return &oneShotPipeline[T, U]{
-		encoder:   encoder,
-		parser:    parser,
-		validator: validator,
-		model:     model,
+		encoder:      encoder,
+		parser:       parser,
+		validator:    kwargs.Validator,
+		model:        model,
+		outputFormat: kwargs.OutputFormat,
 	}
 }
 
 type oneShotPipeline[T, U any] struct {
-	encoder   jpf.Encoder[T]
-	parser    jpf.Parser[U]
-	validator jpf.Validator[T, U]
-	model     jpf.Model
+	encoder      jpf.Encoder[T]
+	parser       jpf.Parser[U]
+	validator    jpf.Validator[T, U]
+	model        jpf.Model
+	outputFormat any
 }
 
 func (mf *oneShotPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineResponse[U], error) {
@@ -35,7 +38,7 @@ func (mf *oneShotPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineRes
 	if err != nil {
 		return jpf.PipelineResponse[U]{}, utils.Wrap(err, "failed to build input messages")
 	}
-	resp, err := mf.model.Respond(ctx, msgs)
+	resp, err := mf.model.Respond(ctx, msgs, jpf.WithOutputFormat(mf.outputFormat))
 	if err != nil {
 		return jpf.PipelineResponse[U]{Usage: resp.Usage}, utils.Wrap(err, "failed to get model response")
 	}
