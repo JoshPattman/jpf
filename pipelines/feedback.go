@@ -14,20 +14,22 @@ import (
 func NewFeedbackRetry[T, U any](
 	encoder jpf.Encoder[T],
 	parser jpf.Parser[U],
-	validator jpf.Validator[T, U],
 	feedbackGenerator jpf.FeedbackGenerator,
 	model jpf.Model,
 	feedbackRole jpf.Role,
 	maxRetries int,
+	opts ...ConstructionOpt[T, U],
 ) jpf.Pipeline[T, U] {
+	kwargs := GetConstructionKwargs(opts...)
 	return &feedbackPipeline[T, U]{
 		encoder:           encoder,
 		parser:            parser,
-		validator:         validator,
+		validator:         kwargs.Validator,
 		feedbackGenerator: feedbackGenerator,
 		model:             model,
 		feedbackRole:      feedbackRole,
 		maxRetries:        maxRetries,
+		outputFormat:      kwargs.OutputFormat,
 	}
 }
 
@@ -39,6 +41,7 @@ type feedbackPipeline[T, U any] struct {
 	model             jpf.Model
 	feedbackRole      jpf.Role
 	maxRetries        int
+	outputFormat      any
 }
 
 func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineResponse[U], error) {
@@ -49,7 +52,7 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineRe
 	totalUsage := jpf.Usage{}
 	var lastErr error
 	for range mf.maxRetries + 1 {
-		resp, err := mf.model.Respond(ctx, history)
+		resp, err := mf.model.Respond(ctx, history, jpf.WithOutputFormat(mf.outputFormat))
 		totalUsage = totalUsage.Add(resp.Usage)
 		if err != nil {
 			return jpf.PipelineResponse[U]{Usage: totalUsage}, utils.Wrap(err, "failed to get model response")

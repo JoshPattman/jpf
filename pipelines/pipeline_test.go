@@ -56,7 +56,7 @@ var MFCases = []utils.TestCase{
 			model := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
-			return NewOneShot(enc, dec, nil, model)
+			return NewOneShot(enc, dec, model)
 		},
 		Input:    "ping",
 		Expected: "pong",
@@ -70,7 +70,7 @@ var MFCases = []utils.TestCase{
 			model := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {"pong"},
 			}}
-			return NewOneShot(enc, dec, val, model)
+			return NewOneShot(enc, dec, model, WithValidator(val))
 		},
 		Input:         "ping",
 		ExpectedError: true,
@@ -85,7 +85,7 @@ var MFCases = []utils.TestCase{
 				"ping": {"pong"},
 				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackRetry(enc, dec, nil, feedback, model, jpf.SystemRole, 1)
+			return NewFeedbackRetry(enc, dec, feedback, model, jpf.SystemRole, 1)
 		},
 		Input:    "ping",
 		Expected: utils.TestStruct{A: 5},
@@ -101,7 +101,7 @@ var MFCases = []utils.TestCase{
 				"ping": {`{"a":5}`},
 				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackRetry(enc, dec, val, feedback, model, jpf.SystemRole, 1)
+			return NewFeedbackRetry(enc, dec, feedback, model, jpf.SystemRole, 1, WithValidator(val))
 		},
 		Input:         "ping",
 		ExpectedError: true,
@@ -117,7 +117,7 @@ var MFCases = []utils.TestCase{
 			model2 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":5}`},
 			}}
-			return NewFallbackRetry(enc, dec, nil, model1, model2)
+			return NewFallbackRetry(enc, dec, []jpf.Model{model1, model2})
 		},
 		Input:    "ping",
 		Expected: utils.TestStruct{A: 5},
@@ -133,7 +133,7 @@ var MFCases = []utils.TestCase{
 			model2 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":"x"}`},
 			}}
-			return NewFallbackRetry(enc, dec, nil, model1, model2)
+			return NewFallbackRetry(enc, dec, []jpf.Model{model1, model2})
 		},
 		Input:         "ping",
 		ExpectedError: true,
@@ -150,7 +150,7 @@ var MFCases = []utils.TestCase{
 			model2 := &utils.TestingModel{Responses: map[string][]string{
 				"ping": {`{"a":5}`},
 			}}
-			return NewFallbackRetry(enc, dec, val, model1, model2)
+			return NewFallbackRetry(enc, dec, []jpf.Model{model1, model2}, WithValidator(val))
 		},
 		Input:         "ping",
 		ExpectedError: true,

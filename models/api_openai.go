@@ -13,6 +13,7 @@ import (
 
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/internal/utils"
+	"github.com/invopop/jsonschema"
 )
 
 type apiOpenAIModel struct {
@@ -24,7 +25,7 @@ type apiOpenAIModel struct {
 func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
 	kwargs := jpf.GetModelResponseKwargs(opts...)
 	isStreamed := kwargs.Streamer != nil
-	body, err := m.createBodyData(msgs, isStreamed)
+	body, err := m.createBodyData(msgs, isStreamed, kwargs.OutputFormat)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
@@ -184,12 +185,12 @@ func (m *apiOpenAIModel) createRequest(ctx context.Context, body io.Reader) (*ht
 	return req.WithContext(ctx), nil
 }
 
-func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message, isStreamed bool) (io.Reader, error) {
+func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message, isStreamed bool, outputFormat any) (io.Reader, error) {
 	apiMessages, err := m.messages(msgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not convert messages to OpenAI format")
 	}
-	body, err := m.body(apiMessages, isStreamed)
+	body, err := m.body(apiMessages, isStreamed, outputFormat)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not create OpenAI format body")
 	}
@@ -262,7 +263,7 @@ func (m *apiOpenAIModel) messageContent(msg jpf.Message) (any, error) {
 	}
 }
 
-func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool) (map[string]any, error) {
+func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool, outputFormat any) (map[string]any, error) {
 	bodyMap := map[string]any{
 		"model":    m.name,
 		"messages": msgs,
@@ -288,8 +289,12 @@ func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool) (map[str
 	if m.settings.maxOutput != nil {
 		bodyMap["max_completion_tokens"] = m.settings.maxOutput
 	}
-	if m.settings.jsonSchema != nil {
-		bodyMap["response_format"] = m.schema(m.settings.jsonSchema)
+	if outputFormat != nil {
+		schem, err := m.schema(outputFormat)
+		if err != nil {
+			return nil, errors.Join(errors.New("failed to create schema"), err)
+		}
+		bodyMap["response_format"] = schem
 	}
 	if isStreamed {
 		bodyMap["stream"] = true
@@ -298,7 +303,22 @@ func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool) (map[str
 	return bodyMap, nil
 }
 
-func (m *apiOpenAIModel) schema(schema any) any {
+func (m *apiOpenAIModel) schema(obj any) (any, error) {
+	r := &jsonschema.Reflector{
+		BaseSchemaID:   "Anonymous",
+		Anonymous:      true,
+		DoNotReference: true,
+	}
+	s := r.Reflect(obj)
+	schemaBs, err := s.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	schema := make(map[string]any)
+	err = json.Unmarshal(schemaBs, &schema)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
 		"type": "json_schema",
 		"json_schema": map[string]any{
@@ -306,7 +326,7 @@ func (m *apiOpenAIModel) schema(schema any) any {
 			"schema": schema,
 			"strict": true,
 		},
-	}
+	}, nil
 }
 
 func (m *apiOpenAIModel) reasoningEffort(re ReasoningEffort) string {

@@ -16,22 +16,25 @@ import (
 func NewFallbackRetry[T, U any](
 	encoder jpf.Encoder[T],
 	parser jpf.Parser[U],
-	validator jpf.Validator[T, U],
-	models ...jpf.Model,
+	models []jpf.Model,
+	opts ...ConstructionOpt[T, U],
 ) jpf.Pipeline[T, U] {
+	kwargs := GetConstructionKwargs(opts...)
 	return &fallbackPipeline[T, U]{
 		encoder,
 		parser,
-		validator,
+		kwargs.Validator,
 		models,
+		kwargs.OutputFormat,
 	}
 }
 
 type fallbackPipeline[T, U any] struct {
-	encoder   jpf.Encoder[T]
-	decoder   jpf.Parser[U]
-	validator jpf.Validator[T, U]
-	models    []jpf.Model
+	encoder      jpf.Encoder[T]
+	decoder      jpf.Parser[U]
+	validator    jpf.Validator[T, U]
+	models       []jpf.Model
+	outputFormat any
 }
 
 func (m *fallbackPipeline[T, U]) Call(ctx context.Context, input T) (jpf.PipelineResponse[U], error) {
@@ -58,7 +61,7 @@ func (mf *fallbackPipeline[T, U]) callOne(ctx context.Context, t T, model jpf.Mo
 	if err != nil {
 		return zero, jpf.Usage{}, utils.Wrap(err, "failed to build input messages")
 	}
-	resp, err := model.Respond(ctx, msgs)
+	resp, err := model.Respond(ctx, msgs, jpf.WithOutputFormat(mf.outputFormat))
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to get model response")
 	}

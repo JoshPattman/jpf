@@ -152,5 +152,5 @@ func (builder *CodeConvertPipelineBuilder) Build(useGemini bool) jpf.Pipeline[Co
 
 	formatter := encoders.NewTemplate[CodeConversionInput](builder.SystemPrompt, "{{.Code}}")
 	parser := parsers.NewRaw()
-	return pipelines.NewOneShot(formatter, parser, nil, model)
+	return pipelines.NewOneShot(formatter, parser, model)
 }
