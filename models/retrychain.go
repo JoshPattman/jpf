@@ -25,12 +25,13 @@ type retryChainModel struct {
 	models []jpf.Model
 }
 
-func (m *retryChainModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (m *retryChainModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
+	kwargs := jpf.GetModelResponseKwargs(opts...)
 	var errs []error
 	var totalUsageSoFar jpf.Usage
 
 	for i, model := range m.models {
-		resp, err := model.Respond(ctx, msgs, streamer)
+		resp, err := model.Respond(ctx, msgs, opts...)
 		resp = resp.IncludingUsage(totalUsageSoFar)
 
 		if err == nil {
@@ -39,8 +40,8 @@ func (m *retryChainModel) Respond(ctx context.Context, msgs []jpf.Message, strea
 
 		errs = append(errs, fmt.Errorf("model %d failed: %w", i, err))
 		totalUsageSoFar = resp.Usage
-		if streamer != nil {
-			streamer.OnMessageReset()
+		if kwargs.Streamer != nil {
+			kwargs.Streamer.OnMessageReset()
 		}
 	}
 

@@ -35,19 +35,20 @@ type retryModel struct {
 	delay   time.Duration
 }
 
-func (m *retryModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (m *retryModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
+	kwargs := jpf.GetModelResponseKwargs(opts...)
 	var totalUsageSoFar jpf.Usage
 	var err error
 	for range m.retries + 1 {
 		var resp jpf.ModelResponse
-		resp, err = m.Model.Respond(ctx, msgs, streamer)
+		resp, err = m.Model.Respond(ctx, msgs, opts...)
 		resp = resp.IncludingUsage(totalUsageSoFar)
 		if err == nil {
 			return resp, nil
 		}
 		totalUsageSoFar = resp.Usage
-		if streamer != nil {
-			streamer.OnMessageReset()
+		if kwargs.Streamer != nil {
+			kwargs.Streamer.OnMessageReset()
 		}
 		time.Sleep(m.delay)
 	}

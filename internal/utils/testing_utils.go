@@ -38,7 +38,8 @@ type TestingModel struct {
 	NFails    int
 }
 
-func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
+	kwargs := jpf.GetModelResponseKwargs(opts...)
 	if t.NFails > 0 {
 		t.NFails--
 		return jpf.ModelResponse{}, errors.New("deliberate fail")
@@ -53,9 +54,9 @@ func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer
 	}
 	resp, remaining := resps[0], resps[1:]
 	t.Responses[req] = remaining
-	if streamer != nil {
-		streamer.OnMessageBegin()
-		streamer.OnMessageText(resp)
+	if kwargs.Streamer != nil {
+		kwargs.Streamer.OnMessageBegin()
+		kwargs.Streamer.OnMessageText(resp)
 	}
 	return jpf.ModelResponse{
 		Message: jpf.Message{Role: jpf.AssistantRole, Content: resp},
@@ -75,7 +76,8 @@ type SlowTestingModel struct {
 	Response jpf.ModelResponse
 }
 
-func (s *SlowTestingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (s *SlowTestingModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
+	kwargs := jpf.GetModelResponseKwargs(opts...)
 	// Use a timer that respects context cancellation
 	timer := time.NewTimer(s.Delay)
 	defer timer.Stop()
@@ -83,9 +85,9 @@ func (s *SlowTestingModel) Respond(ctx context.Context, msgs []jpf.Message, stre
 	select {
 	case <-timer.C:
 		// Delay completed, return response
-		if streamer != nil {
-			streamer.OnMessageBegin()
-			streamer.OnMessageText(s.Response.Message.Content)
+		if kwargs.Streamer != nil {
+			kwargs.Streamer.OnMessageBegin()
+			kwargs.Streamer.OnMessageText(s.Response.Message.Content)
 		}
 		return s.Response, nil
 	case <-ctx.Done():

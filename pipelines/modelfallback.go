@@ -58,7 +58,7 @@ func (mf *fallbackPipeline[T, U]) callOne(ctx context.Context, t T, model jpf.Mo
 	if err != nil {
 		return zero, jpf.Usage{}, utils.Wrap(err, "failed to build input messages")
 	}
-	resp, err := model.Respond(ctx, msgs, nil)
+	resp, err := model.Respond(ctx, msgs)
 	if err != nil {
 		return zero, resp.Usage, utils.Wrap(err, "failed to get model response")
 	}
