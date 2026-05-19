@@ -22,8 +22,8 @@ type timeoutModel struct {
 	timeout time.Duration
 }
 
-func (m *timeoutModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (m *timeoutModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
-	return m.Model.Respond(timeoutCtx, msgs, streamer)
+	return m.Model.Respond(timeoutCtx, msgs, opts...)
 }

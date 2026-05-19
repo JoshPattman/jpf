@@ -28,7 +28,7 @@ func main() {
 			Role:    jpf.UserRole,
 			Content: "Dogs",
 		},
-	}, &printStreamer{})
+	}, jpf.WithStreamResponse(&printStreamer{}))
 	fmt.Println()
 	fmt.Println()
 

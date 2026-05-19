@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"errors"
+	"slices"
 	"sync"
 
 	"github.com/JoshPattman/jpf"
@@ -35,7 +36,7 @@ type multiDispatchErrorResult struct {
 	err   error
 }
 
-func (m *multiDispatchModel) Respond(ctx context.Context, messages []jpf.Message, _ jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (m *multiDispatchModel) Respond(ctx context.Context, messages []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
 	if len(m.models) == 0 {
 		return jpf.ModelResponse{}, ErrNoMultiDispatchModels
 	}
@@ -48,8 +49,9 @@ func (m *multiDispatchModel) Respond(ctx context.Context, messages []jpf.Message
 	for _, model := range m.models {
 		go func(model jpf.Model) {
 			defer allDone.Done()
-			// Note it is deliberate here that we are not passing the streamer
-			resp, err := model.Respond(ctx, messages, nil)
+			opts = slices.Clone(opts)
+			opts = append(opts, jpf.WithStreamResponse(nil))
+			resp, err := model.Respond(ctx, messages, opts...)
 			if err != nil {
 				select {
 				case errResult <- multiDispatchErrorResult{resp.Usage, err}:

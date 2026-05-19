@@ -15,10 +15,10 @@ type mappingModel struct {
 	f     func(jpf.Message) jpf.Message
 }
 
-func (m *mappingModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (m *mappingModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
 	mappedMessages := make([]jpf.Message, len(msgs))
 	for i, msg := range msgs {
 		mappedMessages[i] = m.f(msg)
 	}
-	return m.model.Respond(ctx, mappedMessages, streamer)
+	return m.model.Respond(ctx, mappedMessages, opts...)
 }

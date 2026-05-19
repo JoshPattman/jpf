@@ -21,8 +21,9 @@ type apiOpenAIModel struct {
 	settings apiModelSettings
 }
 
-func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
-	isStreamed := streamer != nil
+func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
+	kwargs := jpf.GetModelResponseKwargs(opts...)
+	isStreamed := kwargs.Streamer != nil
 	body, err := m.createBodyData(msgs, isStreamed)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
@@ -42,8 +43,8 @@ func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, stream
 
 	var respTyped openAIAPIStaticResponse
 	var rawRespBytes []byte
-	if streamer != nil {
-		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body, streamer)
+	if kwargs.Streamer != nil {
+		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body, kwargs.Streamer)
 	} else {
 		respTyped, rawRespBytes, err = m.parseStaticResponse(ctx, resp.Body)
 	}

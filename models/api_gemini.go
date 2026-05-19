@@ -21,7 +21,8 @@ type apiGeminiModel struct {
 	settings apiModelSettings
 }
 
-func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, streamer jpf.ModelStreamer) (jpf.ModelResponse, error) {
+func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
+	kwargs := jpf.GetModelResponseKwargs(opts...)
 	err := m.validateNoUnusableArgs()
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not validate model setup")
@@ -30,7 +31,7 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, stream
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
-	isStreamed := streamer != nil
+	isStreamed := kwargs.Streamer != nil
 	req, err := m.createRequest(ctx, body, isStreamed)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request")
@@ -46,8 +47,8 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, stream
 
 	var respTyped geminiStaticResponse
 	var rawRespBytes []byte
-	if streamer != nil {
-		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body, streamer)
+	if kwargs.Streamer != nil {
+		respTyped, rawRespBytes, err = m.parseStreamResponse(ctx, resp.Body, kwargs.Streamer)
 	} else {
 		respTyped, rawRespBytes, err = m.parseStaticResponse(ctx, resp.Body)
 	}

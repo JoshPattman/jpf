@@ -50,7 +50,27 @@ func (r ModelResponse) IncludingUsage(u Usage) ModelResponse {
 // Model defines an interface to an LLM.
 type Model interface {
 	// Responds to a set of input messages.
-	Respond(context.Context, []Message, ModelStreamer) (ModelResponse, error)
+	Respond(context.Context, []Message, ...ModelResponseOpt) (ModelResponse, error)
+}
+
+type ModelResponseKwargs struct {
+	Streamer ModelStreamer
+}
+
+type ModelResponseOpt func(*ModelResponseKwargs)
+
+func WithStreamResponse(streamer ModelStreamer) ModelResponseOpt {
+	return func(mrk *ModelResponseKwargs) {
+		mrk.Streamer = streamer
+	}
+}
+
+func GetModelResponseKwargs(opts ...ModelResponseOpt) *ModelResponseKwargs {
+	kw := &ModelResponseKwargs{}
+	for _, o := range opts {
+		o(kw)
+	}
+	return kw
 }
 
 type ModelStreamer interface {
