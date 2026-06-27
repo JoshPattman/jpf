@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"fmt"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -28,7 +29,7 @@ func (u Usage) Add(u2 Usage) Usage {
 
 type ModelResponse struct {
 	// The response to the input messages.
-	Message Message
+	Message AssistantMessage
 	// The usage of making this call.
 	// This may be the sum of multiple LLM calls.
 	Usage Usage
@@ -90,37 +91,100 @@ type ModelStreamer interface {
 	OnMessageReset()
 }
 
-// Role is an enum specifying a role for a message.
-type Role uint8
-
-const (
-	SystemRole Role = iota
-	UserRole
-	AssistantRole
-	DeveloperRole
-)
-
-func (r Role) String() string {
-	switch r {
-	case SystemRole:
-		return "system"
-	case UserRole:
-		return "user"
-	case AssistantRole:
-		return "assistant"
-	case DeveloperRole:
-		return "developer"
-	}
-	panic("not a valid role")
+// Message is a sum type of the different messages that can be sent to Models.
+type Message interface {
+	msg()
+	String() string
+	Eq(Message) bool
 }
 
-// Message defines a text message to/from an LLM.
-type Message struct {
-	Role    Role
+func (UserMessage) msg()      {}
+func (AssistantMessage) msg() {}
+func (DeveloperMessage) msg() {}
+func (SystemMessage) msg()    {}
+
+// UserMessage represents a message from the user to the model.
+type UserMessage struct {
 	Content string
 	Images  []ImageAttachment
 }
 
+func (m UserMessage) String() string {
+	return fmt.Sprintf("UserMessage{Content: \"%s\", Images: %d}", m.Content, len(m.Images))
+}
+
+func (m UserMessage) Eq(other Message) bool {
+	switch other := other.(type) {
+	case UserMessage:
+		if len(m.Images) != len(other.Images) {
+			return false
+		}
+		for i := range m.Images {
+			if m.Images[i] != other.Images[i] {
+				return false
+			}
+		}
+		return m.Content == other.Content
+	default:
+		return false
+	}
+}
+
+// AssistantMessage represents a message from the model to the user.
+type AssistantMessage struct {
+	Content string
+}
+
+func (m AssistantMessage) String() string {
+	return fmt.Sprintf("AssistantMessage{Content: \"%s\"}", m.Content)
+}
+
+func (m AssistantMessage) Eq(other Message) bool {
+	switch other := other.(type) {
+	case AssistantMessage:
+		return m.Content == other.Content
+	default:
+		return false
+	}
+}
+
+// DeveloperMessage represents a message from the developer (basically system) to the model.
+type DeveloperMessage struct {
+	Content string
+}
+
+func (m DeveloperMessage) String() string {
+	return fmt.Sprintf("DeveloperMessage{Content: \"%s\"}", m.Content)
+}
+
+func (m DeveloperMessage) Eq(other Message) bool {
+	switch other := other.(type) {
+	case DeveloperMessage:
+		return m.Content == other.Content
+	default:
+		return false
+	}
+}
+
+// SystemMessage represents a message from the system to the model, to set up its task, personality.
+type SystemMessage struct {
+	Content string
+}
+
+func (m SystemMessage) String() string {
+	return fmt.Sprintf("SystemMessage{Content: \"%s\"}", m.Content)
+}
+
+func (m SystemMessage) Eq(other Message) bool {
+	switch other := other.(type) {
+	case SystemMessage:
+		return m.Content == other.Content
+	default:
+		return false
+	}
+}
+
+// ImageAttachment is an image that is attached as additional information to a message.
 type ImageAttachment struct {
 	Source image.Image
 }

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/caches"
 	"github.com/JoshPattman/jpf/internal/utils"
 	"golang.org/x/sync/semaphore"
 )
@@ -40,9 +41,9 @@ func TestCachedModel(t *testing.T) {
 	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
 		"hello": {"hi", "bye"},
 	}}
-	model = Cache(model, newRamCache())
+	model = Cache(model, caches.NewRAM())
 	for i := range 5 {
-		resp1, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp1, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,7 +61,7 @@ func TestLoggingModel(t *testing.T) {
 	logger := NewMockLogger()
 	model = Log(model, logger)
 	for range 3 {
-		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -70,8 +71,8 @@ func TestLoggingModel(t *testing.T) {
 		t.Fatalf("expected 3 logs got %d", len(logger.Infos()))
 	}
 	for i := range responseSeq {
-		if logger.Infos()[i].ResponseFinalMessage.Content != responseSeq[i] {
-			t.Fatalf("expected '%s' got '%s'", logger.Infos()[i].ResponseFinalMessage.Content, responseSeq[i])
+		if logger.Infos()[i].ResultMessage.Content != responseSeq[i] {
+			t.Fatalf("expected '%s' got '%s'", logger.Infos()[i].ResultMessage.Content, responseSeq[i])
 		}
 	}
 }
@@ -84,7 +85,7 @@ func TestRetryModel(t *testing.T) {
 		NFails: 3,
 	}
 	model = Retry(model, 3)
-	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+	resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -107,7 +108,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -128,7 +129,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -152,7 +153,7 @@ func TestRetryChainModel(t *testing.T) {
 				NFails:    1,
 			},
 		})
-		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err == nil {
 			t.Fatal("expected error but got none")
 		}
@@ -173,7 +174,7 @@ func TestRetryChainModel(t *testing.T) {
 				},
 			},
 		})
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -189,7 +190,7 @@ func TestTimeoutModel(t *testing.T) {
 		slowModel := &utils.SlowTestingModel{
 			Delay: 200 * time.Millisecond,
 			Response: jpf.ModelResponse{
-				Message: jpf.Message{Role: jpf.AssistantRole, Content: "response"},
+				Message: jpf.AssistantMessage{Content: "response"},
 			},
 		}
 
@@ -197,7 +198,7 @@ func TestTimeoutModel(t *testing.T) {
 		model := Timeout(slowModel, 50*time.Millisecond)
 
 		start := time.Now()
-		_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		elapsed := time.Since(start)
 
 		// Should fail with context deadline exceeded
@@ -219,14 +220,14 @@ func TestTimeoutModel(t *testing.T) {
 		fastModel := &utils.SlowTestingModel{
 			Delay: 10 * time.Millisecond,
 			Response: jpf.ModelResponse{
-				Message: jpf.Message{Role: jpf.AssistantRole, Content: "fast response"},
+				Message: jpf.AssistantMessage{Content: "fast response"},
 			},
 		}
 
 		// Wrap with 100ms timeout (plenty of time)
 		model := Timeout(fastModel, 100*time.Millisecond)
 
-		resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -240,7 +241,7 @@ func TestTimeoutModel(t *testing.T) {
 		slowModel := &utils.SlowTestingModel{
 			Delay: 200 * time.Millisecond,
 			Response: jpf.ModelResponse{
-				Message: jpf.Message{Role: jpf.AssistantRole, Content: "response"},
+				Message: jpf.AssistantMessage{Content: "response"},
 			},
 		}
 
@@ -252,7 +253,7 @@ func TestTimeoutModel(t *testing.T) {
 		defer cancel()
 
 		start := time.Now()
-		_, err := model.Respond(parentCtx, []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+		_, err := model.Respond(parentCtx, []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 		elapsed := time.Since(start)
 
 		// Should fail with context deadline exceeded
@@ -271,18 +272,18 @@ func TestMultiDispatchModel(t *testing.T) {
 	slowerModel := &utils.SlowTestingModel{
 		Delay: 200 * time.Millisecond,
 		Response: jpf.ModelResponse{
-			Message: jpf.Message{Role: jpf.AssistantRole, Content: "response_slow"},
+			Message: jpf.AssistantMessage{Content: "response_slow"},
 		},
 	}
 	fasterModel := &utils.SlowTestingModel{
 		Delay: 100 * time.Millisecond,
 		Response: jpf.ModelResponse{
-			Message: jpf.Message{Role: jpf.AssistantRole, Content: "response_fast"},
+			Message: jpf.AssistantMessage{Content: "response_fast"},
 		},
 	}
 	model := MultiDispatch([]jpf.Model{slowerModel, fasterModel})
 
-	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+	resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 
 	if err != nil {
 		t.Fatal(err)
@@ -297,7 +298,7 @@ func TestMultiDispatchModelWithSomeFails(t *testing.T) {
 	slowerModel := &utils.SlowTestingModel{
 		Delay: 200 * time.Millisecond,
 		Response: jpf.ModelResponse{
-			Message: jpf.Message{Role: jpf.AssistantRole, Content: "response_slow"},
+			Message: jpf.AssistantMessage{Content: "response_slow"},
 		},
 	}
 	failingModel := &utils.TestingModel{
@@ -305,7 +306,7 @@ func TestMultiDispatchModelWithSomeFails(t *testing.T) {
 	}
 	model := MultiDispatch([]jpf.Model{slowerModel, failingModel})
 
-	resp, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+	resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 
 	if err != nil {
 		t.Fatal(err)
@@ -325,7 +326,7 @@ func TestMultiDispatchModelWithAllFails(t *testing.T) {
 	}
 	model := MultiDispatch([]jpf.Model{failingModelA, failingModelB})
 
-	_, err := model.Respond(context.Background(), []jpf.Message{{Role: jpf.SystemRole, Content: "hello"}})
+	_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 	if err == nil {
 		t.Fatal("expected error but got none")
 	}
@@ -342,34 +343,4 @@ func findSubstring(s, substr string) bool {
 		}
 	}
 	return false
-}
-
-func newRamCache() jpf.ModelResponseCache {
-	return &inMemoryCache{
-		Resps: make(map[string]memoryCachePacket),
-	}
-}
-
-type memoryCachePacket struct {
-	Final jpf.Message
-}
-
-type inMemoryCache struct {
-	Resps map[string]memoryCachePacket
-}
-
-func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.Message, error) {
-	msgsHash := msgs[0].Content
-	if cp, ok := i.Resps[msgsHash]; ok {
-		return true, cp.Final, nil
-	}
-	return false, jpf.Message{}, nil
-}
-
-func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.Message) error {
-	msgsHash := inputs[0].Content
-	i.Resps[msgsHash] = memoryCachePacket{
-		Final: out,
-	}
-	return nil
 }

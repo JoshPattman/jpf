@@ -12,7 +12,7 @@ import (
 type FGCase struct {
 	ID           string
 	Build        func() jpf.FeedbackGenerator
-	InputMessage jpf.Message
+	InputMessage jpf.AssistantMessage
 	InputError   error
 	Expected     string
 }
@@ -32,7 +32,7 @@ var FGCases = []utils.TestCase{
 	FGCase{
 		ID:           "rawmessage/errormessage",
 		Build:        NewErrString,
-		InputMessage: jpf.Message{},
+		InputMessage: jpf.AssistantMessage{},
 		InputError:   errors.New("abcdef"),
 		Expected:     "abcdef",
 	},

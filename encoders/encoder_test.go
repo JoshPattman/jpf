@@ -34,12 +34,27 @@ func (testCase MECase[T]) Test() error {
 			return errors.Join(fmt.Errorf("expected and observed did not match. Expected %v but got %v", testCase.Expected, result))
 		}
 		for i := range result {
-			if result[i].Content != testCase.Expected[i] {
+			if !contentEq(result[i], testCase.Expected[i]) {
 				return errors.Join(fmt.Errorf("expected and observed did not match. Expected %v but got %v", testCase.Expected, result))
 			}
 		}
 	}
 	return nil
+}
+
+func contentEq(msg jpf.Message, content string) bool {
+	switch msg := msg.(type) {
+	case jpf.UserMessage:
+		return msg.Content == content
+	case jpf.AssistantMessage:
+		return msg.Content == content
+	case jpf.DeveloperMessage:
+		return msg.Content == content
+	case jpf.SystemMessage:
+		return msg.Content == content
+	default:
+		panic("unreachable")
+	}
 }
 
 var MECases = []utils.TestCase{

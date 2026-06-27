@@ -20,12 +20,10 @@ func main() {
 	// Pipelines are intended to be used for reliable data transformation, not realtime responses - this is due to their potential to retry on invalid messages etc.
 	// For this reason, it does not make sense for a pipeline to stream.
 	response, err := model.Respond(context.Background(), []jpf.Message{
-		{
-			Role:    jpf.SystemRole,
+		jpf.SystemMessage{
 			Content: "Write 5 haikus about the topic",
 		},
-		{
-			Role:    jpf.UserRole,
+		jpf.UserMessage{
 			Content: "Dogs",
 		},
 	}, jpf.WithStreamResponse(&printStreamer{}))

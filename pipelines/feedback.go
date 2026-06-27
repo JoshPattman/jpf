@@ -16,7 +16,6 @@ func NewFeedbackRetry[T, U any](
 	parser jpf.Parser[U],
 	feedbackGenerator jpf.FeedbackGenerator,
 	model jpf.Model,
-	feedbackRole jpf.Role,
 	maxRetries int,
 	opts ...ConstructionOpt[T, U],
 ) jpf.Pipeline[T, U] {
@@ -27,7 +26,6 @@ func NewFeedbackRetry[T, U any](
 		validator:         kwargs.Validator,
 		feedbackGenerator: feedbackGenerator,
 		model:             model,
-		feedbackRole:      feedbackRole,
 		maxRetries:        maxRetries,
 		outputFormat:      kwargs.OutputFormat,
 	}
@@ -39,7 +37,6 @@ type feedbackPipeline[T, U any] struct {
 	validator         jpf.Validator[T, U]
 	feedbackGenerator jpf.FeedbackGenerator
 	model             jpf.Model
-	feedbackRole      jpf.Role
 	maxRetries        int
 	outputFormat      any
 }
@@ -70,8 +67,7 @@ func (mf *feedbackPipeline[T, U]) Call(ctx context.Context, t T) (jpf.PipelineRe
 			feedback := mf.feedbackGenerator.FormatFeedback(resp.Message, err)
 			lastErr = err
 			history = append(history, resp.Message)
-			history = append(history, jpf.Message{
-				Role:    mf.feedbackRole,
+			history = append(history, jpf.UserMessage{
 				Content: feedback,
 			})
 		} else {

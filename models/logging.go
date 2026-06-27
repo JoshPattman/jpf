@@ -29,11 +29,11 @@ func (l *loggingModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...
 	resp, err := l.model.Respond(ctx, msgs, opts...)
 	dur := time.Since(tStart)
 	lmp := jpf.ModelLoggingInfo{
-		Messages:             msgs,
-		ResponseFinalMessage: resp.Message,
-		Usage:                resp.Usage,
-		Err:                  err,
-		Duration:             dur,
+		InputMessages: msgs,
+		ResultMessage: resp.Message,
+		Usage:         resp.Usage,
+		Err:           err,
+		Duration:      dur,
 	}
 	logErr := l.logger.ModelLog(lmp)
 	if err != nil {

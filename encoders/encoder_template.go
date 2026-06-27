@@ -39,8 +39,7 @@ func (e *templateEncoder[T]) BuildInputMessages(data T) ([]jpf.Message, error) {
 		if err := e.systemTemplate.Execute(&systemBuf, data); err != nil {
 			return nil, utils.Wrap(err, "failed to execute system prompt template")
 		}
-		messages = append(messages, jpf.Message{
-			Role:    jpf.SystemRole,
+		messages = append(messages, jpf.SystemMessage{
 			Content: systemBuf.String(),
 		})
 	}
@@ -50,8 +49,7 @@ func (e *templateEncoder[T]) BuildInputMessages(data T) ([]jpf.Message, error) {
 		if err := e.userTemplate.Execute(&userBuf, data); err != nil {
 			return nil, utils.Wrap(err, "failed to execute user prompt template")
 		}
-		messages = append(messages, jpf.Message{
-			Role:    jpf.UserRole,
+		messages = append(messages, jpf.UserMessage{
 			Content: userBuf.String(),
 		})
 	}

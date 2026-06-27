@@ -11,6 +11,6 @@ func NewErrString() jpf.FeedbackGenerator {
 
 type errStringFG struct{}
 
-func (g *errStringFG) FormatFeedback(_ jpf.Message, err error) string {
+func (g *errStringFG) FormatFeedback(_ jpf.AssistantMessage, err error) string {
 	return err.Error()
 }
