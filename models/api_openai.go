@@ -69,7 +69,7 @@ func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 	}
 	content := respTyped.Choices[0].Message.Content
 	return jpf.ModelResponse{
-		Message: jpf.Message{Role: jpf.AssistantRole, Content: content},
+		Message: jpf.AssistantMessage{Content: content},
 		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
@@ -205,7 +205,7 @@ func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message, isStreamed bool, out
 func (m *apiOpenAIModel) messages(msgs []jpf.Message) ([]openAIAPIMessage, error) {
 	jsonMessages := make([]openAIAPIMessage, 0)
 	for _, msg := range msgs {
-		role, err := m.messageRole(msg.Role)
+		role, err := m.messageRole(msg)
 		if err != nil {
 			return nil, err
 		}
@@ -221,45 +221,56 @@ func (m *apiOpenAIModel) messages(msgs []jpf.Message) ([]openAIAPIMessage, error
 	return jsonMessages, nil
 }
 
-func (m *apiOpenAIModel) messageRole(role jpf.Role) (string, error) {
-	switch role {
-	case jpf.SystemRole:
-		return "system", nil
-	case jpf.UserRole:
+func (m *apiOpenAIModel) messageRole(msg jpf.Message) (string, error) {
+	switch msg.(type) {
+	case jpf.UserMessage:
 		return "user", nil
-	case jpf.AssistantRole:
+	case jpf.AssistantMessage:
 		return "assistant", nil
-	case jpf.DeveloperRole:
+	case jpf.DeveloperMessage:
 		return "developer", nil
+	case jpf.SystemMessage:
+		return "system", nil
 	default:
-		return "", errUnsupportedSetting("role", role.String())
+		return "", errUnsupportedSetting("role", fmt.Sprintf("%T", msg))
 	}
 }
 
 func (m *apiOpenAIModel) messageContent(msg jpf.Message) (any, error) {
-	if len(msg.Images) == 0 {
-		return msg.Content, nil
-	} else {
-		cont := []map[string]any{
-			{
-				"type": "text",
-				"text": msg.Content,
-			},
-		}
-		for _, img := range msg.Images {
-			b64, err := img.ToBase64Encoded(true)
-			if err != nil {
-				return nil, errors.Join(errors.New("failed to encode image to base64"), err)
-			}
-			cont = append(cont, map[string]any{
-				"type": "image_url",
-				"image_url": map[string]any{
-					"url": b64,
+	switch msg := msg.(type) {
+	case jpf.UserMessage:
+		if len(msg.Images) == 0 {
+			return msg.Content, nil
+		} else {
+			cont := []map[string]any{
+				{
+					"type": "text",
+					"text": msg.Content,
 				},
-			},
-			)
+			}
+			for _, img := range msg.Images {
+				b64, err := img.ToBase64Encoded(true)
+				if err != nil {
+					return nil, errors.Join(errors.New("failed to encode image to base64"), err)
+				}
+				cont = append(cont, map[string]any{
+					"type": "image_url",
+					"image_url": map[string]any{
+						"url": b64,
+					},
+				},
+				)
+			}
+			return cont, nil
 		}
-		return cont, nil
+	case jpf.SystemMessage:
+		return msg.Content, nil
+	case jpf.AssistantMessage:
+		return msg.Content, nil
+	case jpf.DeveloperMessage:
+		return msg.Content, nil
+	default:
+		panic("unreachable")
 	}
 }
 

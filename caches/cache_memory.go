@@ -15,7 +15,7 @@ func NewRAM() jpf.ModelResponseCache {
 }
 
 type memoryCachePacket struct {
-	Final jpf.Message
+	Final jpf.AssistantMessage
 }
 
 type inMemoryCache struct {
@@ -23,16 +23,16 @@ type inMemoryCache struct {
 }
 
 // GetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.Message, error) {
+func (i *inMemoryCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.AssistantMessage, error) {
 	msgsHash := HashMessages(salt, msgs)
 	if cp, ok := i.Resps[msgsHash]; ok {
 		return true, cp.Final, nil
 	}
-	return false, jpf.Message{}, nil
+	return false, jpf.AssistantMessage{}, nil
 }
 
 // SetCachedResponse implements ModelResponseCache.
-func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.Message) error {
+func (i *inMemoryCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.AssistantMessage) error {
 	msgsHash := HashMessages(salt, inputs)
 	i.Resps[msgsHash] = memoryCachePacket{
 		Final: out,

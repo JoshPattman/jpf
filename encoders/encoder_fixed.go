@@ -17,12 +17,10 @@ type fixedEncoder struct {
 
 func (e *fixedEncoder) BuildInputMessages(input string) ([]jpf.Message, error) {
 	messages := []jpf.Message{
-		{
-			Role:    jpf.SystemRole,
+		jpf.SystemMessage{
 			Content: e.systemPrompt,
 		},
-		{
-			Role:    jpf.UserRole,
+		jpf.UserMessage{
 			Content: input,
 		},
 	}

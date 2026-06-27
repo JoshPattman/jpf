@@ -27,8 +27,8 @@ func TestTemplateEncoder_BuildInputMessages(t *testing.T) {
 			userTemplate:   "Hello, my name is {{.Name}} and I am {{.Age}}.",
 			data:           Person{Name: "Josh", Age: 30},
 			wantMessages: []jpf.Message{
-				{Role: jpf.SystemRole, Content: "You are helping Josh who is 30 years old."},
-				{Role: jpf.UserRole, Content: "Hello, my name is Josh and I am 30."},
+				jpf.SystemMessage{Content: "You are helping Josh who is 30 years old."},
+				jpf.UserMessage{Content: "Hello, my name is Josh and I am 30."},
 			},
 			wantErr: false,
 		},
@@ -38,7 +38,7 @@ func TestTemplateEncoder_BuildInputMessages(t *testing.T) {
 			userTemplate:   "",
 			data:           Person{Name: "Josh", Age: 30},
 			wantMessages: []jpf.Message{
-				{Role: jpf.SystemRole, Content: "You are helping Josh who is 30 years old."},
+				jpf.SystemMessage{Content: "You are helping Josh who is 30 years old."},
 			},
 			wantErr: false,
 		},
@@ -48,7 +48,7 @@ func TestTemplateEncoder_BuildInputMessages(t *testing.T) {
 			userTemplate:   "Hello, my name is {{.Name}} and I am {{.Age}}.",
 			data:           Person{Name: "Josh", Age: 30},
 			wantMessages: []jpf.Message{
-				{Role: jpf.UserRole, Content: "Hello, my name is Josh and I am 30."},
+				jpf.UserMessage{Content: "Hello, my name is Josh and I am 30."},
 			},
 			wantErr: false,
 		},
@@ -94,7 +94,7 @@ func TestTemplateEncoder_DifferentTypes(t *testing.T) {
 		}
 
 		expected := []jpf.Message{
-			{Role: jpf.SystemRole, Content: "Hello Josh"},
+			jpf.SystemMessage{Content: "Hello Josh"},
 		}
 
 		if !reflect.DeepEqual(got, expected) {
@@ -113,7 +113,7 @@ func TestTemplateEncoder_DifferentTypes(t *testing.T) {
 		}
 
 		expected := []jpf.Message{
-			{Role: jpf.SystemRole, Content: "You said: hello world"},
+			jpf.SystemMessage{Content: "You said: hello world"},
 		}
 
 		if !reflect.DeepEqual(got, expected) {

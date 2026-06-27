@@ -26,25 +26,25 @@ type sqlCache struct {
 	db *sql.DB
 }
 
-func (cache *sqlCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.Message, error) {
+func (cache *sqlCache) GetCachedResponse(ctx context.Context, salt string, msgs []jpf.Message) (bool, jpf.AssistantMessage, error) {
 	h := HashMessages(salt, msgs)
 	row := cache.db.QueryRowContext(ctx, `SELECT resp FROM model_cache WHERE hash=?;`, h)
 	blob := []byte{}
 	err := row.Scan(&blob)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, jpf.Message{}, nil
+		return false, jpf.AssistantMessage{}, nil
 	} else if err != nil {
-		return false, jpf.Message{}, utils.Wrap(err, "failed to query database")
+		return false, jpf.AssistantMessage{}, utils.Wrap(err, "failed to query database")
 	}
-	var output jpf.Message
+	var output jpf.AssistantMessage
 	err = gob.NewDecoder(bytes.NewBuffer(blob)).Decode(&output)
 	if err != nil {
-		return false, jpf.Message{}, utils.Wrap(err, "failed to decode cached data")
+		return false, jpf.AssistantMessage{}, utils.Wrap(err, "failed to decode cached data")
 	}
 	return true, output, nil
 }
 
-func (cache *sqlCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.Message) error {
+func (cache *sqlCache) SetCachedResponse(ctx context.Context, salt string, inputs []jpf.Message, out jpf.AssistantMessage) error {
 	h := HashMessages(salt, inputs)
 	blob := bytes.NewBuffer(nil)
 	err := gob.NewEncoder(blob).Encode(out)

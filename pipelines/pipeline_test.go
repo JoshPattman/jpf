@@ -85,7 +85,7 @@ var MFCases = []utils.TestCase{
 				"ping": {"pong"},
 				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackRetry(enc, dec, feedback, model, jpf.SystemRole, 1)
+			return NewFeedbackRetry(enc, dec, feedback, model, 1)
 		},
 		Input:    "ping",
 		Expected: utils.TestStruct{A: 5},
@@ -101,7 +101,7 @@ var MFCases = []utils.TestCase{
 				"ping": {`{"a":5}`},
 				"response did not contain a json object\nllm produced an invalid response": {`{"a":5}`},
 			}}
-			return NewFeedbackRetry(enc, dec, feedback, model, jpf.SystemRole, 1, WithValidator(val))
+			return NewFeedbackRetry(enc, dec, feedback, model, 1, WithValidator(val))
 		},
 		Input:         "ping",
 		ExpectedError: true,

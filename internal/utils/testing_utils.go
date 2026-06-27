@@ -46,7 +46,7 @@ func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...
 	}
 	var req string
 	if len(msgs) > 0 {
-		req = msgs[len(msgs)-1].Content
+		req = content(msgs[len(msgs)-1])
 	}
 	resps, ok := t.Responses[req]
 	if !ok || len(resps) == 0 {
@@ -59,9 +59,24 @@ func (t *TestingModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...
 		kwargs.Streamer.OnMessageText(resp)
 	}
 	return jpf.ModelResponse{
-		Message: jpf.Message{Role: jpf.AssistantRole, Content: resp},
+		Message: jpf.AssistantMessage{Content: resp},
 		Usage:   jpf.Usage{},
 	}, nil
+}
+
+func content(msg jpf.Message) string {
+	switch msg := msg.(type) {
+	case jpf.UserMessage:
+		return msg.Content
+	case jpf.AssistantMessage:
+		return msg.Content
+	case jpf.DeveloperMessage:
+		return msg.Content
+	case jpf.SystemMessage:
+		return msg.Content
+	default:
+		panic("unreachable")
+	}
 }
 
 func (t *TestingModel) Tokens() (int, int) {

@@ -67,7 +67,7 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 
 	content := respTyped.Candidates[0].Content.Parts[0].Text
 	return jpf.ModelResponse{
-		Message: jpf.Message{Role: jpf.AssistantRole, Content: content},
+		Message: jpf.AssistantMessage{Content: content},
 		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
@@ -213,16 +213,14 @@ func (m *apiGeminiModel) messages(msgs []jpf.Message) (string, []any, error) {
 	parts := make([]any, 0)
 	systemMessage := ""
 	for i, msg := range msgs {
-		if msg.Role == jpf.SystemRole {
+		switch msg := msg.(type) {
+		case jpf.SystemMessage:
 			if i != 0 {
 				return "", nil, errors.New("gemini only supports at most one system message at the start of the conversation")
 			}
-			if len(msg.Images) > 0 {
-				return "", nil, errors.New("cannot attach images to system messages in gemini")
-			}
 			systemMessage = msg.Content
-		} else {
-			role, err := m.messageRole(msg.Role)
+		default:
+			role, err := m.messageRole(msg)
 			if err != nil {
 				return "", nil, err
 			}
@@ -239,24 +237,35 @@ func (m *apiGeminiModel) messages(msgs []jpf.Message) (string, []any, error) {
 	return systemMessage, parts, nil
 }
 
-func (m *apiGeminiModel) messageRole(role jpf.Role) (string, error) {
-	switch role {
-	case jpf.UserRole:
+func (m *apiGeminiModel) messageRole(msg jpf.Message) (string, error) {
+	switch msg.(type) {
+	case jpf.UserMessage:
 		return "user", nil
-	case jpf.AssistantRole:
+	case jpf.AssistantMessage:
 		return "model", nil
 	default:
-		return "", errUnsupportedSetting("role", role.String())
+		return "", errUnsupportedSetting("role", fmt.Sprintf("%T", msg))
 	}
 }
 
 func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
+	var content string
+	var imageAttachments []jpf.ImageAttachment
+	switch msg := msg.(type) {
+	case jpf.UserMessage:
+		content = msg.Content
+		imageAttachments = msg.Images
+	case jpf.AssistantMessage:
+		content = msg.Content
+	default:
+		return nil, fmt.Errorf("cannot get content for %T", msg)
+	}
 	textPart := map[string]any{
-		"text": msg.Content,
+		"text": content,
 	}
 	allParts := []map[string]any{textPart}
 
-	for _, img := range msg.Images {
+	for _, img := range imageAttachments {
 		b64, err := img.ToBase64Encoded(false)
 		if err != nil {
 			return nil, errors.Join(errors.New("failed to encode image to base64"), err)

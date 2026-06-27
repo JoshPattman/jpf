@@ -25,9 +25,8 @@ func TestSlogLogger(t *testing.T) {
 	logger := NewSlog(slog.Slog, true)
 
 	info := jpf.ModelLoggingInfo{
-		Messages: []jpf.Message{
-			{
-				Role:    jpf.UserRole,
+		InputMessages: []jpf.Message{
+			jpf.UserMessage{
 				Content: "Hi",
 			},
 		},
@@ -45,9 +44,8 @@ func TestSlogLogger(t *testing.T) {
 	}
 	expectedArgs = append(
 		expectedArgs,
-		"input_messages", info.Messages,
-		"output_aux_messages", info.ResponseAuxMessages,
-		"output_final_message", info.ResponseFinalMessage,
+		"input_messages", info.InputMessages,
+		"output_final_message", info.ResultMessage,
 	)
 	if slog.msg != "model_call" {
 		t.Fatalf("expected model_call message, got %s", slog.msg)
@@ -63,9 +61,8 @@ func TestJsonLogger(t *testing.T) {
 	logger := NewJson(buf)
 
 	info := jpf.ModelLoggingInfo{
-		Messages: []jpf.Message{
-			{
-				Role:    jpf.UserRole,
+		InputMessages: []jpf.Message{
+			jpf.UserMessage{
 				Content: "Hi",
 			},
 		},
@@ -116,8 +113,8 @@ func TestJsonLogger(t *testing.T) {
 		if !ok {
 			t.Errorf("message is not a map: %T", msgs[0])
 		} else {
-			if msg["role"] != jpf.UserRole.String() {
-				t.Errorf("role: want %q, got %v", jpf.UserRole.String(), msg["role"])
+			if msg["role"] != "user" {
+				t.Errorf("role: want %q, got %v", "user", msg["role"])
 			}
 			if msg["content"] != "Hi" {
 				t.Errorf("content: want 'Hi', got %v", msg["content"])

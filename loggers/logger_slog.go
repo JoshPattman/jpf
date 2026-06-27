@@ -26,9 +26,8 @@ func (ml *slogModelLogger) ModelLog(mli jpf.ModelLoggingInfo) error {
 	}
 
 	if ml.logMessages {
-		args = append(args, "input_messages", mli.Messages)
-		args = append(args, "output_aux_messages", mli.ResponseAuxMessages)
-		args = append(args, "output_final_message", mli.ResponseFinalMessage)
+		args = append(args, "input_messages", mli.InputMessages)
+		args = append(args, "output_final_message", mli.ResultMessage)
 	}
 
 	ml.logFunc("model_call", args...)

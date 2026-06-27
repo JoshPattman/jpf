@@ -22,9 +22,8 @@ type jsonModelLogger struct {
 // ModelLog implements ModelLogger.
 func (j *jsonModelLogger) ModelLog(lmp jpf.ModelLoggingInfo) error {
 	res := map[string]any{
-		"messages":       messagesToLoggingJson(lmp.Messages),
-		"aux_responses":  messagesToLoggingJson(lmp.ResponseAuxMessages),
-		"final_response": messageToLoggingJson(lmp.ResponseFinalMessage),
+		"messages":       messagesToLoggingJson(lmp.InputMessages),
+		"final_response": messageToLoggingJson(lmp.ResultMessage),
 		"usage":          usageToLoggingJson(lmp.Usage),
 		"duration":       lmp.Duration.String(),
 	}
@@ -39,10 +38,30 @@ func (j *jsonModelLogger) ModelLog(lmp jpf.ModelLoggingInfo) error {
 }
 
 func messageToLoggingJson(msg jpf.Message) any {
-	return map[string]any{
-		"role":       msg.Role.String(),
-		"content":    msg.Content,
-		"num_images": len(msg.Images),
+	switch msg := msg.(type) {
+	case jpf.UserMessage:
+		return map[string]any{
+			"role":       "user",
+			"content":    msg.Content,
+			"num_images": len(msg.Images),
+		}
+	case jpf.AssistantMessage:
+		return map[string]any{
+			"role":    "assistant",
+			"content": msg.Content,
+		}
+	case jpf.DeveloperMessage:
+		return map[string]any{
+			"role":    "developer",
+			"content": msg.Content,
+		}
+	case jpf.SystemMessage:
+		return map[string]any{
+			"role":    "system",
+			"content": msg.Content,
+		}
+	default:
+		panic("unreachable")
 	}
 }
 

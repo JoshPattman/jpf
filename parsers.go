@@ -20,5 +20,5 @@ type Validator[T, U any] interface {
 
 // FeedbackGenerator takes an error and converts it to a piece of text feedback to send to the LLM.
 type FeedbackGenerator interface {
-	FormatFeedback(Message, error) string
+	FormatFeedback(AssistantMessage, error) string
 }

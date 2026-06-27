@@ -35,8 +35,7 @@ func testHelloModel(t *testing.T, model jpf.Model) {
 	resp, err := model.Respond(
 		context.Background(),
 		[]jpf.Message{
-			{
-				Role:    jpf.UserRole,
+			jpf.UserMessage{
 				Content: "Hello there!",
 			},
 		})
