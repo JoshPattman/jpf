@@ -51,9 +51,10 @@ func testHelloModel(t *testing.T, model jpf.Model) {
 
 func TestToolCallModels(t *testing.T) {
 	oaiKey := os.Getenv("OPENAI_KEY")
-	// gemKey := os.Getenv("GEMINI_KEY")
+	gemKey := os.Getenv("GEMINI_KEY")
 	modelsToRun := []jpf.Model{
 		models.NewRemote(models.OpenAI, "gpt-4.1", oaiKey),
+		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
 		models.NewRemote(models.OpenAI, "o3-mini", oaiKey),
 		models.NewRemote(models.OpenAI, "gpt-5", oaiKey),
 	}
