@@ -77,7 +77,7 @@ func testToolCallModel(t *testing.T, model jpf.Model) {
 	}
 	msgs := []jpf.Message{
 		jpf.SystemMessage{
-			Content: "When calling tools, you **must** include a short natural language message explaining what you are doing.",
+			Content: "When calling tools, you **must** include a short natural language message explaining what you are doing. The ping tool will include a confirmation password. You **must** include that exact password in your final reasponse, as a regex will check for it.",
 		},
 		jpf.UserMessage{
 			Content: "Ping me!",
