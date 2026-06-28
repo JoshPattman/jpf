@@ -329,6 +329,9 @@ func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) 
 	if kwargs.OutputFormat != nil {
 		return errUnsupportedSetting("WithOutputFormat", fmt.Sprintf("%T", kwargs.OutputFormat))
 	}
+	if len(kwargs.ToolSchemas) > 0 {
+		return errUnsupportedSetting("WithToolSchemas", len(kwargs.ToolSchemas))
+	}
 	return nil
 }
 

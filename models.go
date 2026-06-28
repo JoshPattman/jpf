@@ -57,6 +57,7 @@ type Model interface {
 type ModelResponseKwargs struct {
 	Streamer     ModelStreamer
 	OutputFormat any
+	ToolSchemas  []ToolSchema
 }
 
 type ModelResponseOpt func(*ModelResponseKwargs)
@@ -74,6 +75,14 @@ func WithStreamResponse(streamer ModelStreamer) ModelResponseOpt {
 func WithOutputFormat(format any) ModelResponseOpt {
 	return func(mrk *ModelResponseKwargs) {
 		mrk.OutputFormat = format
+	}
+}
+
+// Add the provided tool schemas (additive, not replace) to the model.
+// If there is at least one tool schema, tool calling will be enabled, so the model needs to support tool calling in this case.
+func WithToolSchemas(schemas ...ToolSchema) ModelResponseOpt {
+	return func(mrk *ModelResponseKwargs) {
+		mrk.ToolSchemas = append(mrk.ToolSchemas, schemas...)
 	}
 }
 
@@ -202,4 +211,25 @@ func (i *ImageAttachment) ToBase64Encoded(useCompression bool) (string, error) {
 		}
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes()), nil
 	}
+}
+
+type ToolSchema struct {
+	Name        string
+	Description string
+	Args        []ToolArg
+}
+
+type ToolArgType uint8
+
+const (
+	ToolArgInt ToolArgType = iota
+	ToolArgFloat
+	ToolArgString
+)
+
+type ToolArg struct {
+	Name        string
+	Description string
+	Type        ToolArgType
+	Required    bool
 }
