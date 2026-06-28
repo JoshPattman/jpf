@@ -148,3 +148,82 @@ func testStructuredOutput(t *testing.T, model jpf.Model) {
 	}
 	t.Log(resp.Message.Content)
 }
+
+func TestStreamToolCallModels(t *testing.T) {
+	// oaiKey := os.Getenv("OPENAI_KEY")
+	gemKey := os.Getenv("GEMINI_KEY")
+	modelsToRun := []jpf.Model{
+		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
+	}
+	for _, model := range modelsToRun {
+		testStreamToolCallModel(t, models.Timeout(model, time.Minute))
+	}
+}
+
+type streamTextCollector struct {
+	text string
+}
+
+func (s *streamTextCollector) OnMessageBegin() {}
+func (s *streamTextCollector) OnMessageReset() {}
+func (s *streamTextCollector) OnMessageText(text string) {
+	s.text += text
+}
+
+func testStreamToolCallModel(t *testing.T, model jpf.Model) {
+	schemas := jpf.ToolSchema{
+		Name:        "ping_user",
+		Description: "ping the user, use only when asked",
+		Args: []jpf.ToolArg{
+			{
+				Name:        "message",
+				Description: "a nice message to ping the user with",
+				Type:        jpf.ToolArgString,
+				Required:    true,
+			},
+		},
+	}
+	msgs := []jpf.Message{
+		jpf.SystemMessage{
+			Content: "When calling tools, you **must** include a short natural language message explaining what you are doing. The ping tool will include a confirmation password. You **must** include that exact password in your final reasponse, as a regex will check for it.",
+		},
+		jpf.UserMessage{
+			Content: "Ping me!",
+		},
+	}
+	streamer := &streamTextCollector{}
+	resp, err := model.Respond(context.Background(), msgs, jpf.WithToolSchemas(schemas), jpf.WithStreamResponse(streamer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Message.ToolCalls) == 0 {
+		t.Fatal("no tools were called")
+	}
+	if resp.Message.ToolCalls[0].Tool != "ping_user" {
+		t.Fatal("wrong tool was called")
+	}
+	if resp.Message.Content != streamer.text {
+		t.Fatal("Streamed text did not match result text")
+	}
+	if resp.Message.Content != "" {
+		t.Log(resp.Message.Content)
+	}
+	t.Log("AI SENT YOU A PING:", resp.Message.ToolCalls[0].Args["message"])
+	msgs = append(msgs, resp.Message)
+	msgs = append(msgs, jpf.ToolResultMessage{
+		CallID: resp.Message.ToolCalls[0].ID,
+		Result: "Ping sent. Now please make sure to include the following conformation password in your response: 'noodles'",
+	})
+	streamer = &streamTextCollector{}
+	resp, err = model.Respond(context.Background(), msgs, jpf.WithToolSchemas(schemas), jpf.WithStreamResponse(streamer))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(resp.Message.Content, "noodles") {
+		t.Fatal("response did not inclide confirmation")
+	}
+	if resp.Message.Content != streamer.text {
+		t.Fatal("Streamed text did not match result text")
+	}
+	t.Log(resp.Message.Content)
+}
