@@ -28,7 +28,7 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not validate model setup")
 	}
-	body, err := m.createBodyData(msgs, kwargs.OutputFormat)
+	body, err := m.createBodyData(msgs, kwargs.ToolSchemas, kwargs.OutputFormat)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
@@ -66,9 +66,25 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 		return failedResponseAfter(usage), fmt.Errorf("response had no content: %s", string(rawRespBytes))
 	}
 
-	content := respTyped.Candidates[0].Content.Parts[0].Text
+	toolCalls := []jpf.ToolCall{}
+	var text strings.Builder
+
+	for _, part := range respTyped.Candidates[0].Content.Parts {
+
+		if part.Text != "" {
+			text.WriteString(part.Text)
+		}
+
+		if part.FunctionCall != nil {
+			toolCalls = append(toolCalls, jpf.ToolCall{
+				ID:   part.FunctionCall.Name, // Gemini doesn't provide ID but we use name
+				Tool: part.FunctionCall.Name,
+				Args: part.FunctionCall.Args,
+			})
+		}
+	}
 	return jpf.ModelResponse{
-		Message: jpf.AssistantMessage{Content: content},
+		Message: jpf.AssistantMessage{Content: text.String(), ToolCalls: toolCalls},
 		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
@@ -146,15 +162,11 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	resp := geminiStaticResponse{
 		Candidates: make([]struct {
 			Content struct {
-				Parts []struct {
-					Text string `json:"text"`
-				} `json:"parts"`
+				Parts []geminiStaticResponsePart `json:"parts"`
 			} `json:"content"`
 		}, 1),
 	}
-	resp.Candidates[0].Content.Parts = make([]struct {
-		Text string `json:"text"`
-	}, 1)
+	resp.Candidates[0].Content.Parts = make([]geminiStaticResponsePart, 1)
 	resp.Candidates[0].Content.Parts[0].Text = fullText.String()
 	resp.UsageMetadata.InputTokens = inputTokens
 	resp.UsageMetadata.OutputTokens = outputTokens
@@ -194,12 +206,12 @@ func (m *apiGeminiModel) createRequest(ctx context.Context, body io.Reader, isSt
 	return req.WithContext(ctx), nil
 }
 
-func (m *apiGeminiModel) createBodyData(msgs []jpf.Message, outputFormat any) (io.Reader, error) {
+func (m *apiGeminiModel) createBodyData(msgs []jpf.Message, toolSchemas []jpf.ToolSchema, outputFormat any) (io.Reader, error) {
 	systemMessage, geminiMsgs, err := m.messages(msgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not convert messages to Gemini format")
 	}
-	body, err := m.body(systemMessage, outputFormat, geminiMsgs)
+	body, err := m.body(systemMessage, toolSchemas, outputFormat, geminiMsgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not create body")
 	}
@@ -244,6 +256,8 @@ func (m *apiGeminiModel) messageRole(msg jpf.Message) (string, error) {
 		return "user", nil
 	case jpf.AssistantMessage:
 		return "model", nil
+	case jpf.ToolResultMessage:
+		return "user", nil
 	default:
 		return "", errUnsupportedSetting("role", fmt.Sprintf("%T", msg))
 	}
@@ -252,12 +266,34 @@ func (m *apiGeminiModel) messageRole(msg jpf.Message) (string, error) {
 func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 	var content string
 	var imageAttachments []jpf.ImageAttachment
+	var toolCallParts []map[string]any
 	switch msg := msg.(type) {
 	case jpf.UserMessage:
 		content = msg.Content
 		imageAttachments = msg.Images
 	case jpf.AssistantMessage:
+		if len(msg.ToolCalls) > 0 {
+			for _, tc := range msg.ToolCalls {
+				toolCallParts = append(toolCallParts, map[string]any{
+					"functionCall": map[string]any{
+						"name": tc.Tool,
+						"args": tc.Args,
+					},
+				})
+			}
+		}
 		content = msg.Content
+	case jpf.ToolResultMessage:
+		return []map[string]any{
+			{
+				"functionResponse": map[string]any{
+					"name": msg.CallID, // Gemini does not have unique ID per tool call, but JPF sets the ID to be the tool name.
+					"response": map[string]any{
+						"result": msg.Result,
+					},
+				},
+			},
+		}, nil
 	default:
 		return nil, fmt.Errorf("cannot get content for %T", msg)
 	}
@@ -278,10 +314,13 @@ func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 			},
 		})
 	}
+	if len(toolCallParts) > 0 {
+		allParts = append(allParts, toolCallParts...)
+	}
 	return allParts, nil
 }
 
-func (m *apiGeminiModel) body(systemMessage string, outputFormat any, msgs []any) (map[string]any, error) {
+func (m *apiGeminiModel) body(systemMessage string, toolSchemas []jpf.ToolSchema, outputFormat any, msgs []any) (map[string]any, error) {
 	body := map[string]any{
 		"contents": msgs,
 	}
@@ -326,7 +365,61 @@ func (m *apiGeminiModel) body(systemMessage string, outputFormat any, msgs []any
 		gen["responseMimeType"] = "application/json"
 		gen["responseSchema"] = schema
 	}
+	if len(toolSchemas) > 0 {
+		body["tools"] = m.tools(toolSchemas)
+	}
 	return body, nil
+}
+
+func (m *apiGeminiModel) tools(toolSchemas []jpf.ToolSchema) []any {
+	decls := make([]any, 0, len(toolSchemas))
+
+	for _, tool := range toolSchemas {
+		props := map[string]any{}
+		required := []string{}
+
+		for _, arg := range tool.Args {
+			typ := "STRING"
+			switch arg.Type {
+			case jpf.ToolArgString:
+				typ = "STRING"
+			case jpf.ToolArgInt:
+				typ = "INTEGER"
+			case jpf.ToolArgFloat:
+				typ = "NUMBER"
+			}
+
+			props[arg.Name] = map[string]any{
+				"type":        typ,
+				"description": arg.Description,
+			}
+
+			if arg.Required {
+				required = append(required, arg.Name)
+			}
+		}
+
+		params := map[string]any{
+			"type":       "OBJECT",
+			"properties": props,
+		}
+
+		if len(required) > 0 {
+			params["required"] = required
+		}
+
+		decls = append(decls, map[string]any{
+			"name":        tool.Name,
+			"description": tool.Description,
+			"parameters":  params,
+		})
+	}
+
+	return []any{
+		map[string]any{
+			"functionDeclarations": decls,
+		},
+	}
 }
 
 func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
@@ -342,8 +435,8 @@ func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) 
 	if m.settings.prediction != nil {
 		return errUnsupportedSetting("prediction", m.settings.prediction)
 	}
-	if len(kwargs.ToolSchemas) > 0 {
-		return errUnsupportedSetting("WithToolSchemas", len(kwargs.ToolSchemas))
+	if kwargs.Streamer != nil && len(kwargs.ToolSchemas) > 0 {
+		return errUnsupportedSetting("WithStreamer + WithToolSchemas", "both present")
 	}
 	return nil
 }
@@ -415,12 +508,18 @@ type geminiErrorResponse struct {
 	} `json:"error"`
 }
 
+type geminiStaticResponsePart struct {
+	Text         string `json:"text"`
+	FunctionCall *struct {
+		Name string         `json:"name"`
+		Args map[string]any `json:"args"`
+	} `json:"functionCall"`
+}
+
 type geminiStaticResponse struct {
 	Candidates []struct {
 		Content struct {
-			Parts []struct {
-				Text string `json:"text"`
-			} `json:"parts"`
+			Parts []geminiStaticResponsePart `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
 	UsageMetadata struct {
