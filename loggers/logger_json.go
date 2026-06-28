@@ -60,6 +60,11 @@ func messageToLoggingJson(msg jpf.Message) any {
 			"role":    "system",
 			"content": msg.Content,
 		}
+	case jpf.ToolResultMessage:
+		return map[string]any{
+			"role":    "tool",
+			"content": msg.Result,
+		}
 	default:
 		panic("unreachable")
 	}

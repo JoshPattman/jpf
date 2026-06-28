@@ -28,11 +28,13 @@ func messageToString(msg jpf.Message) string {
 	case jpf.UserMessage:
 		return fmt.Sprintf("user:%s:%s", msg.Content, imageAttachmentsToString(msg.Images))
 	case jpf.AssistantMessage:
-		return fmt.Sprintf("assistant:%s", msg.Content)
+		return fmt.Sprintf("assistant:%s:%v", msg.Content, msg.ToolCalls)
 	case jpf.DeveloperMessage:
 		return fmt.Sprintf("developer:%s", msg.Content)
 	case jpf.SystemMessage:
 		return fmt.Sprintf("system:%s", msg.Content)
+	case jpf.ToolResultMessage:
+		return fmt.Sprintf("result:%s:%s", msg.CallID, msg.Result)
 	default:
 		panic("unreachable")
 	}
