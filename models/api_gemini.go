@@ -113,7 +113,7 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	}()
 
 	scanner := bufio.NewScanner(respBody)
-	var fullText strings.Builder
+	var parts []geminiStaticResponsePart
 	var inputTokens, outputTokens int
 
 	streamer.OnMessageBegin()
@@ -137,10 +137,11 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 		}
 
 		if len(chunk.Candidates) > 0 && len(chunk.Candidates[0].Content.Parts) > 0 {
-			// concatenate all parts in this chunk
+			parts = append(parts, chunk.Candidates[0].Content.Parts...)
 			for _, p := range chunk.Candidates[0].Content.Parts {
-				fullText.WriteString(p.Text)
-				streamer.OnMessageText(p.Text)
+				if p.Text != "" {
+					streamer.OnMessageText(p.Text)
+				}
 			}
 		}
 
@@ -166,8 +167,7 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 			} `json:"content"`
 		}, 1),
 	}
-	resp.Candidates[0].Content.Parts = make([]geminiStaticResponsePart, 1)
-	resp.Candidates[0].Content.Parts[0].Text = fullText.String()
+	resp.Candidates[0].Content.Parts = parts
 	resp.UsageMetadata.InputTokens = inputTokens
 	resp.UsageMetadata.OutputTokens = outputTokens
 
@@ -435,9 +435,6 @@ func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) 
 	if m.settings.prediction != nil {
 		return errUnsupportedSetting("prediction", m.settings.prediction)
 	}
-	if kwargs.Streamer != nil && len(kwargs.ToolSchemas) > 0 {
-		return errUnsupportedSetting("WithStreamer + WithToolSchemas", "both present")
-	}
 	return nil
 }
 
@@ -489,9 +486,7 @@ func cleanGeminiSchema(v any) any {
 type geminiStreamChunk struct {
 	Candidates []struct {
 		Content struct {
-			Parts []struct {
-				Text string `json:"text"`
-			} `json:"parts"`
+			Parts []geminiStaticResponsePart `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
 	UsageMetadata *struct {
