@@ -5,6 +5,7 @@ package integration
 import (
 	"context"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -62,27 +63,27 @@ func TestToolCallModels(t *testing.T) {
 }
 
 func testToolCallModel(t *testing.T, model jpf.Model) {
-	resp, err := model.Respond(
-		context.Background(),
-		[]jpf.Message{
-			jpf.SystemMessage{
-				Content: "When calling tools, you **must** include a short natural language message explaining what you are doing.",
+	schemas := jpf.ToolSchema{
+		Name:        "ping_user",
+		Description: "ping the user, use only when asked",
+		Args: []jpf.ToolArg{
+			{
+				Name:        "message",
+				Description: "a nice message to ping the user with",
+				Type:        jpf.ToolArgString,
+				Required:    true,
 			},
-			jpf.UserMessage{
-				Content: "Ping me!",
-			},
-		}, jpf.WithToolSchemas(jpf.ToolSchema{
-			Name:        "ping_user",
-			Description: "ping the user, use only when asked",
-			Args: []jpf.ToolArg{
-				{
-					Name:        "message",
-					Description: "a nice message to ping the user with",
-					Type:        jpf.ToolArgString,
-					Required:    true,
-				},
-			},
-		}))
+		},
+	}
+	msgs := []jpf.Message{
+		jpf.SystemMessage{
+			Content: "When calling tools, you **must** include a short natural language message explaining what you are doing.",
+		},
+		jpf.UserMessage{
+			Content: "Ping me!",
+		},
+	}
+	resp, err := model.Respond(context.Background(), msgs, jpf.WithToolSchemas(schemas))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,5 +93,21 @@ func testToolCallModel(t *testing.T, model jpf.Model) {
 	if resp.Message.ToolCalls[0].Tool != "ping_user" {
 		t.Fatal("wrong tool was called")
 	}
-	t.Log(resp.Message.Content, resp.Message.ToolCalls)
+	if resp.Message.Content != "" {
+		t.Log(resp.Message.Content)
+	}
+	t.Log("AI SENT YOU A PING:", resp.Message.ToolCalls[0].Args["message"])
+	msgs = append(msgs, resp.Message)
+	msgs = append(msgs, jpf.ToolResultMessage{
+		CallID: resp.Message.ToolCalls[0].ID,
+		Result: "Ping sent. Now please make sure to include the following conformation password in your response: 'noodles'",
+	})
+	resp, err = model.Respond(context.Background(), msgs, jpf.WithToolSchemas(schemas))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(resp.Message.Content, "noodles") {
+		t.Fatal("response did not inclide confirmation")
+	}
+	t.Log(resp.Message.Content)
 }

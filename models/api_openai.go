@@ -226,9 +226,22 @@ func (m *apiOpenAIModel) messages(msgs []jpf.Message) ([]openAIAPIMessage, error
 		if err != nil {
 			return nil, err
 		}
+		var callID string
+		if msg, ok := msg.(jpf.ToolResultMessage); ok {
+			callID = msg.CallID
+		}
+		var toolCalls []openAIToolCall
+		if msg, ok := msg.(jpf.AssistantMessage); ok {
+			toolCalls, err = m.toolCalls(msg)
+			if err != nil {
+				return nil, err
+			}
+		}
 		jsonMessages = append(jsonMessages, openAIAPIMessage{
-			Role:    role,
-			Content: content,
+			Role:       role,
+			Content:    content,
+			ToolCallID: callID,
+			ToolCalls:  toolCalls,
 		})
 	}
 	return jsonMessages, nil
@@ -244,6 +257,8 @@ func (m *apiOpenAIModel) messageRole(msg jpf.Message) (string, error) {
 		return "developer", nil
 	case jpf.SystemMessage:
 		return "system", nil
+	case jpf.ToolResultMessage:
+		return "tool", nil
 	default:
 		return "", errUnsupportedSetting("role", fmt.Sprintf("%T", msg))
 	}
@@ -282,9 +297,34 @@ func (m *apiOpenAIModel) messageContent(msg jpf.Message) (any, error) {
 		return msg.Content, nil
 	case jpf.DeveloperMessage:
 		return msg.Content, nil
+	case jpf.ToolResultMessage:
+		return msg.Result, nil
 	default:
 		panic("unreachable")
 	}
+}
+
+func (m *apiOpenAIModel) toolCalls(msg jpf.AssistantMessage) ([]openAIToolCall, error) {
+	if len(msg.ToolCalls) == 0 {
+		return nil, nil
+	}
+	calls := make([]openAIToolCall, len(msg.ToolCalls))
+	for i, tc := range msg.ToolCalls {
+		args := bytes.NewBuffer(nil)
+		err := json.NewEncoder(args).Encode(tc.Args)
+		if err != nil {
+			return nil, err
+		}
+		calls[i] = openAIToolCall{
+			Type: "function",
+			ID:   tc.ID,
+			Function: openAIToolCallFunction{
+				Name:      tc.Tool,
+				Arguments: args.String(),
+			},
+		}
+	}
+	return calls, nil
 }
 
 func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool, outputFormat any, toolSchemas []jpf.ToolSchema) (map[string]any, error) {
@@ -446,9 +486,22 @@ func (m *apiOpenAIModel) verbosity(v Verbosity) string {
 	}
 }
 
+type openAIToolCallFunction struct {
+	Name      string `json:"name"`
+	Arguments string `json:"arguments"`
+}
+
+type openAIToolCall struct {
+	Type     string                 `json:"type"`
+	ID       string                 `json:"id"`
+	Function openAIToolCallFunction `json:"function"`
+}
+
 type openAIAPIMessage struct {
-	Role    string `json:"role"`
-	Content any    `json:"content"`
+	Role       string           `json:"role"`
+	Content    any              `json:"content"`
+	ToolCallID string           `json:"tool_call_id,omitempty"`
+	ToolCalls  []openAIToolCall `json:"tool_calls,omitempty"`
 }
 
 type openAIErrorResponse struct {

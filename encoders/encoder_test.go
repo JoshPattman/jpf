@@ -52,6 +52,8 @@ func contentEq(msg jpf.Message, content string) bool {
 		return msg.Content == content
 	case jpf.SystemMessage:
 		return msg.Content == content
+	case jpf.ToolResultMessage:
+		return msg.Result == content
 	default:
 		panic("unreachable")
 	}

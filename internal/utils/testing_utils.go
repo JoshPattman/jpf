@@ -74,6 +74,8 @@ func content(msg jpf.Message) string {
 		return msg.Content
 	case jpf.SystemMessage:
 		return msg.Content
+	case jpf.ToolResultMessage:
+		return msg.Result
 	default:
 		panic("unreachable")
 	}

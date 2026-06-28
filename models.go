@@ -108,10 +108,11 @@ type Message interface {
 	Eq(Message) bool
 }
 
-func (UserMessage) msg()      {}
-func (AssistantMessage) msg() {}
-func (DeveloperMessage) msg() {}
-func (SystemMessage) msg()    {}
+func (UserMessage) msg()       {}
+func (AssistantMessage) msg()  {}
+func (DeveloperMessage) msg()  {}
+func (SystemMessage) msg()     {}
+func (ToolResultMessage) msg() {}
 
 // UserMessage represents a message from the user to the model.
 type UserMessage struct {
@@ -196,6 +197,25 @@ func (m SystemMessage) Eq(other Message) bool {
 	switch other := other.(type) {
 	case SystemMessage:
 		return m.Content == other.Content
+	default:
+		return false
+	}
+}
+
+// ToolResultMessage represents a result from calling a tool.
+type ToolResultMessage struct {
+	CallID string
+	Result string
+}
+
+func (m ToolResultMessage) String() string {
+	return fmt.Sprintf("ToolResultMessage{CallID: \"%s\", Result: \"%s\"}", m.CallID, m.Result)
+}
+
+func (m ToolResultMessage) Eq(other Message) bool {
+	switch other := other.(type) {
+	case ToolResultMessage:
+		return m.CallID == other.CallID && m.Result == other.Result
 	default:
 		return false
 	}
