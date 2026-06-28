@@ -13,6 +13,7 @@ import (
 
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/internal/utils"
+	"github.com/invopop/jsonschema"
 )
 
 type apiGeminiModel struct {
@@ -27,7 +28,7 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not validate model setup")
 	}
-	body, err := m.createBodyData(msgs)
+	body, err := m.createBodyData(msgs, kwargs.OutputFormat)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
@@ -193,12 +194,12 @@ func (m *apiGeminiModel) createRequest(ctx context.Context, body io.Reader, isSt
 	return req.WithContext(ctx), nil
 }
 
-func (m *apiGeminiModel) createBodyData(msgs []jpf.Message) (io.Reader, error) {
+func (m *apiGeminiModel) createBodyData(msgs []jpf.Message, outputFormat any) (io.Reader, error) {
 	systemMessage, geminiMsgs, err := m.messages(msgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not convert messages to Gemini format")
 	}
-	body, err := m.body(systemMessage, geminiMsgs)
+	body, err := m.body(systemMessage, outputFormat, geminiMsgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not create body")
 	}
@@ -280,7 +281,7 @@ func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 	return allParts, nil
 }
 
-func (m *apiGeminiModel) body(systemMessage string, msgs []any) (map[string]any, error) {
+func (m *apiGeminiModel) body(systemMessage string, outputFormat any, msgs []any) (map[string]any, error) {
 	body := map[string]any{
 		"contents": msgs,
 	}
@@ -310,6 +311,21 @@ func (m *apiGeminiModel) body(systemMessage string, msgs []any) (map[string]any,
 		}
 		body["generationConfig"].(map[string]any)["maxOutputTokens"] = *m.settings.maxOutput
 	}
+	if outputFormat != nil {
+		schema, err := m.schema(outputFormat)
+		if err != nil {
+			return nil, utils.Wrap(err, "failed to build response schema")
+		}
+
+		if body["generationConfig"] == nil {
+			body["generationConfig"] = map[string]any{}
+		}
+
+		gen := body["generationConfig"].(map[string]any)
+
+		gen["responseMimeType"] = "application/json"
+		gen["responseSchema"] = schema
+	}
 	return body, nil
 }
 
@@ -326,13 +342,55 @@ func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) 
 	if m.settings.prediction != nil {
 		return errUnsupportedSetting("prediction", m.settings.prediction)
 	}
-	if kwargs.OutputFormat != nil {
-		return errUnsupportedSetting("WithOutputFormat", fmt.Sprintf("%T", kwargs.OutputFormat))
-	}
 	if len(kwargs.ToolSchemas) > 0 {
 		return errUnsupportedSetting("WithToolSchemas", len(kwargs.ToolSchemas))
 	}
 	return nil
+}
+
+func (m *apiGeminiModel) schema(obj any) (any, error) {
+	r := &jsonschema.Reflector{
+		BaseSchemaID:   "Anonymous",
+		Anonymous:      true,
+		DoNotReference: true,
+	}
+	s := r.Reflect(obj)
+	schemaBs, err := s.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	schema := make(map[string]any)
+	err = json.Unmarshal(schemaBs, &schema)
+	if err != nil {
+		return nil, err
+	}
+	return cleanGeminiSchema(schema), nil
+}
+
+func cleanGeminiSchema(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		// delete unsupported Gemini fields
+		delete(x, "$schema")
+		delete(x, "$id")
+		delete(x, "additionalProperties")
+		delete(x, "examples")
+		delete(x, "default")
+
+		for k, vv := range x {
+			x[k] = cleanGeminiSchema(vv)
+		}
+		return x
+
+	case []any:
+		for i := range x {
+			x[i] = cleanGeminiSchema(x[i])
+		}
+		return x
+
+	default:
+		return v
+	}
 }
 
 type geminiStreamChunk struct {
