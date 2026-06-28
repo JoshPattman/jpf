@@ -130,9 +130,10 @@ func IsCelebrity(name string) (bool, error) {
 - Where are the agents?
 	- Agents are built on top of LLMs, but this package is designed for LLM handling, so it lives at the level below agents.
 	- Take a look at [JChat](https://github.com/JoshPattman/agent/cmd/jchat) or [react](https://github.com/JoshPattman/react) to see how you can build an agent on top of JPF.
-- Why does this not support MCP tools on the OpenAI API / Tool calling / Other advanced API features?
-	- Relying on API features like tool calling, MCP tools, or vector stores is not ideal for two reasons: (a) it makes it harder to move between API/model providers (b) it gives you less flexibility and control.
+- Why does this not support MCP tools on the OpenAI API / Other advanced API features?
+	- Relying on API features like MCP tools (and full API agents), or vector stores is not ideal for two reasons: (a) it makes it harder to move between API/model providers (b) it gives you less flexibility and control.
 	- These features are not particularly hard to add locally, so you should aim to do so to ensure your application is as robust as possible to API change.
+	- If a way to abstract the advanced feature such that it becomes provider-agnostic is found, adding it into JPF will be considered.
 
 ## Author
 
