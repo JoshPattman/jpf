@@ -47,3 +47,50 @@ func testHelloModel(t *testing.T, model jpf.Model) {
 	}
 	t.Log(resp.Message.Content)
 }
+
+func TestToolCallModels(t *testing.T) {
+	oaiKey := os.Getenv("OPENAI_KEY")
+	// gemKey := os.Getenv("GEMINI_KEY")
+	modelsToRun := []jpf.Model{
+		models.NewRemote(models.OpenAI, "gpt-4.1", oaiKey),
+		models.NewRemote(models.OpenAI, "o3-mini", oaiKey),
+		models.NewRemote(models.OpenAI, "gpt-5", oaiKey),
+	}
+	for _, model := range modelsToRun {
+		testToolCallModel(t, models.Timeout(model, time.Minute))
+	}
+}
+
+func testToolCallModel(t *testing.T, model jpf.Model) {
+	resp, err := model.Respond(
+		context.Background(),
+		[]jpf.Message{
+			jpf.SystemMessage{
+				Content: "When calling tools, you **must** include a short natural language message explaining what you are doing.",
+			},
+			jpf.UserMessage{
+				Content: "Ping me!",
+			},
+		}, jpf.WithToolSchemas(jpf.ToolSchema{
+			Name:        "ping_user",
+			Description: "ping the user, use only when asked",
+			Args: []jpf.ToolArg{
+				{
+					Name:        "message",
+					Description: "a nice message to ping the user with",
+					Type:        jpf.ToolArgString,
+					Required:    true,
+				},
+			},
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(resp.Message.ToolCalls) == 0 {
+		t.Fatal("no tools were called")
+	}
+	if resp.Message.ToolCalls[0].Tool != "ping_user" {
+		t.Fatal("wrong tool was called")
+	}
+	t.Log(resp.Message.Content, resp.Message.ToolCalls)
+}

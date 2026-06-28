@@ -29,7 +29,7 @@ func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 		return jpf.ModelResponse{}, err
 	}
 	isStreamed := kwargs.Streamer != nil
-	body, err := m.createBodyData(msgs, isStreamed, kwargs.OutputFormat)
+	body, err := m.createBodyData(msgs, isStreamed, kwargs.OutputFormat, kwargs.ToolSchemas)
 	if err != nil {
 		return failedResponse(), utils.Wrap(err, "could not create request body")
 	}
@@ -72,8 +72,21 @@ func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 		return failedResponseAfter(usage), utils.Wrap(err, "response had no choices: %s", string(rawRespBytes))
 	}
 	content := respTyped.Choices[0].Message.Content
+	toolCalls := make([]jpf.ToolCall, len(respTyped.Choices[0].Message.ToolCalls))
+	for i, tc := range respTyped.Choices[0].Message.ToolCalls {
+		args := make(map[string]any)
+		err := json.NewDecoder(bytes.NewBufferString(tc.Function.Arguments)).Decode(&args)
+		if err != nil {
+			return failedResponseAfter(usage), utils.Wrap(err, "could not decode tool arguments")
+		}
+		toolCalls[i] = jpf.ToolCall{
+			ID:   tc.ID,
+			Tool: tc.Function.Name,
+			Args: args,
+		}
+	}
 	return jpf.ModelResponse{
-		Message: jpf.AssistantMessage{Content: content},
+		Message: jpf.AssistantMessage{Content: content, ToolCalls: toolCalls},
 		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
@@ -150,11 +163,7 @@ func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.Re
 
 	// Build the response in the same format as parseStaticResponse
 	response := openAIAPIStaticResponse{
-		Choices: make([]struct {
-			Message struct {
-				Content string `json:"content"`
-			} `json:"message"`
-		}, 1),
+		Choices: make([]openAIStaticChoiceResponse, 1),
 	}
 	response.Choices[0].Message.Content = fullContent.String()
 	response.Usage.InputTokens = inputTokens
@@ -189,12 +198,12 @@ func (m *apiOpenAIModel) createRequest(ctx context.Context, body io.Reader) (*ht
 	return req.WithContext(ctx), nil
 }
 
-func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message, isStreamed bool, outputFormat any) (io.Reader, error) {
+func (m *apiOpenAIModel) createBodyData(msgs []jpf.Message, isStreamed bool, outputFormat any, toolSchemas []jpf.ToolSchema) (io.Reader, error) {
 	apiMessages, err := m.messages(msgs)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not convert messages to OpenAI format")
 	}
-	body, err := m.body(apiMessages, isStreamed, outputFormat)
+	body, err := m.body(apiMessages, isStreamed, outputFormat, toolSchemas)
 	if err != nil {
 		return nil, utils.Wrap(err, "could not create OpenAI format body")
 	}
@@ -278,7 +287,7 @@ func (m *apiOpenAIModel) messageContent(msg jpf.Message) (any, error) {
 	}
 }
 
-func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool, outputFormat any) (map[string]any, error) {
+func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool, outputFormat any, toolSchemas []jpf.ToolSchema) (map[string]any, error) {
 	bodyMap := map[string]any{
 		"model":    m.name,
 		"messages": msgs,
@@ -315,12 +324,70 @@ func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool, outputFo
 		bodyMap["stream"] = true
 		bodyMap["stream_options"] = map[string]any{"include_usage": true}
 	}
+
+	if len(toolSchemas) > 0 {
+		bodyMap["tools"] = m.tools(toolSchemas)
+		bodyMap["tool_choice"] = "auto"
+	}
 	return bodyMap, nil
 }
 
+func (m *apiOpenAIModel) tools(toolSchemas []jpf.ToolSchema) []any {
+	openAITools := make([]any, 0, len(toolSchemas))
+	for _, tool := range toolSchemas {
+		props := map[string]any{}
+		required := []string{}
+
+		for _, arg := range tool.Args {
+			t := "string"
+
+			switch arg.Type {
+			case jpf.ToolArgString:
+				t = "string"
+			case jpf.ToolArgInt:
+				t = "integer"
+			case jpf.ToolArgFloat:
+				t = "number"
+			default:
+				panic("unreachable")
+			}
+
+			props[arg.Name] = map[string]any{
+				"type":        t,
+				"description": arg.Description,
+			}
+
+			if arg.Required {
+				required = append(required, arg.Name)
+			}
+		}
+
+		params := map[string]any{
+			"type":                 "object",
+			"properties":           props,
+			"additionalProperties": false,
+		}
+
+		if len(required) > 0 {
+			params["required"] = required
+		}
+
+		openAITools = append(openAITools, map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name":        tool.Name,
+				"description": tool.Description,
+				"parameters":  params,
+				"strict":      true,
+			},
+		})
+	}
+	return openAITools
+}
+
 func (m *apiOpenAIModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
-	if len(kwargs.ToolSchemas) > 0 {
-		return errUnsupportedSetting("WithToolSchemas", len(kwargs.ToolSchemas))
+	if kwargs.Streamer != nil && len(kwargs.ToolSchemas) > 0 {
+		return errUnsupportedSetting("WithStreamer + WithToolSchemas", "both present")
 	}
 	return nil
 }
@@ -409,13 +476,22 @@ type openAIStreamChunk struct {
 	} `json:"error"`
 }
 
+type openAIStaticChoiceResponse struct {
+	Message struct {
+		Content   string `json:"content"`
+		ToolCalls []struct {
+			ID       string `json:"id"`
+			Function struct {
+				Name      string `json:"name"`
+				Arguments string `json:"arguments"`
+			} `json:"function"`
+		} `json:"tool_calls"`
+	} `json:"message"`
+}
+
 type openAIAPIStaticResponse struct {
-	Choices []struct {
-		Message struct {
-			Content string `json:"content"`
-		} `json:"message"`
-	} `json:"choices"`
-	Usage struct {
+	Choices []openAIStaticChoiceResponse `json:"choices"`
+	Usage   struct {
 		InputTokens  int `json:"prompt_tokens"`
 		OutputTokens int `json:"completion_tokens"`
 	}

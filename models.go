@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/jpeg"
 	"image/png"
+	"reflect"
 )
 
 // Usage defines how many tokens were used when making calls to LLMs.
@@ -141,17 +142,24 @@ func (m UserMessage) Eq(other Message) bool {
 
 // AssistantMessage represents a message from the model to the user.
 type AssistantMessage struct {
-	Content string
+	Content   string
+	ToolCalls []ToolCall
+}
+
+type ToolCall struct {
+	ID   string
+	Tool string
+	Args map[string]any
 }
 
 func (m AssistantMessage) String() string {
-	return fmt.Sprintf("AssistantMessage{Content: \"%s\"}", m.Content)
+	return fmt.Sprintf("AssistantMessage{Content: \"%s\", ToolCalls: %d}", m.Content, len(m.ToolCalls))
 }
 
 func (m AssistantMessage) Eq(other Message) bool {
 	switch other := other.(type) {
 	case AssistantMessage:
-		return m.Content == other.Content
+		return m.Content == other.Content && reflect.DeepEqual(m.ToolCalls, other.ToolCalls)
 	default:
 		return false
 	}
