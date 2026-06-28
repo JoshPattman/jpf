@@ -24,6 +24,10 @@ type apiOpenAIModel struct {
 
 func (m *apiOpenAIModel) Respond(ctx context.Context, msgs []jpf.Message, opts ...jpf.ModelResponseOpt) (jpf.ModelResponse, error) {
 	kwargs := jpf.GetModelResponseKwargs(opts...)
+	err := m.validateNoUnusableArgs(kwargs)
+	if err != nil {
+		return jpf.ModelResponse{}, err
+	}
 	isStreamed := kwargs.Streamer != nil
 	body, err := m.createBodyData(msgs, isStreamed, kwargs.OutputFormat)
 	if err != nil {
@@ -312,6 +316,13 @@ func (m *apiOpenAIModel) body(msgs []openAIAPIMessage, isStreamed bool, outputFo
 		bodyMap["stream_options"] = map[string]any{"include_usage": true}
 	}
 	return bodyMap, nil
+}
+
+func (m *apiOpenAIModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
+	if len(kwargs.ToolSchemas) > 0 {
+		return errUnsupportedSetting("WithToolSchemas", len(kwargs.ToolSchemas))
+	}
+	return nil
 }
 
 func (m *apiOpenAIModel) schema(obj any) (any, error) {
