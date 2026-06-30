@@ -150,9 +150,10 @@ func testStructuredOutput(t *testing.T, model jpf.Model) {
 }
 
 func TestStreamToolCallModels(t *testing.T) {
-	// oaiKey := os.Getenv("OPENAI_KEY")
+	oaiKey := os.Getenv("OPENAI_KEY")
 	gemKey := os.Getenv("GEMINI_KEY")
 	modelsToRun := []jpf.Model{
+		models.NewRemote(models.OpenAI, "gpt-5", oaiKey),
 		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
 	}
 	for _, model := range modelsToRun {
