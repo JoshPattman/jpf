@@ -115,6 +115,7 @@ func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	}()
 	scanner := bufio.NewScanner(respBody)
 	var fullContent strings.Builder
+	toolCalls := make(map[int]openAIToolCall)
 	var inputTokens, outputTokens int
 
 	streamer.OnMessageBegin()
@@ -148,6 +149,23 @@ func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.Re
 			content := chunk.Choices[0].Delta.Content
 			fullContent.WriteString(content)
 			streamer.OnMessageText(content)
+			chunkToolCalls := chunk.Choices[0].Delta.ToolCalls
+			for _, chunkToolCall := range chunkToolCalls {
+				existingCall := toolCalls[chunkToolCall.Index]
+				if chunkToolCall.ID != nil {
+					existingCall.ID = *chunkToolCall.ID
+				}
+				if chunkToolCall.Type != nil {
+					existingCall.Type = *chunkToolCall.Type
+				}
+				if chunkToolCall.Function != nil {
+					if chunkToolCall.Function.Name != "" {
+						existingCall.Function.Name = chunkToolCall.Function.Name
+					}
+					existingCall.Function.Arguments += chunkToolCall.Function.Arguments
+				}
+				toolCalls[chunkToolCall.Index] = existingCall
+			}
 		}
 		if chunk.Usage.PromptTokens > 0 {
 			inputTokens = chunk.Usage.PromptTokens
@@ -165,7 +183,13 @@ func (m *apiOpenAIModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	response := openAIAPIStaticResponse{
 		Choices: make([]openAIStaticChoiceResponse, 1),
 	}
+	calls := make([]openAIToolCall, len(toolCalls))
+	for i := range calls {
+		calls[i] = toolCalls[i]
+	}
+	response.Choices[0].Message.ToolCalls = calls
 	response.Choices[0].Message.Content = fullContent.String()
+	response.Choices[0].Message.ToolCalls = calls
 	response.Usage.InputTokens = inputTokens
 	response.Usage.OutputTokens = outputTokens
 
@@ -426,9 +450,6 @@ func (m *apiOpenAIModel) tools(toolSchemas []jpf.ToolSchema) []any {
 }
 
 func (m *apiOpenAIModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
-	if kwargs.Streamer != nil && len(kwargs.ToolSchemas) > 0 {
-		return errUnsupportedSetting("WithStreamer + WithToolSchemas", "both present")
-	}
 	return nil
 }
 
@@ -497,6 +518,13 @@ type openAIToolCall struct {
 	Function openAIToolCallFunction `json:"function"`
 }
 
+type openAIStreamedToolCallDelta struct {
+	Type     *string                 `json:"type"`
+	ID       *string                 `json:"id"`
+	Index    int                     `json:"index"`
+	Function *openAIToolCallFunction `json:"function"`
+}
+
 type openAIAPIMessage struct {
 	Role       string           `json:"role"`
 	Content    any              `json:"content"`
@@ -515,7 +543,8 @@ type openAIErrorResponse struct {
 type openAIStreamChunk struct {
 	Choices []struct {
 		Delta struct {
-			Content string `json:"content"`
+			Content   string                        `json:"content"`
+			ToolCalls []openAIStreamedToolCallDelta `json:"tool_calls,omitempty"`
 		} `json:"delta"`
 	} `json:"choices"`
 	Usage struct {
@@ -531,14 +560,8 @@ type openAIStreamChunk struct {
 
 type openAIStaticChoiceResponse struct {
 	Message struct {
-		Content   string `json:"content"`
-		ToolCalls []struct {
-			ID       string `json:"id"`
-			Function struct {
-				Name      string `json:"name"`
-				Arguments string `json:"arguments"`
-			} `json:"function"`
-		} `json:"tool_calls"`
+		Content   string           `json:"content"`
+		ToolCalls []openAIToolCall `json:"tool_calls"`
 	} `json:"message"`
 }
 
