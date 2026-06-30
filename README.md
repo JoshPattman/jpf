@@ -18,6 +18,7 @@ Providing essential building blocks and robust LLM interaction interfaces, **jpf
 - **Out-of-the-box Logging**: Simply add logging messages to your models, helping you track down issues.
 - **Industry Standard Context Management**: All potentially slow interfaces support Go's context.Context for timeouts and cancellation.
 - **Rate Limit Management**: Compose models together to set local rate limits to prevent API errors.
+- **Tool / Function calling**: Let your models call tools with static or streamed requests.
 - **MIT License**: Use the code for anything, anywhere, for free.
 
 ## Installation
@@ -35,7 +36,7 @@ Learn more about JPF in the [Core Concepts](#core-concepts) section.
 There are multiple examples available in the [examples](https://github.com/JoshPattman/jpf/examples) directory.
 
 ### Build a model
-- A model is capable of responding to a set of messages.
+- A model is capable of responding to a set of messages, and are the core engine behind all of your AI features.
 - Models are built through composition, adding functionality that runs on your machine.
 
 ```go
@@ -61,6 +62,11 @@ func BuildModel() jpf.Model {
 ### Build a pipeline
 - A pipeline is a wrapper around a model that takes and returns structured data.
 - Pipelines may retry using various strategies when a validation error (attempting to parse the output) occurs.
+- Pipelines are particularly useful when making one / a few calls to an LLM to perform a fixed task, for example:
+	- Translate some text
+	- Answer a question about some text
+	- Summarise a document
+
 ```go
 // Define the structured data to provide to the pipeline
 type TaskInput struct {
