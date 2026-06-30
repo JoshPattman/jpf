@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -113,7 +114,9 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	}()
 
 	scanner := bufio.NewScanner(respBody)
-	var parts []geminiStaticResponsePart
+	var currentFunctionCall *geminiResponseFunctionCall
+	responseContent := &strings.Builder{}
+	functionCalls := make([]geminiResponseFunctionCall, 0)
 	var inputTokens, outputTokens int
 
 	streamer.OnMessageBegin()
@@ -137,10 +140,23 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 		}
 
 		if len(chunk.Candidates) > 0 && len(chunk.Candidates[0].Content.Parts) > 0 {
-			parts = append(parts, chunk.Candidates[0].Content.Parts...)
 			for _, p := range chunk.Candidates[0].Content.Parts {
 				if p.Text != "" {
+					responseContent.WriteString(p.Text)
 					streamer.OnMessageText(p.Text)
+				}
+				if p.FunctionCall != nil {
+					if currentFunctionCall == nil {
+						currentFunctionCall = p.FunctionCall
+					} else if currentFunctionCall.Name == p.FunctionCall.Name {
+						if currentFunctionCall.Args == nil {
+							currentFunctionCall.Args = make(map[string]any)
+						}
+						maps.Copy(currentFunctionCall.Args, p.FunctionCall.Args)
+					} else {
+						functionCalls = append(functionCalls, *currentFunctionCall)
+						currentFunctionCall = p.FunctionCall
+					}
 				}
 			}
 		}
@@ -159,13 +175,27 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 		return geminiStaticResponse{}, nil, utils.Wrap(err, "error reading gemini stream")
 	}
 
+	if currentFunctionCall != nil {
+		functionCalls = append(functionCalls, *currentFunctionCall)
+	}
+
 	// Build a static-style response
 	resp := geminiStaticResponse{
 		Candidates: make([]struct {
 			Content struct {
-				Parts []geminiStaticResponsePart `json:"parts"`
+				Parts []geminiResponsePart `json:"parts"`
 			} `json:"content"`
 		}, 1),
+	}
+	parts := []geminiResponsePart{
+		{
+			Text: responseContent.String(),
+		},
+	}
+	for _, fn := range functionCalls {
+		parts = append(parts, geminiResponsePart{
+			FunctionCall: &fn,
+		})
 	}
 	resp.Candidates[0].Content.Parts = parts
 	resp.UsageMetadata.InputTokens = inputTokens
@@ -486,7 +516,7 @@ func cleanGeminiSchema(v any) any {
 type geminiStreamChunk struct {
 	Candidates []struct {
 		Content struct {
-			Parts []geminiStaticResponsePart `json:"parts"`
+			Parts []geminiResponsePart `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
 	UsageMetadata *struct {
@@ -503,18 +533,20 @@ type geminiErrorResponse struct {
 	} `json:"error"`
 }
 
-type geminiStaticResponsePart struct {
-	Text         string `json:"text"`
-	FunctionCall *struct {
-		Name string         `json:"name"`
-		Args map[string]any `json:"args"`
-	} `json:"functionCall"`
+type geminiResponseFunctionCall struct {
+	Name string         `json:"name"`
+	Args map[string]any `json:"args"`
+}
+
+type geminiResponsePart struct {
+	Text         string                      `json:"text"`
+	FunctionCall *geminiResponseFunctionCall `json:"functionCall"`
 }
 
 type geminiStaticResponse struct {
 	Candidates []struct {
 		Content struct {
-			Parts []geminiStaticResponsePart `json:"parts"`
+			Parts []geminiResponsePart `json:"parts"`
 		} `json:"content"`
 	} `json:"candidates"`
 	UsageMetadata struct {
