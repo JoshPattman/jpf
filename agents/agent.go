@@ -3,7 +3,6 @@ package agents
 import (
 	"context"
 	"fmt"
-	"iter"
 	"slices"
 	"strings"
 
@@ -11,48 +10,53 @@ import (
 	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-const defaultAgentInstruction = `You are a ReAct agent.
-You will call tools until your job is complete, then you will provide a final response with no further tool calls to indicate you are finished iterating until the next task / message.`
-
-const defaultAgentPersonality = `Your name is simply 'AI Assistant'.`
-
-func NewAgent(maxIterations int, model jpf.Model) *Agent {
-	a := &Agent{
-		defaultAgentInstruction,
-		defaultAgentPersonality,
+func NewAgentInstance(model jpf.Model) *AgentInstance {
+	a := &AgentInstance{
+		DefaultSession(),
 		nil,
 		nil,
-		nil,
-		nil,
-		maxIterations,
+		20,
 		model,
 	}
-	a.SetCoreMessages(nil)
-	a.SetSkills(nil)
-	a.SetTools(nil)
+	a.SetSkillCatalogue(nil)
+	a.SetToolCatalogue(nil)
 	return a
 }
 
-type Agent struct {
-	agentInstruction       string
-	personalityInstruction string
-	coreMessages           []jpf.Message
-	tools                  []Tool
-	skills                 []Skill
-	activeSkills           []string
-	maxIterations          int
-	model                  jpf.Model
+type AgentInstance struct {
+	session        AgentSession
+	toolCatalogue  []Tool
+	skillCatalogue []Skill
+	maxIterations  int
+	model          jpf.Model
 }
 
-func (a *Agent) CoreMessages() iter.Seq[jpf.Message] {
-	return slices.Values(a.coreMessages)
+func (a *AgentInstance) Session() AgentSession {
+	return a.session.Clone()
 }
 
-func (a *Agent) Run(ctx context.Context, query string, messageCallback func(jpf.Message)) error {
+func (a *AgentInstance) SetSession(sess AgentSession) {
+	a.session = sess.Clone()
+}
+
+func (a *AgentInstance) SetMaxIterations(n int) {
+	a.maxIterations = n
+}
+
+func (a *AgentInstance) SetToolCatalogue(tools []Tool) {
+	a.toolCatalogue = slices.Concat(a.getBuiltinTools(), slices.Clone(tools))
+}
+
+func (a *AgentInstance) SetSkillCatalogue(skills []Skill) {
+	a.skillCatalogue = slices.Clone(skills)
+}
+
+func (a *AgentInstance) Run(ctx context.Context, query string, messageCallback func(jpf.Message)) error {
 	if messageCallback == nil {
 		messageCallback = func(jpf.Message) {}
 	}
-	a.coreMessages = append(a.coreMessages, jpf.UserMessage{Content: query})
+	a.deactivateMissingActiveSkills()
+	a.session.CoreMessages = append(a.session.CoreMessages, jpf.UserMessage{Content: query})
 	for range a.maxIterations {
 		nextAction, err := a.determineNextAction(ctx, messageCallback)
 		if err != nil {
@@ -70,27 +74,18 @@ func (a *Agent) Run(ctx context.Context, query string, messageCallback func(jpf.
 	return nil
 }
 
-func (a *Agent) SetTools(tools []Tool) {
-	a.tools = slices.Concat(a.getBuiltinTools(), slices.Clone(tools))
-}
-
-func (a *Agent) SetSkills(skills []Skill) {
-	a.skills = slices.Clone(skills)
+func (a *AgentInstance) deactivateMissingActiveSkills() {
 	nextActiveSkills := make([]string, 0)
-	for _, s := range a.activeSkills {
+	for _, s := range a.session.ActiveSkillNames {
 		_, err := a.lookupSkill(s)
 		if err == nil {
 			nextActiveSkills = append(nextActiveSkills, s)
 		}
 	}
-	a.activeSkills = nextActiveSkills
+	a.session.ActiveSkillNames = nextActiveSkills
 }
 
-func (a *Agent) SetCoreMessages(msgs []jpf.Message) {
-	a.coreMessages = slices.Clone(msgs)
-}
-
-func (a *Agent) getBuiltinTools() []Tool {
+func (a *AgentInstance) getBuiltinTools() []Tool {
 	activateSkillTool := Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "activate_skill",
@@ -113,14 +108,14 @@ func (a *Agent) getBuiltinTools() []Tool {
 			if !ok {
 				return "", fmt.Errorf("skill_name must be a string")
 			}
-			if slices.Contains(a.activeSkills, name) {
+			if slices.Contains(a.session.ActiveSkillNames, name) {
 				return "", fmt.Errorf("skill '%s' is already active", name)
 			}
 			skill, err := a.lookupSkill(name)
 			if err != nil {
 				return "", err
 			}
-			a.activeSkills = append(a.activeSkills, skill.Name)
+			a.session.ActiveSkillNames = append(a.session.ActiveSkillNames, skill.Name)
 			return fmt.Sprintf("activated skill '%s'", skill.Name), nil
 		},
 	}
@@ -147,14 +142,14 @@ func (a *Agent) getBuiltinTools() []Tool {
 			if !ok {
 				return "", fmt.Errorf("skill_name must be a string")
 			}
-			if !slices.Contains(a.activeSkills, name) {
+			if !slices.Contains(a.session.ActiveSkillNames, name) {
 				return "", fmt.Errorf("skill '%s' is not currently active", name)
 			}
 			skill, err := a.lookupSkill(name)
 			if err != nil {
 				return "", err
 			}
-			a.activeSkills = slices.DeleteFunc(a.activeSkills, func(s string) bool { return s == skill.Name })
+			a.session.ActiveSkillNames = slices.DeleteFunc(a.session.ActiveSkillNames, func(s string) bool { return s == skill.Name })
 			return fmt.Sprintf("deactivated skill '%s'", skill.Name), nil
 		},
 	}
@@ -164,7 +159,7 @@ func (a *Agent) getBuiltinTools() []Tool {
 	}
 }
 
-func (a *Agent) determineNextAction(ctx context.Context, messageCallback func(jpf.Message)) (jpf.AssistantMessage, error) {
+func (a *AgentInstance) determineNextAction(ctx context.Context, messageCallback func(jpf.Message)) (jpf.AssistantMessage, error) {
 	llmMessages := a.getMessagesForLLM()
 	response, err := a.model.Respond(
 		ctx,
@@ -174,12 +169,12 @@ func (a *Agent) determineNextAction(ctx context.Context, messageCallback func(jp
 	if err != nil {
 		return jpf.AssistantMessage{}, err
 	}
-	a.coreMessages = append(a.coreMessages, response.Message)
+	a.session.CoreMessages = append(a.session.CoreMessages, response.Message)
 	messageCallback(response.Message)
 	return response.Message, nil
 }
 
-func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.Message), action jpf.AssistantMessage) error {
+func (a *AgentInstance) executeToolCalls(ctx context.Context, messageCallback func(jpf.Message), action jpf.AssistantMessage) error {
 	tools := make([]Tool, len(action.ToolCalls))
 	for i, call := range action.ToolCalls {
 		tool, err := a.lookupTool(call.Tool)
@@ -202,15 +197,15 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 		} else {
 			msg.Result = result
 		}
-		a.coreMessages = append(a.coreMessages, msg)
+		a.session.CoreMessages = append(a.session.CoreMessages, msg)
 		messageCallback(msg)
 	}
 
 	return nil
 }
 
-func (a *Agent) lookupTool(name string) (Tool, error) {
-	for _, t := range a.tools {
+func (a *AgentInstance) lookupTool(name string) (Tool, error) {
+	for _, t := range a.toolCatalogue {
 		if t.Schema.Name == name {
 			return t, nil
 		}
@@ -218,15 +213,15 @@ func (a *Agent) lookupTool(name string) (Tool, error) {
 	return Tool{}, fmt.Errorf("could not find tool with name '%s'", name)
 }
 
-func (a *Agent) toolSchemas() []jpf.ToolSchema {
-	schemas := make([]jpf.ToolSchema, len(a.tools))
-	for i, t := range a.tools {
+func (a *AgentInstance) toolSchemas() []jpf.ToolSchema {
+	schemas := make([]jpf.ToolSchema, len(a.toolCatalogue))
+	for i, t := range a.toolCatalogue {
 		schemas[i] = t.Schema
 	}
 	return schemas
 }
 
-func (a *Agent) getMessagesForLLM() []jpf.Message {
+func (a *AgentInstance) getMessagesForLLM() []jpf.Message {
 	llmMessages := []jpf.Message{}
 	systemMessage := a.systemMessage()
 	if systemMessage != nil {
@@ -236,13 +231,13 @@ func (a *Agent) getMessagesForLLM() []jpf.Message {
 	if headState != nil {
 		llmMessages = append(llmMessages, headState)
 	}
-	llmMessages = append(llmMessages, a.coreMessages...)
+	llmMessages = append(llmMessages, a.session.CoreMessages...)
 	return llmMessages
 }
 
-func (a *Agent) getActiveSkills() []Skill {
+func (a *AgentInstance) getActiveSkills() []Skill {
 	activeSkills := make([]Skill, 0)
-	for _, name := range a.activeSkills {
+	for _, name := range a.session.ActiveSkillNames {
 		s, err := a.lookupSkill(name)
 		if err != nil {
 			continue
@@ -252,8 +247,8 @@ func (a *Agent) getActiveSkills() []Skill {
 	return activeSkills
 }
 
-func (a *Agent) lookupSkill(name string) (Skill, error) {
-	for _, s := range a.skills {
+func (a *AgentInstance) lookupSkill(name string) (Skill, error) {
+	for _, s := range a.skillCatalogue {
 		if s.Name == name {
 			return s, nil
 		}
@@ -261,8 +256,8 @@ func (a *Agent) lookupSkill(name string) (Skill, error) {
 	return Skill{}, fmt.Errorf("could not find skill with name '%s'", name)
 }
 
-func (a *Agent) headStateMessage() jpf.Message {
-	if len(a.skills) == 0 {
+func (a *AgentInstance) headStateMessage() jpf.Message {
+	if len(a.skillCatalogue) == 0 {
 		return nil
 	}
 	activeSkills := a.getActiveSkills()
@@ -272,8 +267,8 @@ func (a *Agent) headStateMessage() jpf.Message {
 		fmt.Fprintf(headState, "Skill '%s'\n%s\n\n", s.Name, s.Content)
 	}
 	headState.WriteString("# Available Skills\nBelow is a list of every skill that is avaiable for you to activate.\n")
-	for _, s := range a.skills {
-		if slices.Contains(a.activeSkills, s.Name) {
+	for _, s := range a.skillCatalogue {
+		if slices.Contains(a.session.ActiveSkillNames, s.Name) {
 			continue
 		}
 		fmt.Fprintf(headState, "Skill '%s', activate when: %s\n", s.Name, s.Description)
@@ -281,7 +276,7 @@ func (a *Agent) headStateMessage() jpf.Message {
 	return jpf.DeveloperMessage{Content: headState.String()}
 }
 
-func (a *Agent) systemMessage() jpf.Message {
-	prompt := fmt.Sprintf("# Instructions\n%s\n\n# Personality & Task\n%s", a.agentInstruction, a.personalityInstruction)
+func (a *AgentInstance) systemMessage() jpf.Message {
+	prompt := fmt.Sprintf("# Instructions\n%s\n\n# Personality\n%s\n\n# Task\n%s", a.session.AgentPrompt, a.session.PersonalityPrompt, a.session.TaskPrompt)
 	return jpf.SystemMessage{Content: prompt}
 }
