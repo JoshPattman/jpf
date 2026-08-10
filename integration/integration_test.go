@@ -27,11 +27,15 @@ func TestHelloModels(t *testing.T) {
 		models.NewRemote(models.OpenAIChatCompletions, "o3-mini", oaiKey, models.WithReasoningEffort(models.MediumReasoning)),
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-5", oaiKey),
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-5", oaiKey, models.WithVerbosity(models.MediumVerbosity)),
+		models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", oaiKey, models.WithReasoningEffort(models.NoneReasoning)),
+		models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", oaiKey, models.WithReasoningEffort(models.XHighReasoning)),
 		models.NewRemote(models.OpenAIResponses, "gpt-4.1", oaiKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-4.1", oaiKey, models.WithTemperature(0)),
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey, models.WithReasoningEffort(models.MediumReasoning)),
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey, models.WithVerbosity(models.MediumVerbosity)),
+		models.NewRemote(models.OpenAIResponses, "gpt-5.4", oaiKey, models.WithReasoningEffort(models.NoneReasoning)),
+		models.NewRemote(models.OpenAIResponses, "gpt-5.4", oaiKey, models.WithReasoningEffort(models.XHighReasoning)),
 	}
 	for i, model := range modelsToRun {
 		t.Run(fmt.Sprintf("configuration_%d", i), testHelloModel(models.Timeout(model, time.Minute)))

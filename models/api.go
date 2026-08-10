@@ -9,7 +9,8 @@ import (
 type ReasoningEffort uint8
 
 const (
-	LowReasoning ReasoningEffort = iota
+	NoneReasoning ReasoningEffort = iota
+	LowReasoning
 	MediumReasoning
 	HighReasoning
 	XHighReasoning

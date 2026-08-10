@@ -431,6 +431,8 @@ func (m *apiOpenAIResponsesModel) schema(obj any) (any, error) {
 
 func (m *apiOpenAIResponsesModel) reasoningEffort(re ReasoningEffort) string {
 	switch re {
+	case NoneReasoning:
+		return "none"
 	case LowReasoning:
 		return "low"
 	case MediumReasoning:
