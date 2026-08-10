@@ -11,7 +11,7 @@ Providing essential building blocks and robust LLM interaction interfaces, **jpf
 ## Features
 
 - **Retry and Feedback Handling**: Resilient mechanisms for retrying tasks and incorporating feedback into interactions.
-- **Customizable Models**: Seamlessly integrate LLMs from multiple providers using unified interfaces.
+- **Customizable Models**: Seamlessly integrate LLMs from multiple providers using unified interfaces — OpenAI (Chat Completions or Responses API) and Google Gemini are supported out of the box.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
 - **Stream Responses**: Keep your users engaged with responses that are streamed back as they are generated.
 - **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.
@@ -43,7 +43,7 @@ There are multiple examples available in the [examples](https://github.com/JoshP
 func BuildModel() jpf.Model {
 	// Create a new gpt-4o model attached to the OpenAI API.
 	model := models.NewRemote(
-		models.OpenAI, // Defines the API format and the default URL (URL can be overriden)
+		models.OpenAIChatCompletions, // Defines the API format and the default URL (URL can be overriden) - also supports models.OpenAIResponses and models.Google
 		"gpt-4o", // Model name on API
 		os.Getenv("OPENAI_KEY"), // API key
 		models.WithTemperature(0.5) // Optional params - many more are supported

@@ -68,7 +68,7 @@ func main() {
 // but I have added this here to show that it can be simplified.
 func BuildStructuredQuerier[T any]() (jpf.Pipeline[string, T], error) {
 	model := models.NewRemote(
-		models.OpenAI,
+		models.OpenAIChatCompletions,
 		"gpt-4o",
 		os.Getenv("OPENAI_KEY"),
 	)

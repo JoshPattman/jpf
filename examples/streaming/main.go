@@ -12,7 +12,7 @@ import (
 func main() {
 	// Create the model.
 	// We can still use normal encoders, decoders, and retry logic (do be aware that retries will call the onBegin callback again).
-	model := models.NewRemote(models.OpenAI, "gpt-4.1", os.Getenv("OPENAI_KEY"))
+	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-4.1", os.Getenv("OPENAI_KEY"))
 	//model := models.NewAPIModel(models.Google, "gemini-2.5-flash", os.Getenv("GEMINI_KEY"), models.WithStreamCallbacks(nil, onStream))
 
 	fmt.Println("===== Stream =====")

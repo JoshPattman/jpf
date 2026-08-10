@@ -30,7 +30,7 @@ func (m *mockLogger) Infos() []jpf.ModelLoggingInfo {
 }
 
 func TestConstructOtherModels(t *testing.T) {
-	model := NewRemote(OpenAI, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
+	model := NewRemote(OpenAIChatCompletions, "abc", "123", WithHeader("A", "B"), WithTemperature(0.5))
 	model = LimitConcurrency(model, semaphore.NewWeighted(1))
 	model = Log(model, NewMockLogger())
 	model = Retry(model, 10, WithDelay(time.Second))
