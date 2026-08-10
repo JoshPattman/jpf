@@ -53,7 +53,7 @@ type ModelBuilder struct {
 
 func (builder *ModelBuilder) Build(verbosity models.Verbosity, pPenalty float64) jpf.Model {
 	return models.NewRemote(
-		models.OpenAI,
+		models.OpenAIChatCompletions,
 		builder.OpenAIModelName,
 		builder.OpenAIKey,
 		models.WithVerbosity(verbosity),

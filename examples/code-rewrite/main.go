@@ -118,7 +118,7 @@ func (builder *ModelBuilder) Build(useGemini bool) jpf.Model {
 		name = builder.GeminiModelName
 		key = builder.GeminiKey
 	} else {
-		mode = models.OpenAI
+		mode = models.OpenAIChatCompletions
 		name = builder.OpenAIModelName
 		key = builder.OpenAIKey
 	}

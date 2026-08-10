@@ -26,8 +26,9 @@ const (
 type APIFormat uint8
 
 const (
-	OpenAI APIFormat = iota
+	OpenAIChatCompletions APIFormat = iota
 	Google
+	OpenAIResponses
 )
 
 type apiModelSettings struct {
@@ -98,10 +99,12 @@ func NewRemote(format APIFormat, name string, key string, opts ...APIModelOpt) j
 		opt(&settings)
 	}
 	switch format {
-	case OpenAI:
+	case OpenAIChatCompletions:
 		return &apiOpenAIModel{name, key, settings}
 	case Google:
 		return &apiGeminiModel{name, key, settings}
+	case OpenAIResponses:
+		return &apiOpenAIResponsesModel{name, key, settings}
 	default:
 		panic("unrecognised format")
 	}
@@ -109,10 +112,12 @@ func NewRemote(format APIFormat, name string, key string, opts ...APIModelOpt) j
 
 func getDefaultURL(format APIFormat) string {
 	switch format {
-	case OpenAI:
+	case OpenAIChatCompletions:
 		return "https://api.openai.com/v1/chat/completions"
 	case Google:
 		return "https://generativelanguage.googleapis.com/v1beta/models"
+	case OpenAIResponses:
+		return "https://api.openai.com/v1/responses"
 	default:
 		panic("unrecognised format")
 	}

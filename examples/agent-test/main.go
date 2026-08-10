@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	model := models.NewRemote(models.OpenAI, "gpt-5.4", os.Getenv("OPENAI_KEY"))
+	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
 	model = models.Retry(model, 3, models.WithDelay(time.Second))
 
 	agent := agents.NewAgent(model)
