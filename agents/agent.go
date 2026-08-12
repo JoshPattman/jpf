@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -190,12 +191,19 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 	}
 
 	for i, call := range action.ToolCalls {
-		result, err := tools[i].Call(ctx, call.Args)
 		msg := jpf.ToolResultMessage{CallID: call.ID}
+
+		args := maps.Clone(call.Args)
+		err := validateAndFixArgsForSchema(args, tools[i].Schema)
 		if err != nil {
 			msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
 		} else {
-			msg.Result = result
+			result, err := tools[i].Call(ctx, args)
+			if err != nil {
+				msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
+			} else {
+				msg.Result = result
+			}
 		}
 		a.session.CoreMessages = append(a.session.CoreMessages, msg)
 		messageCallback(msg)
