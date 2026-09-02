@@ -9,8 +9,11 @@ import (
 )
 
 type Tool struct {
+	// How and when can the agent call the tool, and what it should expect it to do.
 	Schema jpf.ToolSchema
-	Call   func(context.Context, map[string]any) (string, error)
+	// How should the agent framework run the tool.
+	// If not specified, the agent framework will break the loop and defer.
+	Call func(context.Context, map[string]any) (string, error)
 }
 
 // Fetches the arg from the tool args, must only be called on required args defined int he schema.

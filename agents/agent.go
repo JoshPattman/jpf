@@ -52,12 +52,84 @@ func (a *Agent) SetSkillCatalogue(skills []Skill) {
 	a.skillCatalogue = slices.Clone(skills)
 }
 
+// Run the agent from a new message to add into the conversation.
+// Should only be called if the agent is not currently awaiting deferred tool responses.
+// May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
 func (a *Agent) Run(ctx context.Context, query string, messageCallback func(jpf.Message)) error {
+	if len(a.CurrentDeferredToolCalls()) != 0 {
+		return fmt.Errorf("cannot run an agent from fresh when it is awaiting deferred calls, please use resume instead")
+	}
 	if messageCallback == nil {
 		messageCallback = func(jpf.Message) {}
 	}
+	msg := jpf.UserMessage{Content: query}
+	a.session.CoreMessages = append(a.session.CoreMessages, msg)
+	messageCallback(msg)
+	return a.runOrResumeHelper(ctx, messageCallback)
+}
+
+// Resume the agent from a set of responses to deferred tool calls to add into the conversation.
+// Should only be called if the agent is currently awaiting deferred tool responses.
+// May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
+func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, messageCallback func(jpf.Message)) error {
+	defCalls := a.CurrentDeferredToolCalls()
+	if len(defCalls) == 0 {
+		return fmt.Errorf("cannot resume an agent when it is not awaiting deferred calls, please use run instead")
+	}
+	if len(defCalls) != len(callResults) {
+		return fmt.Errorf("call results do not match the expected awaiting deferred calls")
+	}
+	if messageCallback == nil {
+		messageCallback = func(jpf.Message) {}
+	}
+	// Verify required calls are present
+	callIDs := make([]string, len(defCalls))
+	for i, call := range defCalls {
+		callIDs[i] = call.CallID
+	}
+	for _, res := range callResults {
+		if !slices.Contains(callIDs, res.CallID) {
+			return fmt.Errorf("call results do not match the expected awaiting deferred calls")
+		}
+	}
+	// Replace placeholder calls
+	sess := a.Session()
+	for _, result := range callResults {
+		for i := len(sess.CoreMessages) - 1; i >= 0; i-- {
+			resp, ok := sess.CoreMessages[i].(jpf.ToolResultMessage)
+			if !ok {
+				continue
+			}
+			if resp.CallID != result.CallID {
+				continue
+			}
+			if result.Err != nil {
+				resp.Result = fmt.Sprintf("The tool call failed with error: %s", result.Err.Error())
+			} else {
+				resp.Result = result.Result
+			}
+			sess.CoreMessages[i] = resp
+			break
+		}
+	}
+	// Run callback
+	for i, msg := range slices.Backward(sess.CoreMessages) {
+		_, ok := msg.(jpf.ToolResultMessage)
+		if !ok {
+			for j := i + 1; j < len(sess.CoreMessages); j++ {
+				messageCallback(sess.CoreMessages[j])
+			}
+			break
+		}
+	}
+
+	sess.CurrentDeferredToolCalls = nil
+	a.SetSession(sess)
+	return a.runOrResumeHelper(ctx, messageCallback)
+}
+
+func (a *Agent) runOrResumeHelper(ctx context.Context, messageCallback func(jpf.Message)) error {
 	a.deactivateMissingActiveSkills()
-	a.session.CoreMessages = append(a.session.CoreMessages, jpf.UserMessage{Content: query})
 	for range a.maxIterations {
 		nextAction, err := a.determineNextAction(ctx, messageCallback)
 		if err != nil {
@@ -71,8 +143,26 @@ func (a *Agent) Run(ctx context.Context, query string, messageCallback func(jpf.
 				return utils.Wrap(err, "failed to execute tools")
 			}
 		}
+		if len(a.session.CurrentDeferredToolCalls) > 0 {
+			break
+		}
 	}
 	return nil
+}
+
+type DeferredToolCall struct {
+	CallID string
+	Args   map[string]any
+}
+
+type DeferredCallResponse struct {
+	CallID string
+	Result string
+	Err    error
+}
+
+func (a *Agent) CurrentDeferredToolCalls() []DeferredToolCall {
+	return slices.Clone(a.Session().CurrentDeferredToolCalls)
 }
 
 func (a *Agent) deactivateMissingActiveSkills() {
@@ -190,6 +280,9 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 		}
 	}
 
+	deferredCalls := make([]DeferredToolCall, 0)
+	toCallback := make([]jpf.ToolResultMessage, 0)
+
 	for i, call := range action.ToolCalls {
 		msg := jpf.ToolResultMessage{CallID: call.ID}
 
@@ -197,6 +290,9 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 		err := validateAndFixArgsForSchema(args, tools[i].Schema)
 		if err != nil {
 			msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
+		} else if tools[i].Call == nil {
+			msg.Result = ""
+			deferredCalls = append(deferredCalls, DeferredToolCall{msg.CallID, args})
 		} else {
 			result, err := tools[i].Call(ctx, args)
 			if err != nil {
@@ -206,7 +302,15 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 			}
 		}
 		a.session.CoreMessages = append(a.session.CoreMessages, msg)
-		messageCallback(msg)
+		toCallback = append(toCallback, msg)
+	}
+
+	if len(deferredCalls) == 0 {
+		for _, msg := range toCallback {
+			messageCallback(msg)
+		}
+	} else {
+		a.session.CurrentDeferredToolCalls = append(a.session.CurrentDeferredToolCalls, deferredCalls...)
 	}
 
 	return nil

@@ -27,6 +27,8 @@ type AgentSession struct {
 	PersonalityPrompt string
 	// The messages, excluding system and other special messages.
 	CoreMessages []jpf.Message
+	// The current tool calls that have been deferred, with their validated args.
+	CurrentDeferredToolCalls []DeferredToolCall
 	// The names of the skills that should currently be active.
 	ActiveSkillNames []string
 }
@@ -37,6 +39,7 @@ func (a AgentSession) Clone() AgentSession {
 		a.TaskPrompt,
 		a.PersonalityPrompt,
 		slices.Clone(a.CoreMessages),
+		slices.Clone(a.CurrentDeferredToolCalls),
 		slices.Clone(a.ActiveSkillNames),
 	}
 }
