@@ -33,23 +33,26 @@ type AgentSessionDTO struct {
 
 // DeferredToolCallDTO is a JSON-serialisable representation of a DeferredToolCall.
 type DeferredToolCallDTO struct {
-	CallID string         `json:"call_id"`
-	Args   map[string]any `json:"args,omitempty"`
+	ToolName string         `json:"tool_name"`
+	CallID   string         `json:"call_id"`
+	Args     map[string]any `json:"args,omitempty"`
 }
 
 // LoadDeferredToolCall populates the DTO in place from call, replacing any existing contents.
 func (d *DeferredToolCallDTO) LoadDeferredToolCall(call DeferredToolCall) {
 	*d = DeferredToolCallDTO{
-		CallID: call.CallID,
-		Args:   maps.Clone(call.Args),
+		ToolName: call.ToolName,
+		CallID:   call.CallID,
+		Args:     maps.Clone(call.Args),
 	}
 }
 
 // ToDeferredToolCall converts the DTO back into the DeferredToolCall it represents.
 func (d *DeferredToolCallDTO) ToDeferredToolCall() DeferredToolCall {
 	return DeferredToolCall{
-		CallID: d.CallID,
-		Args:   maps.Clone(d.Args),
+		ToolName: d.ToolName,
+		CallID:   d.CallID,
+		Args:     maps.Clone(d.Args),
 	}
 }
 

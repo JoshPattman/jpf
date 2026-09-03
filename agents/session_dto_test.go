@@ -21,7 +21,7 @@ func TestAgentSessionDTORoundTrip(t *testing.T) {
 			jpf.ToolResultMessage{CallID: "c1", Result: "done"},
 		},
 		CurrentDeferredToolCalls: []DeferredToolCall{
-			{CallID: "c2", Args: map[string]any{"path": "/tmp"}},
+			{ToolName: "read_file", CallID: "c2", Args: map[string]any{"path": "/tmp"}},
 		},
 		ActiveSkillNames: []string{"skill-a", "skill-b"},
 	}
@@ -57,7 +57,7 @@ func TestAgentSessionDTORoundTrip(t *testing.T) {
 			t.Fatalf("message %d mismatch:\n got: %s\nwant: %s", i, got.CoreMessages[i], sess.CoreMessages[i])
 		}
 	}
-	if len(got.CurrentDeferredToolCalls) != 1 || got.CurrentDeferredToolCalls[0].CallID != "c2" {
+	if len(got.CurrentDeferredToolCalls) != 1 || got.CurrentDeferredToolCalls[0].CallID != "c2" || got.CurrentDeferredToolCalls[0].ToolName != "read_file" {
 		t.Fatalf("deferred calls did not round-trip: %+v", got.CurrentDeferredToolCalls)
 	}
 	if got.CurrentDeferredToolCalls[0].Args["path"] != "/tmp" {

@@ -151,8 +151,9 @@ func (a *Agent) runOrResumeHelper(ctx context.Context, messageCallback func(jpf.
 }
 
 type DeferredToolCall struct {
-	CallID string
-	Args   map[string]any
+	ToolName string
+	CallID   string
+	Args     map[string]any
 }
 
 type DeferredCallResponse struct {
@@ -278,7 +279,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 			msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
 		} else if tools[i].Call == nil {
 			msg.Result = ""
-			deferredCalls = append(deferredCalls, DeferredToolCall{msg.CallID, args})
+			deferredCalls = append(deferredCalls, DeferredToolCall{call.Tool, msg.CallID, args})
 		} else {
 			result, err := tools[i].Call(ctx, args)
 			if err != nil {
