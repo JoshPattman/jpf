@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/JoshPattman/jpf/caches"
 	"github.com/JoshPattman/jpf/internal/utils"
 	"golang.org/x/sync/semaphore"
+	"golang.org/x/time/rate"
 )
 
 func NewMockLogger() *mockLogger {
@@ -329,6 +331,115 @@ func TestMultiDispatchModelWithAllFails(t *testing.T) {
 	_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
 	if err == nil {
 		t.Fatal("expected error but got none")
+	}
+}
+
+func TestRateLimitModel(t *testing.T) {
+	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
+		"hello": {"hi"},
+	}}
+	model = RateLimit(model, rate.NewLimiter(rate.Inf, 1))
+	resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Message.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", resp.Message.Content)
+	}
+
+	t.Run("errors when the request exceeds the limiter's burst", func(t *testing.T) {
+		model := RateLimit(&utils.TestingModel{}, rate.NewLimiter(rate.Every(time.Hour), 0))
+		_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
+		if err == nil {
+			t.Fatal("expected an error but got none")
+		}
+	})
+}
+
+func TestMapModel(t *testing.T) {
+	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
+		"HELLO": {"hi"},
+	}}
+	model = Map(model, func(msg jpf.Message) jpf.Message {
+		sys := msg.(jpf.SystemMessage)
+		return jpf.SystemMessage{Content: strings.ToUpper(sys.Content)}
+	})
+	resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Message.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", resp.Message.Content)
+	}
+}
+
+func TestLimitConcurrencyModel(t *testing.T) {
+	var model jpf.Model = &utils.TestingModel{Responses: map[string][]string{
+		"hello": {"hi"},
+	}}
+	model = LimitConcurrency(model, semaphore.NewWeighted(1))
+	resp, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp.Message.Content != "hi" {
+		t.Fatalf("expected 'hi' but got '%v'", resp.Message.Content)
+	}
+
+	t.Run("errors when the semaphore cannot be acquired", func(t *testing.T) {
+		sem := semaphore.NewWeighted(1)
+		if !sem.TryAcquire(1) {
+			t.Fatal("failed to pre-acquire semaphore")
+		}
+		limited := LimitConcurrency(&utils.TestingModel{}, sem)
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := limited.Respond(ctx, []jpf.Message{jpf.SystemMessage{Content: "hello"}})
+		if err == nil {
+			t.Fatal("expected an error but got none")
+		}
+	})
+}
+
+func TestCountUsageModel(t *testing.T) {
+	inner := &utils.SlowTestingModel{
+		Response: jpf.ModelResponse{
+			Message: jpf.AssistantMessage{Content: "hi"},
+			Usage:   jpf.Usage{InputTokens: 3, OutputTokens: 5},
+		},
+	}
+	counter := NewUsageCounter()
+	model := CountUsage(inner, counter)
+	for range 2 {
+		_, err := model.Respond(context.Background(), []jpf.Message{jpf.SystemMessage{Content: "hello"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	got := counter.Get()
+	if got.InputTokens != 6 || got.OutputTokens != 10 {
+		t.Fatalf("expected accumulated usage, got %+v", got)
+	}
+}
+
+func TestTransformByPrefix(t *testing.T) {
+	f := TransformByPrefix("pre-")
+	if got := f("fix"); got != "pre-fix" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestFailedResponse(t *testing.T) {
+	resp := failedResponse()
+	if resp.Usage.FailedCalls != 1 {
+		t.Fatalf("got %+v", resp)
+	}
+}
+
+func TestFailedResponseAfter(t *testing.T) {
+	resp := failedResponseAfter(jpf.Usage{InputTokens: 5})
+	if resp.Usage.FailedCalls != 1 || resp.Usage.InputTokens != 5 {
+		t.Fatalf("got %+v", resp)
 	}
 }
 
