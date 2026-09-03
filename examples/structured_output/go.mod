@@ -3,7 +3,7 @@ module soutput
 go 1.24.0
 
 require (
-	github.com/JoshPattman/jpf v0.10.0
+	github.com/JoshPattman/jpf v0.11.0-beta.5
 	github.com/invopop/jsonschema v0.13.0
 )
 

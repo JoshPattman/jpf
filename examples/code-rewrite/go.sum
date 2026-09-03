@@ -1,5 +1,5 @@
-github.com/JoshPattman/jpf v0.10.0 h1:HfkHuM/paHj3Z7bxwjmVIiSWORScZtzzc+YInUK4VFU=
-github.com/JoshPattman/jpf v0.10.0/go.mod h1:uAM7PW11vdtDFgOuOeSEb1ye6NiY3M3XC4E+hf2UAqA=
+github.com/JoshPattman/jpf v0.11.0-beta.5 h1:8RObC4FHfXkDIbEZlWvwj/TqnBQfcouwtMI7FT8Kcfo=
+github.com/JoshPattman/jpf v0.11.0-beta.5/go.mod h1:uAM7PW11vdtDFgOuOeSEb1ye6NiY3M3XC4E+hf2UAqA=
 github.com/bahlo/generic-list-go v0.2.0 h1:5sz/EEAK+ls5wF+NeqDpk5+iNdMDXrh3z3nPnH1Wvgk=
 github.com/bahlo/generic-list-go v0.2.0/go.mod h1:2KvAjgMlE5NNynlg/5iLrrCCZ2+5xWbdbCW3pNTGyYg=
 github.com/buger/jsonparser v1.1.1 h1:2PnMjfWD7wBILjqQbt530v576A/cAbQvEW9gGIpYMUs=
