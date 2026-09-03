@@ -25,20 +25,4 @@ jobs:
         run: go test -v -coverprofile=coverage.out ./...
 
       - name: Coverage summary
-        run: |
-          awk -F: '
-          NR==1 { next }
-          {
-            n = split($1, f, "/")
-            pkg = f[1]
-            for (i = 2; i < n; i++) pkg = pkg "/" f[i]
-            split($2, rest, " ")
-            stmts = rest[2]; count = rest[3]
-            total[pkg] += stmts
-            if (count + 0 > 0) covered[pkg] += stmts
-          }
-          END {
-            for (p in total) printf "%-45s %6.1f%%\n", p, 100 * covered[p] / total[p]
-          }
-          ' coverage.out | sort
-          go tool cover -func=coverage.out | tail -1
+        run: go tool cover -func=coverage.out | tail -1
