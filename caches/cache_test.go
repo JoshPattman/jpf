@@ -2,41 +2,75 @@ package caches
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/JoshPattman/jpf"
+	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-func TestFileCacheMissThenHit(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "cache.gob")
-	cache, err := NewFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+type CacheCase struct {
+	ID    string
+	Build func() jpf.ModelResponseCache
+}
+
+func (c CacheCase) Name() string { return c.ID }
+
+func (c CacheCase) Test() error {
+	cache := c.Build()
 	msgs := []jpf.Message{jpf.UserMessage{Content: "hi"}}
 
-	hit, _, err := cache.GetCachedResponse(context.Background(), "salt", msgs)
+	hit, resp, err := cache.GetCachedResponse(context.Background(), "salt", msgs)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	if hit {
-		t.Fatal("expected a miss on an empty cache")
+		return fmt.Errorf("expected a miss, got %+v", resp)
 	}
 
 	want := jpf.AssistantMessage{Content: "hello"}
 	if err := cache.SetCachedResponse(context.Background(), "salt", msgs, want); err != nil {
-		t.Fatal(err)
+		return err
 	}
 
-	hit, resp, err := cache.GetCachedResponse(context.Background(), "salt", msgs)
+	hit, resp, err = cache.GetCachedResponse(context.Background(), "salt", msgs)
 	if err != nil {
-		t.Fatal(err)
+		return err
 	}
 	if !hit || resp.Content != want.Content {
-		t.Fatalf("expected a hit with %+v, got hit=%v resp=%+v", want, hit, resp)
+		return fmt.Errorf("expected a hit with %+v, got hit=%v resp=%+v", want, hit, resp)
 	}
+
+	hit, _, err = cache.GetCachedResponse(context.Background(), "other-salt", msgs)
+	if err != nil {
+		return err
+	}
+	if hit {
+		return errors.New("expected a different salt to miss")
+	}
+	return nil
+}
+
+func newTempFileCache() jpf.ModelResponseCache {
+	path := filepath.Join(os.TempDir(), fmt.Sprintf("jpf-cache-test-%d.gob", time.Now().UnixNano()))
+	cache, err := NewFile(path)
+	if err != nil {
+		panic(err)
+	}
+	return cache
+}
+
+var CacheCases = []utils.TestCase{
+	CacheCase{ID: "memory", Build: func() jpf.ModelResponseCache { return NewRAM() }},
+	CacheCase{ID: "file", Build: newTempFileCache},
+}
+
+func TestCache(t *testing.T) {
+	utils.RunTests(t, CacheCases)
 }
 
 func TestFileCachePersistsAcrossInstances(t *testing.T) {
