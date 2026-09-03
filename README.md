@@ -4,6 +4,8 @@
 
 [![Go Ref](https://pkg.go.dev/static/frontend/badge/badge.svg)](https://pkg.go.dev/github.com/JoshPattman/jpf)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Unit Tests](https://github.com/JoshPattman/jpf/actions/workflows/ci.yml/badge.svg)](https://github.com/JoshPattman/jpf/actions/workflows/ci.yml)
+[![Integration Tests](https://github.com/JoshPattman/jpf/actions/workflows/integration.yml/badge.svg)](https://github.com/JoshPattman/jpf/actions/workflows/integration.yml)
 
 Providing essential building blocks and robust LLM interaction interfaces, **jpf** enables you to craft custom AI solutions without the bloat.
 
@@ -18,6 +20,7 @@ Providing essential building blocks and robust LLM interaction interfaces, **jpf
 - **Industry Standard Context Management**: All potentially slow interfaces support Go's context.Context for timeouts and cancellation.
 - **Rate Limit Management**: Compose models together to set local rate limits to prevent API errors.
 - **Tool / Function calling**: Let your models call tools with static or streamed requests.
+- **Agent Framework**: Compose a ReAct-style agent on top of any model, complete with tool calling, skills, deferred (async) tool execution, and JSON-serialisable sessions for saving / resuming across process boundaries.
 - **MIT License**: Use the code for anything, anywhere, for free.
 
 ## Installation
@@ -28,11 +31,11 @@ Install jpf in your Go project via:
 go get github.com/JoshPattman/jpf
 ```
 
-Learn more about JPF in the [Core Concepts](#core-concepts) section.
+Learn more about JPF in the [Quickstart](#quickstart) section.
 
 ## Quickstart
 
-There are multiple examples available in the [examples](https://github.com/JoshPattman/jpf/examples) directory.
+There are multiple examples available in the [examples](https://github.com/JoshPattman/jpf/tree/main/examples) directory.
 
 ### Build a model
 - A model is capable of responding to a set of messages, and are the core engine behind all of your AI features.
@@ -95,15 +98,14 @@ func BuildPipeline(model jpf.Model) jpf.Pipeline[TaskInput, TaskOutput] {
 	parser = parsers.SubstringJsonObject(parser)
 	// When retrying, will provide fedback by simply formatting the error
 	feedback := feedbacks.NewErrString()
-	// Create a pipeline that retries up to 5 times on parsing or validation errors, providing feedback as developer
+	// Create a pipeline that retries up to 5 times on parsing or validation errors
 	return pipelines.NewFeedbackRetry(
 		encoder,
 		parser,
-		&CustomValidator{}, // This is allowed to be nil if no further validation is required
 		feedback,
 		model,
-		jpf.DeveloperRole,
 		5,
+		pipelines.WithValidator(&CustomValidator{}), // Optional - omit if no further validation is required
 	)
 }
 ```
@@ -116,25 +118,65 @@ func IsCelebrity(name string) (bool, error) {
 	// as this allows for higher testability and customisability.
 	model := BuildModel()
 	pipeline := BuildPipeline(model)
-	// Calling a pipeline gives result, usage, and error
-	result, usage, err := pipeline.Call(context.Background(), TaskInput{name})
+	// Calling a pipeline gives a result (with the parsed value and usage), and an error
+	resp, err := pipeline.Call(context.Background(), TaskInput{name})
 	if err != nil {
 		return false, err
 	}
-	fmt.Println(usage)
-	return result.IsCelebrity, nil
+	fmt.Println(resp.Usage)
+	return resp.Result.IsCelebrity, nil
 }
 ```
 
+### Build an agent
+- An agent wraps a model in a ReAct loop, calling tools across multiple turns until it decides it is done.
+- Give it a `[]agents.Tool`, each with a `jpf.ToolSchema` describing it to the model, and a `Call` that runs it.
+- Leaving a tool's `Call` as `nil` defers it instead of running it inline - the agent pauses and hands you back the pending calls (via `agent.CurrentDeferredToolCalls()`) to resolve however you like (e.g. a background job), then you `Resume` it with the results. See the [deferred-agent example](examples/deferred-agent) for a full save / resume flow.
+- An agent's session (prompts, message history, active skills, pending deferred calls) can be round-tripped through JSON with `agents.AgentSessionDTO`, so an agent can be persisted and picked back up by a different process.
+- Skills (`agent.SetSkillCatalogue`) are optional blocks of context an agent can activate / deactivate for itself via built-in tools, so you can offer it extra guidance without bloating every request with all of it up front.
+
+```go
+func BuildAgent(model jpf.Model) *agents.Agent {
+	agent := agents.NewAgent(model)
+	agent.SetToolCatalogue([]agents.Tool{
+		{
+			Schema: jpf.ToolSchema{
+				Name:        "ping_user",
+				Description: "Ping the user, only use when asked to ping",
+				Args:        nil,
+			},
+			Call: func(_ context.Context, m map[string]any) (string, error) {
+				fmt.Println("PING")
+				return "the user has been pinged", nil
+			},
+		},
+	})
+	return agent
+}
+```
+
+### Run the agent
+```go
+func RunAgent(agent *agents.Agent) {
+	// Run drives the agent until it stops calling tools, hits its iteration
+	// limit, or defers a tool call. The callback is fired for every message
+	// added to the conversation along the way.
+	err := agent.Run(
+		context.Background(),
+		"Ping me",
+		func(m jpf.Message) { fmt.Printf("%v\n", m) },
+	)
+	if err != nil {
+		panic(err)
+	}
+}
+```
 
 ## FAQ
 - I want to change my model's temperature/structured output/output tokens/... after I have built it!
 	- The intention is to provide functions that need to use an LLM with a builder function instead of a built object. This way, you can use the builder function multiple times with different parameters.
 	- Take a look at the examples to see this concept.
 	- This design decision was made as it prevents you from injecting unnecessary LLM-related data into business logic.
-- Where are the agents?
-	- Agents are built on top of LLMs, but this package is designed for LLM handling, so it lives at the level below agents.
-	- Take a look at [JChat](https://github.com/JoshPattman/agent/cmd/jchat) or [react](https://github.com/JoshPattman/react) to see how you can build an agent on top of JPF.
 - Why does this not support MCP tools on the OpenAI API / Other advanced API features?
 	- Relying on API features like MCP tools (and full API agents), or vector stores is not ideal for two reasons: (a) it makes it harder to move between API/model providers (b) it gives you less flexibility and control.
 	- These features are not particularly hard to add locally, so you should aim to do so to ensure your application is as robust as possible to API change.
