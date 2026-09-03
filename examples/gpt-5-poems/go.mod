@@ -2,7 +2,7 @@ module gpt5poems
 
 go 1.24.0
 
-require github.com/JoshPattman/jpf v0.10.0
+require github.com/JoshPattman/jpf v0.11.0-beta.5
 
 require (
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
