@@ -20,4 +20,14 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
-        run: go test --tags integration -v ./integration/
+        run: go test --tags integration -v -coverprofile=integration.out -coverpkg=./... ./integration/
+
+      - name: Run unit tests for coverage
+        run: go test -coverprofile=unit.out ./...
+
+      - name: Overall coverage
+        run: |
+          head -n1 unit.out > merged.out
+          tail -n +2 unit.out >> merged.out
+          tail -n +2 integration.out >> merged.out
+          go tool cover -func=merged.out | tail -1

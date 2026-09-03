@@ -14,7 +14,8 @@ func HashMessages(salt string, inputs []jpf.Message) string {
 	s.WriteString(salt)
 	s.WriteString("Messages")
 	for _, msg := range inputs {
-		s.WriteString(messageToString(msg) + ";")
+		msgString := messageToString(msg) + ";"
+		s.WriteString(msgString)
 	}
 	src := s.String()
 	hasher := sha256.New()
