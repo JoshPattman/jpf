@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"sync"
@@ -13,20 +15,7 @@ import (
 )
 
 func main() {
-	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
-	model = models.Retry(model, 3, models.WithDelay(time.Second))
-
-	agent := agents.NewAgent(model)
-	agent.SetToolCatalogue([]agents.Tool{
-		{
-			Schema: jpf.ToolSchema{
-				Name:        "ping_user",
-				Description: "Ping the user, only use when asked to ping. When they are ready, they will pong you back.",
-				Args:        nil,
-			},
-			Call: nil, // To make a call deferred, simply do not include an auto-run function.
-		},
-	})
+	agent := createEmptyAgent()
 	messageCallback := func(m jpf.Message) {
 		fmt.Printf("%v\n", m)
 	}
@@ -65,8 +54,55 @@ func main() {
 				panic("not possible")
 			}
 		}
+		// Now we have set off the tasks, its safe to save the agent to a json file
+		file := bytes.NewBuffer(nil)
+		sessionDTO := agents.AgentSessionDTO{}
+		err = sessionDTO.LoadSession(agent.Session())
+		if err != nil {
+			panic(err)
+		}
+		err = json.NewEncoder(file).Encode(sessionDTO)
+		if err != nil {
+			panic(err)
+		}
+
 		wg.Wait()
+
+		// This could be a completely different service - notice how only data that can be serialised is needed
 		fmt.Println("Resuming agent")
-		agent.Resume(context.Background(), defResponses, messageCallback)
+		agent2 := createEmptyAgent()
+		sessionDTO2 := agents.AgentSessionDTO{}
+		err = json.NewDecoder(file).Decode(&sessionDTO2)
+		if err != nil {
+			panic(err)
+		}
+		session2, err := sessionDTO2.ToSession()
+		if err != nil {
+			panic(err)
+		}
+		agent2.SetSession(session2)
+		if err := agent2.Resume(context.Background(), defResponses, messageCallback); err != nil {
+			panic(err)
+		}
+
+		// Ensure the loop checks the updated agent state
+		agent = agent2
 	}
+}
+
+func createEmptyAgent() *agents.Agent {
+	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
+	model = models.Retry(model, 3, models.WithDelay(time.Second))
+	agent := agents.NewAgent(model)
+	agent.SetToolCatalogue([]agents.Tool{
+		{
+			Schema: jpf.ToolSchema{
+				Name:        "ping_user",
+				Description: "Ping the user, only use when asked to ping. When they are ready, they will pong you back.",
+				Args:        nil,
+			},
+			Call: nil, // To make a call deferred, simply do not include an auto-run function.
+		},
+	})
+	return agent
 }
