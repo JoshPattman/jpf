@@ -191,14 +191,7 @@ func (a *Agent) getBuiltinTools() []Tool {
 			},
 		},
 		Call: func(_ context.Context, m map[string]any) (string, error) {
-			nameAny, ok := m["skill_name"]
-			if !ok {
-				return "", fmt.Errorf("must provide skill_name")
-			}
-			name, ok := nameAny.(string)
-			if !ok {
-				return "", fmt.Errorf("skill_name must be a string")
-			}
+			name := RequiredArg[string](m, "name")
 			if slices.Contains(a.session.ActiveSkillNames, name) {
 				return "", fmt.Errorf("skill '%s' is already active", name)
 			}
@@ -225,14 +218,7 @@ func (a *Agent) getBuiltinTools() []Tool {
 			},
 		},
 		Call: func(_ context.Context, m map[string]any) (string, error) {
-			nameAny, ok := m["skill_name"]
-			if !ok {
-				return "", fmt.Errorf("must provide skill_name")
-			}
-			name, ok := nameAny.(string)
-			if !ok {
-				return "", fmt.Errorf("skill_name must be a string")
-			}
+			name := RequiredArg[string](m, "name")
 			if !slices.Contains(a.session.ActiveSkillNames, name) {
 				return "", fmt.Errorf("skill '%s' is not currently active", name)
 			}
