@@ -30,6 +30,7 @@ const (
 	OpenAIChatCompletions APIFormat = iota
 	Google
 	OpenAIResponses
+	Anthropic
 )
 
 type apiModelSettings struct {
@@ -106,6 +107,8 @@ func NewRemote(format APIFormat, name string, key string, opts ...APIModelOpt) j
 		return &apiGeminiModel{name, key, settings}
 	case OpenAIResponses:
 		return &apiOpenAIResponsesModel{name, key, settings}
+	case Anthropic:
+		return &apiAnthropicModel{name, key, settings}
 	default:
 		panic("unrecognised format")
 	}
@@ -119,6 +122,8 @@ func getDefaultURL(format APIFormat) string {
 		return "https://generativelanguage.googleapis.com/v1beta/models"
 	case OpenAIResponses:
 		return "https://api.openai.com/v1/responses"
+	case Anthropic:
+		return "https://api.anthropic.com/v1/messages"
 	default:
 		panic("unrecognised format")
 	}

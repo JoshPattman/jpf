@@ -20,6 +20,7 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           GEMINI_KEY: ${{ secrets.GEMINI_KEY }}
+          ANTHROPIC_KEY: ${{ secrets.ANTHROPIC_KEY }}
         run: go test --tags integration -v -coverprofile=integration.out -coverpkg=./... ./integration/
 
       - name: Run unit tests for coverage

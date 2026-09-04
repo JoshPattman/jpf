@@ -17,6 +17,7 @@ import (
 func TestHelloModels(t *testing.T) {
 	oaiKey := os.Getenv("OPENAI_KEY")
 	gemKey := os.Getenv("GEMINI_KEY")
+	anthKey := os.Getenv("ANTHROPIC_KEY")
 	modelsToRun := []jpf.Model{
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-4.1", oaiKey),
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-4.1", oaiKey, models.WithTemperature(0)),
@@ -36,6 +37,7 @@ func TestHelloModels(t *testing.T) {
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey, models.WithVerbosity(models.MediumVerbosity)),
 		models.NewRemote(models.OpenAIResponses, "gpt-5.4", oaiKey, models.WithReasoningEffort(models.NoneReasoning)),
 		models.NewRemote(models.OpenAIResponses, "gpt-5.4", oaiKey, models.WithReasoningEffort(models.XHighReasoning)),
+		models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey),
 	}
 	for i, model := range modelsToRun {
 		t.Run(fmt.Sprintf("configuration_%d", i), testHelloModel(models.Timeout(model, time.Minute)))
@@ -64,6 +66,7 @@ func testHelloModel(model jpf.Model) func(t *testing.T) {
 func TestToolCallModels(t *testing.T) {
 	oaiKey := os.Getenv("OPENAI_KEY")
 	gemKey := os.Getenv("GEMINI_KEY")
+	anthKey := os.Getenv("ANTHROPIC_KEY")
 	modelsToRun := []jpf.Model{
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-4.1", oaiKey),
 		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
@@ -71,6 +74,7 @@ func TestToolCallModels(t *testing.T) {
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-5", oaiKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-4.1", oaiKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey),
+		models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey),
 	}
 	for i, model := range modelsToRun {
 		t.Run(fmt.Sprintf("configuration_%d", i), testToolCallModel(models.Timeout(model, time.Minute)))
@@ -132,6 +136,7 @@ func testToolCallModel(model jpf.Model) func(t *testing.T) {
 func TestStructuredOutputs(t *testing.T) {
 	oaiKey := os.Getenv("OPENAI_KEY")
 	gemKey := os.Getenv("GEMINI_KEY")
+	anthKey := os.Getenv("ANTHROPIC_KEY")
 	modelsToRun := []jpf.Model{
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-4.1", oaiKey),
 		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
@@ -139,6 +144,7 @@ func TestStructuredOutputs(t *testing.T) {
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-5", oaiKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-4.1", oaiKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey),
+		models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey),
 	}
 	for i, model := range modelsToRun {
 		t.Run(fmt.Sprintf("configuration_%d", i), testStructuredOutput(models.Timeout(model, time.Minute)))
@@ -172,10 +178,12 @@ func testStructuredOutput(model jpf.Model) func(t *testing.T) {
 func TestStreamToolCallModels(t *testing.T) {
 	oaiKey := os.Getenv("OPENAI_KEY")
 	gemKey := os.Getenv("GEMINI_KEY")
+	anthKey := os.Getenv("ANTHROPIC_KEY")
 	modelsToRun := []jpf.Model{
 		models.NewRemote(models.OpenAIChatCompletions, "gpt-5", oaiKey),
 		models.NewRemote(models.Google, "gemini-2.5-flash", gemKey),
 		models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey),
+		models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey),
 	}
 	for i, model := range modelsToRun {
 		t.Run(fmt.Sprintf("configuration_%d", i), testStreamToolCallModel(models.Timeout(model, time.Minute)))
