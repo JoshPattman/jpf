@@ -12,7 +12,7 @@ Providing essential building blocks and robust LLM interaction interfaces, **jpf
 ## Features
 
 - **Retry and Feedback Handling**: Resilient mechanisms for retrying tasks and incorporating feedback into interactions.
-- **Customizable Models**: Seamlessly integrate LLMs from multiple providers using unified interfaces — OpenAI (Chat Completions or Responses API) and Google Gemini are supported out of the box.
+- **Customizable Models**: Seamlessly integrate LLMs from multiple providers using unified interfaces — OpenAI (Chat Completions or Responses API), Google Gemini, and Anthropic Claude are supported out of the box.
 - **Token Usage Tracking**: Stay informed of API token consumption for cost-effective development.
 - **Stream Responses**: Keep your users engaged with responses that are streamed back as they are generated.
 - **Easy-to-use Caching**: Reduce the calls made to models by composing a caching layer onto an existing model.

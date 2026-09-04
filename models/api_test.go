@@ -70,6 +70,7 @@ func TestGetDefaultURL(t *testing.T) {
 		{OpenAIChatCompletions, "https://api.openai.com/v1/chat/completions"},
 		{Google, "https://generativelanguage.googleapis.com/v1beta/models"},
 		{OpenAIResponses, "https://api.openai.com/v1/responses"},
+		{Anthropic, "https://api.anthropic.com/v1/messages"},
 	}
 	for _, tt := range tests {
 		if got := getDefaultURL(tt.format); got != tt.want {
@@ -102,6 +103,7 @@ func TestNewRemoteConstructsCorrectModelType(t *testing.T) {
 		{OpenAIChatCompletions, func(m jpf.Model) bool { _, ok := m.(*apiOpenAIModel); return ok }},
 		{Google, func(m jpf.Model) bool { _, ok := m.(*apiGeminiModel); return ok }},
 		{OpenAIResponses, func(m jpf.Model) bool { _, ok := m.(*apiOpenAIResponsesModel); return ok }},
+		{Anthropic, func(m jpf.Model) bool { _, ok := m.(*apiAnthropicModel); return ok }},
 	}
 	for _, tt := range tests {
 		model := NewRemote(tt.format, "name", "key")
