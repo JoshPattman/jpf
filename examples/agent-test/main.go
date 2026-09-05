@@ -23,9 +23,9 @@ func main() {
 				Description: "Ping the user, only use when asked to ping",
 				Args:        nil,
 			},
-			Call: func(_ context.Context, m map[string]any) (string, error) {
+			Call: func(_ context.Context, m map[string]any) (agents.ToolResult, error) {
 				fmt.Println("PING")
-				return "the user has been pinged, you **must** now call the pong tool", nil
+				return agents.ToolResult{Content: "the user has been pinged, you **must** now call the pong tool"}, nil
 			},
 		},
 		{
@@ -34,9 +34,9 @@ func main() {
 				Description: "Pong the user, only used when asked to pong",
 				Args:        nil,
 			},
-			Call: func(_ context.Context, m map[string]any) (string, error) {
+			Call: func(_ context.Context, m map[string]any) (agents.ToolResult, error) {
 				fmt.Println("PONG")
-				return "the user has been ponged", nil
+				return agents.ToolResult{Content: "the user has been ponged"}, nil
 			},
 		},
 	})

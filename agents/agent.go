@@ -191,17 +191,17 @@ func (a *Agent) getBuiltinTools() []Tool {
 				},
 			},
 		},
-		Call: func(_ context.Context, m map[string]any) (string, error) {
+		Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
 			name := RequiredArg[string](m, "skill_name")
 			if slices.Contains(a.session.ActiveSkillNames, name) {
-				return "", fmt.Errorf("skill '%s' is already active", name)
+				return ToolResult{}, fmt.Errorf("skill '%s' is already active", name)
 			}
 			skill, err := a.lookupSkill(name)
 			if err != nil {
-				return "", err
+				return ToolResult{}, err
 			}
 			a.session.ActiveSkillNames = append(a.session.ActiveSkillNames, skill.Name)
-			return fmt.Sprintf("activated skill '%s'", skill.Name), nil
+			return ToolResult{Content: fmt.Sprintf("activated skill '%s'", skill.Name)}, nil
 		},
 	}
 
@@ -218,17 +218,17 @@ func (a *Agent) getBuiltinTools() []Tool {
 				},
 			},
 		},
-		Call: func(_ context.Context, m map[string]any) (string, error) {
+		Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
 			name := RequiredArg[string](m, "skill_name")
 			if !slices.Contains(a.session.ActiveSkillNames, name) {
-				return "", fmt.Errorf("skill '%s' is not currently active", name)
+				return ToolResult{}, fmt.Errorf("skill '%s' is not currently active", name)
 			}
 			skill, err := a.lookupSkill(name)
 			if err != nil {
-				return "", err
+				return ToolResult{}, err
 			}
 			a.session.ActiveSkillNames = slices.DeleteFunc(a.session.ActiveSkillNames, func(s string) bool { return s == skill.Name })
-			return fmt.Sprintf("deactivated skill '%s'", skill.Name), nil
+			return ToolResult{Content: fmt.Sprintf("deactivated skill '%s'", skill.Name)}, nil
 		},
 	}
 	return []Tool{
@@ -258,8 +258,8 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 		tool, err := a.lookupTool(call.Tool)
 		if err != nil {
 			tools[i] = Tool{
-				Call: func(ctx context.Context, m map[string]any) (string, error) {
-					return "", fmt.Errorf("could not find tool with name '%s'", call.Tool)
+				Call: func(ctx context.Context, m map[string]any) (ToolResult, error) {
+					return ToolResult{}, fmt.Errorf("could not find tool with name '%s'", call.Tool)
 				},
 			}
 		} else {
@@ -285,7 +285,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 			if err != nil {
 				msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
 			} else {
-				msg.Result = result
+				msg.Result = result.Content
 			}
 		}
 		a.session.CoreMessages = append(a.session.CoreMessages, msg)
