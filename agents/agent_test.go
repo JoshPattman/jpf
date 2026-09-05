@@ -66,8 +66,8 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 	agent.SetToolCatalogue([]Tool{
 		{
 			Schema: jpf.ToolSchema{Name: "echo", Args: []jpf.ToolArg{{Name: "msg", Type: jpf.ToolArgString, Required: true}}},
-			Call: func(_ context.Context, m map[string]any) (string, error) {
-				return "echoed: " + RequiredArg[string](m, "msg"), nil
+			Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
+				return ToolResult{Content: "echoed: " + RequiredArg[string](m, "msg")}, nil
 			},
 		},
 	})
@@ -235,9 +235,9 @@ func TestAgentInvalidArgsProducesErrorResult(t *testing.T) {
 	agent.SetToolCatalogue([]Tool{
 		{
 			Schema: jpf.ToolSchema{Name: "greet", Args: []jpf.ToolArg{{Name: "name", Type: jpf.ToolArgString, Required: true}}},
-			Call: func(_ context.Context, m map[string]any) (string, error) {
+			Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
 				t.Fatalf("Call should not run when required args are missing")
-				return "", nil
+				return ToolResult{}, nil
 			},
 		},
 	})
@@ -263,7 +263,7 @@ func TestAgentMaxIterationsStopsLoop(t *testing.T) {
 	agent.SetToolCatalogue([]Tool{
 		{
 			Schema: jpf.ToolSchema{Name: "loop"},
-			Call:   func(_ context.Context, _ map[string]any) (string, error) { return "again", nil },
+			Call:   func(_ context.Context, _ map[string]any) (ToolResult, error) { return ToolResult{Content: "again"}, nil },
 		},
 	})
 

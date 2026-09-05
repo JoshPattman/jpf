@@ -13,7 +13,12 @@ type Tool struct {
 	Schema jpf.ToolSchema
 	// How should the agent framework run the tool.
 	// If not specified, the agent framework will break the loop and defer.
-	Call func(context.Context, map[string]any) (string, error)
+	Call func(context.Context, map[string]any) (ToolResult, error)
+}
+
+// ToolResult is what a Tool.Call returns.
+type ToolResult struct {
+	Content string
 }
 
 // Fetches the arg from the tool args, must only be called on required args defined int he schema.
