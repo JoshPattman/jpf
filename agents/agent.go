@@ -52,35 +52,62 @@ func (a *Agent) SetSkillCatalogue(skills []Skill) {
 	a.skillCatalogue = slices.Clone(skills)
 }
 
+type AgentStreamer interface {
+	OnMessageComplete(jpf.Message)
+}
+
+type AgentStreamerBase struct{}
+
+func (*AgentStreamerBase) OnMessageComplete(jpf.Message) {}
+
+type AgentResponseOpt func(*agentResponseKwargs)
+
+type agentResponseKwargs struct {
+	Streamer AgentStreamer
+}
+
+func WithStreamer(streamer AgentStreamer) AgentResponseOpt {
+	return func(ark *agentResponseKwargs) {
+		ark.Streamer = streamer
+	}
+}
+
+func getKwargs(opts []AgentResponseOpt) agentResponseKwargs {
+	kwargs := agentResponseKwargs{}
+	for _, o := range opts {
+		o(&kwargs)
+	}
+	if kwargs.Streamer == nil {
+		kwargs.Streamer = &AgentStreamerBase{}
+	}
+	return kwargs
+}
+
 // Run the agent from a new message to add into the conversation.
 // Should only be called if the agent is not currently awaiting deferred tool responses.
 // May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
-func (a *Agent) Run(ctx context.Context, query string, messageCallback func(jpf.Message)) error {
+func (a *Agent) Run(ctx context.Context, query string, opts ...AgentResponseOpt) error {
+	kwargs := getKwargs(opts)
 	if len(a.CurrentDeferredToolCalls()) != 0 {
 		return fmt.Errorf("cannot run an agent from fresh when it is awaiting deferred calls, please use resume instead")
 	}
-	if messageCallback == nil {
-		messageCallback = func(jpf.Message) {}
-	}
 	msg := jpf.UserMessage{Content: query}
 	a.session.CoreMessages = append(a.session.CoreMessages, msg)
-	messageCallback(msg)
-	return a.runOrResumeHelper(ctx, messageCallback)
+	kwargs.Streamer.OnMessageComplete(msg)
+	return a.runOrResumeHelper(ctx, kwargs)
 }
 
 // Resume the agent from a set of responses to deferred tool calls to add into the conversation.
 // Should only be called if the agent is currently awaiting deferred tool responses.
 // May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
-func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, messageCallback func(jpf.Message)) error {
+func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, opts ...AgentResponseOpt) error {
+	kwargs := getKwargs(opts)
 	defCalls := a.CurrentDeferredToolCalls()
 	if len(defCalls) == 0 {
 		return fmt.Errorf("cannot resume an agent when it is not awaiting deferred calls, please use run instead")
 	}
 	if len(defCalls) != len(callResults) {
 		return fmt.Errorf("call results do not match the expected awaiting deferred calls")
-	}
-	if messageCallback == nil {
-		messageCallback = func(jpf.Message) {}
 	}
 	// Verify required calls are present
 	callIDs := make([]string, len(defCalls))
@@ -117,7 +144,7 @@ func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, 
 		_, ok := msg.(jpf.ToolResultMessage)
 		if !ok {
 			for j := i + 1; j < len(sess.CoreMessages); j++ {
-				messageCallback(sess.CoreMessages[j])
+				kwargs.Streamer.OnMessageComplete(sess.CoreMessages[j])
 			}
 			break
 		}
@@ -125,20 +152,20 @@ func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, 
 
 	sess.CurrentDeferredToolCalls = nil
 	a.SetSession(sess)
-	return a.runOrResumeHelper(ctx, messageCallback)
+	return a.runOrResumeHelper(ctx, kwargs)
 }
 
-func (a *Agent) runOrResumeHelper(ctx context.Context, messageCallback func(jpf.Message)) error {
+func (a *Agent) runOrResumeHelper(ctx context.Context, kwargs agentResponseKwargs) error {
 	a.deactivateMissingActiveSkills()
 	for range a.maxIterations {
-		nextAction, err := a.determineNextAction(ctx, messageCallback)
+		nextAction, err := a.determineNextAction(ctx, kwargs.Streamer.OnMessageComplete)
 		if err != nil {
 			return utils.Wrap(err, "failed to determine next action")
 		}
 		if len(nextAction.ToolCalls) == 0 {
 			break
 		} else {
-			err = a.executeToolCalls(ctx, messageCallback, nextAction)
+			err = a.executeToolCalls(ctx, kwargs.Streamer.OnMessageComplete, nextAction)
 			if err != nil {
 				return utils.Wrap(err, "failed to execute tools")
 			}

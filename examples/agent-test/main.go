@@ -11,6 +11,12 @@ import (
 	"github.com/JoshPattman/jpf/models"
 )
 
+type printStreamer struct{}
+
+func (printStreamer) OnMessageComplete(m jpf.Message) {
+	fmt.Printf("%v\n", m)
+}
+
 func main() {
 	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
 	model = models.Retry(model, 3, models.WithDelay(time.Second))
@@ -43,9 +49,7 @@ func main() {
 	err := agent.Run(
 		context.Background(),
 		"Ping me",
-		func(m jpf.Message) {
-			fmt.Printf("%v\n", m)
-		},
+		agents.WithStreamer(printStreamer{}),
 	)
 	if err != nil {
 		panic(err)
