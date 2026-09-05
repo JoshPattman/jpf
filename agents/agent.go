@@ -52,14 +52,6 @@ func (a *Agent) SetSkillCatalogue(skills []Skill) {
 	a.skillCatalogue = slices.Clone(skills)
 }
 
-type AgentStreamer interface {
-	OnMessageComplete(jpf.Message)
-}
-
-type AgentStreamerBase struct{}
-
-func (*AgentStreamerBase) OnMessageComplete(jpf.Message) {}
-
 type AgentResponseOpt func(*agentResponseKwargs)
 
 type agentResponseKwargs struct {
