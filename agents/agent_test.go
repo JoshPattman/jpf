@@ -45,6 +45,16 @@ func assistantTurn(content string, calls ...jpf.ToolCall) fakeModelTurn {
 	return fakeModelTurn{Response: jpf.ModelResponse{Message: jpf.AssistantMessage{Content: content, ToolCalls: calls}}}
 }
 
+// recordingStreamer records every message it is given, so tests can assert on
+// exactly what was streamed to the caller.
+type recordingStreamer struct {
+	messages []jpf.Message
+}
+
+func (r *recordingStreamer) OnMessageComplete(msg jpf.Message) {
+	r.messages = append(r.messages, msg)
+}
+
 func requireMessages(t *testing.T, got, want []jpf.Message) {
 	t.Helper()
 	if len(got) != len(want) {
@@ -72,8 +82,8 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 		},
 	})
 
-	var callback []jpf.Message
-	err := agent.Run(context.Background(), "hello", func(msg jpf.Message) { callback = append(callback, msg) })
+	rec := &recordingStreamer{}
+	err := agent.Run(context.Background(), "hello", WithStreamer(rec))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -88,7 +98,7 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 		jpf.AssistantMessage{Content: "done"},
 	}
 	requireMessages(t, agent.Session().CoreMessages, want)
-	requireMessages(t, callback, want)
+	requireMessages(t, rec.messages, want)
 }
 
 func TestAgentRunErrorsWhenAwaitingDeferredCalls(t *testing.T) {
@@ -97,7 +107,7 @@ func TestAgentRunErrorsWhenAwaitingDeferredCalls(t *testing.T) {
 	sess.CurrentDeferredToolCalls = []DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
 
-	err := agent.Run(context.Background(), "hello", nil)
+	err := agent.Run(context.Background(), "hello")
 	if err == nil || !strings.Contains(err.Error(), "resume") {
 		t.Fatalf("expected an error mentioning resume, got: %v", err)
 	}
@@ -112,8 +122,8 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 		{Schema: jpf.ToolSchema{Name: "fetch", Args: []jpf.ToolArg{{Name: "url", Type: jpf.ToolArgString, Required: true}}}},
 	})
 
-	var runCallback []jpf.Message
-	err := agent.Run(context.Background(), "go fetch", func(msg jpf.Message) { runCallback = append(runCallback, msg) })
+	runRec := &recordingStreamer{}
+	err := agent.Run(context.Background(), "go fetch", WithStreamer(runRec))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -128,14 +138,14 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 		jpf.AssistantMessage{ToolCalls: []jpf.ToolCall{{ID: "c1", Tool: "fetch", Args: map[string]any{"url": "http://x"}}}},
 		jpf.ToolResultMessage{CallID: "c1", Result: ""},
 	})
-	requireMessages(t, runCallback, []jpf.Message{
+	requireMessages(t, runRec.messages, []jpf.Message{
 		jpf.UserMessage{Content: "go fetch"},
 		jpf.AssistantMessage{ToolCalls: []jpf.ToolCall{{ID: "c1", Tool: "fetch", Args: map[string]any{"url": "http://x"}}}},
 	})
 
 	model.turns = append(model.turns, assistantTurn("got it"))
-	var resumeCallback []jpf.Message
-	err = agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "42"}}, func(msg jpf.Message) { resumeCallback = append(resumeCallback, msg) })
+	resumeRec := &recordingStreamer{}
+	err = agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "42"}}, WithStreamer(resumeRec))
 	if err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
@@ -150,7 +160,7 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 	})
 	// Resuming replays the now-resolved tool result (never shown to the callback while deferred),
 	// then continues normally with the model's next message.
-	requireMessages(t, resumeCallback, []jpf.Message{
+	requireMessages(t, resumeRec.messages, []jpf.Message{
 		jpf.ToolResultMessage{CallID: "c1", Result: "42"},
 		jpf.AssistantMessage{Content: "got it"},
 	})
@@ -158,7 +168,7 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 
 func TestAgentResumeErrorsWhenNotAwaitingDeferredCalls(t *testing.T) {
 	agent := NewAgent(&fakeModel{})
-	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "x"}}, nil)
+	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "x"}})
 	if err == nil || !strings.Contains(err.Error(), "run instead") {
 		t.Fatalf("expected an error mentioning run instead, got: %v", err)
 	}
@@ -170,7 +180,7 @@ func TestAgentResumeErrorsOnCallCountMismatch(t *testing.T) {
 	sess.CurrentDeferredToolCalls = []DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
 
-	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "x"}, {CallID: "c2", Result: "y"}}, nil)
+	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "x"}, {CallID: "c2", Result: "y"}})
 	if err == nil {
 		t.Fatalf("expected an error for mismatched call count")
 	}
@@ -182,7 +192,7 @@ func TestAgentResumeErrorsOnUnknownCallID(t *testing.T) {
 	sess.CurrentDeferredToolCalls = []DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
 
-	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "wrong", Result: "x"}}, nil)
+	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "wrong", Result: "x"}})
 	if err == nil {
 		t.Fatalf("expected an error for an unrecognised call id")
 	}
@@ -197,7 +207,7 @@ func TestAgentDeferredCallArgsAreValidatedAndCoerced(t *testing.T) {
 		{Schema: jpf.ToolSchema{Name: "count", Args: []jpf.ToolArg{{Name: "n", Type: jpf.ToolArgInt, Required: true}}}},
 	})
 
-	if err := agent.Run(context.Background(), "count to 5", nil); err != nil {
+	if err := agent.Run(context.Background(), "count to 5"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	deferred := agent.CurrentDeferredToolCalls()
@@ -216,7 +226,7 @@ func TestAgentUnknownToolProducesErrorResult(t *testing.T) {
 	}}
 	agent := NewAgent(model)
 
-	if err := agent.Run(context.Background(), "hi", nil); err != nil {
+	if err := agent.Run(context.Background(), "hi"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	msgs := agent.Session().CoreMessages
@@ -242,7 +252,7 @@ func TestAgentInvalidArgsProducesErrorResult(t *testing.T) {
 		},
 	})
 
-	if err := agent.Run(context.Background(), "hi", nil); err != nil {
+	if err := agent.Run(context.Background(), "hi"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	msgs := agent.Session().CoreMessages
@@ -268,7 +278,7 @@ func TestAgentMaxIterationsStopsLoop(t *testing.T) {
 	})
 
 	// If the agent tries a 4th round trip, fakeModel panics - proving maxIterations is respected.
-	if err := agent.Run(context.Background(), "go", nil); err != nil {
+	if err := agent.Run(context.Background(), "go"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(model.calls) != 3 {
@@ -314,7 +324,7 @@ func TestAgentActivateAndDeactivateSkill(t *testing.T) {
 	agent := NewAgent(model)
 	agent.SetSkillCatalogue([]Skill{{Name: "golang", Description: "go help", Content: "use gofmt"}})
 
-	if err := agent.Run(context.Background(), "help me with go", nil); err != nil {
+	if err := agent.Run(context.Background(), "help me with go"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	result := agent.Session().CoreMessages[2].(jpf.ToolResultMessage)
@@ -329,7 +339,7 @@ func TestAgentActivateAndDeactivateSkill(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c2", Tool: "deactivate_skill", Args: map[string]any{"skill_name": "golang"}}),
 		assistantTurn("deactivated"),
 	)
-	if err := agent.Run(context.Background(), "thanks, done", nil); err != nil {
+	if err := agent.Run(context.Background(), "thanks, done"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	msgs := agent.Session().CoreMessages
@@ -351,7 +361,7 @@ func TestAgentDeactivatesMissingActiveSkills(t *testing.T) {
 	sess.ActiveSkillNames = []string{"kept", "stale"}
 	agent.SetSession(sess)
 
-	if err := agent.Run(context.Background(), "hi", nil); err != nil {
+	if err := agent.Run(context.Background(), "hi"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	if got := agent.Session().ActiveSkillNames; len(got) != 1 || got[0] != "kept" {
@@ -364,7 +374,7 @@ func TestAgentIncludesSystemAndHeadStateMessages(t *testing.T) {
 	agent := NewAgent(model)
 	agent.SetSkillCatalogue([]Skill{{Name: "golang", Description: "when writing go code", Content: "use gofmt"}})
 
-	if err := agent.Run(context.Background(), "hi", nil); err != nil {
+	if err := agent.Run(context.Background(), "hi"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 	sent := model.calls[0].Messages
@@ -401,7 +411,7 @@ func TestFakeModelSurfacesModelError(t *testing.T) {
 	model := &fakeModel{turns: []fakeModelTurn{{Err: wantErr}}}
 	agent := NewAgent(model)
 
-	err := agent.Run(context.Background(), "hi", nil)
+	err := agent.Run(context.Background(), "hi")
 	if err == nil || !errors.Is(err, wantErr) {
 		t.Fatalf("expected wrapped model error, got: %v", err)
 	}

@@ -14,15 +14,19 @@ import (
 	"github.com/JoshPattman/jpf/models"
 )
 
+type printStreamer struct{}
+
+func (printStreamer) OnMessageComplete(m jpf.Message) {
+	fmt.Printf("%v\n", m)
+}
+
 func main() {
 	agent := createEmptyAgent()
-	messageCallback := func(m jpf.Message) {
-		fmt.Printf("%v\n", m)
-	}
+	streamer := printStreamer{}
 	err := agent.Run(
 		context.Background(),
 		"Ping me",
-		messageCallback,
+		agents.WithStreamer(streamer),
 	)
 	if err != nil {
 		panic(err)
@@ -81,7 +85,7 @@ func main() {
 			panic(err)
 		}
 		agent2.SetSession(session2)
-		if err := agent2.Resume(context.Background(), defResponses, messageCallback); err != nil {
+		if err := agent2.Resume(context.Background(), defResponses, agents.WithStreamer(streamer)); err != nil {
 			panic(err)
 		}
 
