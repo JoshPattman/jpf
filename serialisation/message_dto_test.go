@@ -1,9 +1,11 @@
-package jpf
+package serialisation
 
 import (
 	"encoding/json"
 	"image"
 	"testing"
+
+	"github.com/JoshPattman/jpf"
 )
 
 func TestMessageDTORoundTrip(t *testing.T) {
@@ -12,20 +14,20 @@ func TestMessageDTORoundTrip(t *testing.T) {
 
 	tests := []struct {
 		name string
-		msg  Message
+		msg  jpf.Message
 	}{
-		{"user", UserMessage{Content: "hello"}},
-		{"user with image", UserMessage{Content: "look", Images: []ImageAttachment{{Source: img}}}},
-		{"assistant plain", AssistantMessage{Content: "hi there"}},
-		{"assistant with tool calls", AssistantMessage{
+		{"user", jpf.UserMessage{Content: "hello"}},
+		{"user with image", jpf.UserMessage{Content: "look", Images: []jpf.ImageAttachment{{Source: img}}}},
+		{"assistant plain", jpf.AssistantMessage{Content: "hi there"}},
+		{"assistant with tool calls", jpf.AssistantMessage{
 			Content: "calling",
-			ToolCalls: []ToolCall{
+			ToolCalls: []jpf.ToolCall{
 				{ID: "c1", Tool: "search", Args: map[string]any{"q": "cats", "n": float64(3)}},
 			},
 		}},
-		{"developer", DeveloperMessage{Content: "be nice"}},
-		{"system", SystemMessage{Content: "you are a bot"}},
-		{"tool result", ToolResultMessage{CallID: "c1", Result: "done"}},
+		{"developer", jpf.DeveloperMessage{Content: "be nice"}},
+		{"system", jpf.SystemMessage{Content: "you are a bot"}},
+		{"tool result", jpf.ToolResultMessage{CallID: "c1", Result: "done"}},
 	}
 
 	for _, tt := range tests {
@@ -52,8 +54,8 @@ func TestMessageDTORoundTrip(t *testing.T) {
 
 			// Images do not survive Eq (decoded image is a different value), so compare
 			// them structurally and clear before the Eq check.
-			if want, ok := tt.msg.(UserMessage); ok {
-				gotUser := got.(UserMessage)
+			if want, ok := tt.msg.(jpf.UserMessage); ok {
+				gotUser := got.(jpf.UserMessage)
 				if len(gotUser.Images) != len(want.Images) {
 					t.Fatalf("image count: got %d want %d", len(gotUser.Images), len(want.Images))
 				}
@@ -62,8 +64,8 @@ func TestMessageDTORoundTrip(t *testing.T) {
 						t.Fatalf("image %d did not round-trip: %+v", i, ia.Source)
 					}
 				}
-				got = UserMessage{Content: gotUser.Content}
-				tt.msg = UserMessage{Content: want.Content}
+				got = jpf.UserMessage{Content: gotUser.Content}
+				tt.msg = jpf.UserMessage{Content: want.Content}
 			}
 
 			if !tt.msg.Eq(got) {
@@ -74,8 +76,8 @@ func TestMessageDTORoundTrip(t *testing.T) {
 }
 
 func TestMessageDTOLoadMessageResetsState(t *testing.T) {
-	dto := MessageDTO{Role: MessageRoleAssistant, ToolCalls: []ToolCall{{ID: "old"}}}
-	if err := dto.LoadMessage(SystemMessage{Content: "fresh"}); err != nil {
+	dto := MessageDTO{Role: MessageRoleAssistant, ToolCalls: []jpf.ToolCall{{ID: "old"}}}
+	if err := dto.LoadMessage(jpf.SystemMessage{Content: "fresh"}); err != nil {
 		t.Fatalf("LoadMessage: %v", err)
 	}
 	if dto.ToolCalls != nil {
