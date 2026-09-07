@@ -3,7 +3,6 @@ package agents
 import (
 	"context"
 	"fmt"
-	"maps"
 	"slices"
 	"strings"
 
@@ -26,7 +25,7 @@ func NewAgent(model jpf.Model) *Agent {
 
 type Agent struct {
 	session        AgentSession
-	toolCatalogue  []Tool
+	toolCatalogue  []jpf.Tool
 	skillCatalogue []Skill
 	maxIterations  int
 	model          jpf.Model
@@ -44,7 +43,7 @@ func (a *Agent) SetMaxIterations(n int) {
 	a.maxIterations = n
 }
 
-func (a *Agent) SetToolCatalogue(tools []Tool) {
+func (a *Agent) SetToolCatalogue(tools []jpf.Tool) {
 	a.toolCatalogue = slices.Concat(a.getBuiltinTools(), slices.Clone(tools))
 }
 
@@ -92,7 +91,7 @@ func (a *Agent) Run(ctx context.Context, query string, opts ...AgentResponseOpt)
 // Resume the agent from a set of responses to deferred tool calls to add into the conversation.
 // Should only be called if the agent is currently awaiting deferred tool responses.
 // May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
-func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, opts ...AgentResponseOpt) error {
+func (a *Agent) Resume(ctx context.Context, callResults []jpf.DeferredCallResult, opts ...AgentResponseOpt) error {
 	kwargs := getKwargs(opts)
 	defCalls := a.CurrentDeferredToolCalls()
 	if len(defCalls) == 0 {
@@ -125,7 +124,7 @@ func (a *Agent) Resume(ctx context.Context, callResults []DeferredCallResponse, 
 			if result.Err != nil {
 				resp.Result = fmt.Sprintf("The tool call failed with error: %s", result.Err.Error())
 			} else {
-				resp.Result = result.Result
+				resp.Result = result.Content
 			}
 			sess.CoreMessages[i] = resp
 			break
@@ -169,19 +168,7 @@ func (a *Agent) runOrResumeHelper(ctx context.Context, kwargs agentResponseKwarg
 	return nil
 }
 
-type DeferredToolCall struct {
-	ToolName string
-	CallID   string
-	Args     map[string]any
-}
-
-type DeferredCallResponse struct {
-	CallID string
-	Result string
-	Err    error
-}
-
-func (a *Agent) CurrentDeferredToolCalls() []DeferredToolCall {
+func (a *Agent) CurrentDeferredToolCalls() []jpf.DeferredToolCall {
 	return slices.Clone(a.Session().CurrentDeferredToolCalls)
 }
 
@@ -196,61 +183,61 @@ func (a *Agent) deactivateMissingActiveSkills() {
 	a.session.ActiveSkillNames = nextActiveSkills
 }
 
-func (a *Agent) getBuiltinTools() []Tool {
-	activateSkillTool := Tool{
+func (a *Agent) getBuiltinTools() []jpf.Tool {
+	activateSkillTool := jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "activate_skill",
 			Description: "activate a skill that is currently not active, causing the full skill body to show in all future context for you (in the head state)",
-			Args: []jpf.ToolArg{
+			Params: []jpf.ToolParam{
 				{
 					Name:        "skill_name",
 					Description: "the name of the skill to activate",
-					Type:        jpf.ToolArgString,
+					Type:        jpf.ToolParamString,
 					Required:    true,
 				},
 			},
 		},
-		Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
-			name := RequiredArg[string](m, "skill_name")
+		Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
+			name := m.RequiredString("skill_name")
 			if slices.Contains(a.session.ActiveSkillNames, name) {
-				return ToolResult{}, fmt.Errorf("skill '%s' is already active", name)
+				return jpf.ToolResult{}, fmt.Errorf("skill '%s' is already active", name)
 			}
 			skill, err := a.lookupSkill(name)
 			if err != nil {
-				return ToolResult{}, err
+				return jpf.ToolResult{}, err
 			}
 			a.session.ActiveSkillNames = append(a.session.ActiveSkillNames, skill.Name)
-			return ToolResult{Content: fmt.Sprintf("activated skill '%s'", skill.Name)}, nil
+			return jpf.ToolResult{Content: fmt.Sprintf("activated skill '%s'", skill.Name)}, nil
 		},
 	}
 
-	deactivateSkillTool := Tool{
+	deactivateSkillTool := jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "deactivate_skill",
 			Description: "deactivate a skill that is currently active, causing the full skill body to be removed in future calls (in the head state) - call this when you feel a skill is no longer useful to you and you are able to forget it for now",
-			Args: []jpf.ToolArg{
+			Params: []jpf.ToolParam{
 				{
 					Name:        "skill_name",
 					Description: "the name of the skill to deactivate",
-					Type:        jpf.ToolArgString,
+					Type:        jpf.ToolParamString,
 					Required:    true,
 				},
 			},
 		},
-		Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
-			name := RequiredArg[string](m, "skill_name")
+		Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
+			name := m.RequiredString("skill_name")
 			if !slices.Contains(a.session.ActiveSkillNames, name) {
-				return ToolResult{}, fmt.Errorf("skill '%s' is not currently active", name)
+				return jpf.ToolResult{}, fmt.Errorf("skill '%s' is not currently active", name)
 			}
 			skill, err := a.lookupSkill(name)
 			if err != nil {
-				return ToolResult{}, err
+				return jpf.ToolResult{}, err
 			}
 			a.session.ActiveSkillNames = slices.DeleteFunc(a.session.ActiveSkillNames, func(s string) bool { return s == skill.Name })
-			return ToolResult{Content: fmt.Sprintf("deactivated skill '%s'", skill.Name)}, nil
+			return jpf.ToolResult{Content: fmt.Sprintf("deactivated skill '%s'", skill.Name)}, nil
 		},
 	}
-	return []Tool{
+	return []jpf.Tool{
 		activateSkillTool,
 		deactivateSkillTool,
 	}
@@ -272,13 +259,13 @@ func (a *Agent) determineNextAction(ctx context.Context, messageCallback func(jp
 }
 
 func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.Message), action jpf.AssistantMessage) error {
-	tools := make([]Tool, len(action.ToolCalls))
+	tools := make([]jpf.Tool, len(action.ToolCalls))
 	for i, call := range action.ToolCalls {
 		tool, err := a.lookupTool(call.Tool)
 		if err != nil {
-			tools[i] = Tool{
-				Call: func(ctx context.Context, m map[string]any) (ToolResult, error) {
-					return ToolResult{}, fmt.Errorf("could not find tool with name '%s'", call.Tool)
+			tools[i] = jpf.Tool{
+				Call: func(ctx context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
+					return jpf.ToolResult{}, fmt.Errorf("could not find tool with name '%s'", call.Tool)
 				},
 			}
 		} else {
@@ -286,19 +273,19 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 		}
 	}
 
-	deferredCalls := make([]DeferredToolCall, 0)
+	deferredCalls := make([]jpf.DeferredToolCall, 0)
 	toCallback := make([]jpf.ToolResultMessage, 0)
 
 	for i, call := range action.ToolCalls {
 		msg := jpf.ToolResultMessage{CallID: call.ID}
 
-		args := maps.Clone(call.Args)
-		err := validateAndFixArgsForSchema(args, tools[i].Schema)
+		args := call.Args.Clone()
+		err := args.AlignWithSchema(tools[i].Schema)
 		if err != nil {
 			msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
 		} else if tools[i].Call == nil {
 			msg.Result = ""
-			deferredCalls = append(deferredCalls, DeferredToolCall{call.Tool, msg.CallID, args})
+			deferredCalls = append(deferredCalls, jpf.DeferredToolCall{ToolName: call.Tool, CallID: msg.CallID, Args: args})
 		} else {
 			result, err := tools[i].Call(ctx, args)
 			if err != nil {
@@ -322,13 +309,13 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 	return nil
 }
 
-func (a *Agent) lookupTool(name string) (Tool, error) {
+func (a *Agent) lookupTool(name string) (jpf.Tool, error) {
 	for _, t := range a.toolCatalogue {
 		if t.Schema.Name == name {
 			return t, nil
 		}
 	}
-	return Tool{}, fmt.Errorf("could not find tool with name '%s'", name)
+	return jpf.Tool{}, fmt.Errorf("could not find tool with name '%s'", name)
 }
 
 func (a *Agent) toolSchemas() []jpf.ToolSchema {

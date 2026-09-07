@@ -408,14 +408,14 @@ func (m *apiGeminiModel) tools(toolSchemas []jpf.ToolSchema) []any {
 		props := map[string]any{}
 		required := []string{}
 
-		for _, arg := range tool.Args {
+		for _, arg := range tool.Params {
 			typ := "STRING"
 			switch arg.Type {
-			case jpf.ToolArgString:
+			case jpf.ToolParamString:
 				typ = "STRING"
-			case jpf.ToolArgInt:
+			case jpf.ToolParamInt:
 				typ = "INTEGER"
-			case jpf.ToolArgFloat:
+			case jpf.ToolParamFloat:
 				typ = "NUMBER"
 			}
 

@@ -73,11 +73,11 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 		assistantTurn("done"),
 	}}
 	agent := NewAgent(model)
-	agent.SetToolCatalogue([]Tool{
+	agent.SetToolCatalogue([]jpf.Tool{
 		{
-			Schema: jpf.ToolSchema{Name: "echo", Args: []jpf.ToolArg{{Name: "msg", Type: jpf.ToolArgString, Required: true}}},
-			Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
-				return ToolResult{Content: "echoed: " + RequiredArg[string](m, "msg")}, nil
+			Schema: jpf.ToolSchema{Name: "echo", Params: []jpf.ToolParam{{Name: "msg", Type: jpf.ToolParamString, Required: true}}},
+			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
+				return jpf.ToolResult{Content: "echoed: " + m.RequiredString("msg")}, nil
 			},
 		},
 	})
@@ -104,7 +104,7 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 func TestAgentRunErrorsWhenAwaitingDeferredCalls(t *testing.T) {
 	agent := NewAgent(&fakeModel{})
 	sess := agent.Session()
-	sess.CurrentDeferredToolCalls = []DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
+	sess.CurrentDeferredToolCalls = []jpf.DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
 
 	err := agent.Run(context.Background(), "hello")
@@ -118,8 +118,8 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "fetch", Args: map[string]any{"url": "http://x"}}),
 	}}
 	agent := NewAgent(model)
-	agent.SetToolCatalogue([]Tool{
-		{Schema: jpf.ToolSchema{Name: "fetch", Args: []jpf.ToolArg{{Name: "url", Type: jpf.ToolArgString, Required: true}}}},
+	agent.SetToolCatalogue([]jpf.Tool{
+		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString, Required: true}}}},
 	})
 
 	runRec := &recordingStreamer{}
@@ -145,7 +145,7 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 
 	model.turns = append(model.turns, assistantTurn("got it"))
 	resumeRec := &recordingStreamer{}
-	err = agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "42"}}, WithStreamer(resumeRec))
+	err = agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "c1", Content: "42"}}, WithStreamer(resumeRec))
 	if err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
@@ -168,7 +168,7 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 
 func TestAgentResumeErrorsWhenNotAwaitingDeferredCalls(t *testing.T) {
 	agent := NewAgent(&fakeModel{})
-	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "x"}})
+	err := agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "c1", Content: "x"}})
 	if err == nil || !strings.Contains(err.Error(), "run instead") {
 		t.Fatalf("expected an error mentioning run instead, got: %v", err)
 	}
@@ -177,10 +177,10 @@ func TestAgentResumeErrorsWhenNotAwaitingDeferredCalls(t *testing.T) {
 func TestAgentResumeErrorsOnCallCountMismatch(t *testing.T) {
 	agent := NewAgent(&fakeModel{})
 	sess := agent.Session()
-	sess.CurrentDeferredToolCalls = []DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
+	sess.CurrentDeferredToolCalls = []jpf.DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
 
-	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "c1", Result: "x"}, {CallID: "c2", Result: "y"}})
+	err := agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "c1", Content: "x"}, {CallID: "c2", Content: "y"}})
 	if err == nil {
 		t.Fatalf("expected an error for mismatched call count")
 	}
@@ -189,10 +189,10 @@ func TestAgentResumeErrorsOnCallCountMismatch(t *testing.T) {
 func TestAgentResumeErrorsOnUnknownCallID(t *testing.T) {
 	agent := NewAgent(&fakeModel{})
 	sess := agent.Session()
-	sess.CurrentDeferredToolCalls = []DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
+	sess.CurrentDeferredToolCalls = []jpf.DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
 
-	err := agent.Resume(context.Background(), []DeferredCallResponse{{CallID: "wrong", Result: "x"}})
+	err := agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "wrong", Content: "x"}})
 	if err == nil {
 		t.Fatalf("expected an error for an unrecognised call id")
 	}
@@ -203,8 +203,8 @@ func TestAgentDeferredCallArgsAreValidatedAndCoerced(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "count", Args: map[string]any{"n": float64(5)}}),
 	}}
 	agent := NewAgent(model)
-	agent.SetToolCatalogue([]Tool{
-		{Schema: jpf.ToolSchema{Name: "count", Args: []jpf.ToolArg{{Name: "n", Type: jpf.ToolArgInt, Required: true}}}},
+	agent.SetToolCatalogue([]jpf.Tool{
+		{Schema: jpf.ToolSchema{Name: "count", Params: []jpf.ToolParam{{Name: "n", Type: jpf.ToolParamInt, Required: true}}}},
 	})
 
 	if err := agent.Run(context.Background(), "count to 5"); err != nil {
@@ -242,12 +242,12 @@ func TestAgentInvalidArgsProducesErrorResult(t *testing.T) {
 		assistantTurn("ok"),
 	}}
 	agent := NewAgent(model)
-	agent.SetToolCatalogue([]Tool{
+	agent.SetToolCatalogue([]jpf.Tool{
 		{
-			Schema: jpf.ToolSchema{Name: "greet", Args: []jpf.ToolArg{{Name: "name", Type: jpf.ToolArgString, Required: true}}},
-			Call: func(_ context.Context, m map[string]any) (ToolResult, error) {
+			Schema: jpf.ToolSchema{Name: "greet", Params: []jpf.ToolParam{{Name: "name", Type: jpf.ToolParamString, Required: true}}},
+			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
 				t.Fatalf("Call should not run when required args are missing")
-				return ToolResult{}, nil
+				return jpf.ToolResult{}, nil
 			},
 		},
 	})
@@ -270,10 +270,12 @@ func TestAgentMaxIterationsStopsLoop(t *testing.T) {
 	}}
 	agent := NewAgent(model)
 	agent.SetMaxIterations(3)
-	agent.SetToolCatalogue([]Tool{
+	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{Name: "loop"},
-			Call:   func(_ context.Context, _ map[string]any) (ToolResult, error) { return ToolResult{Content: "again"}, nil },
+			Call: func(_ context.Context, _ jpf.ToolArgs) (jpf.ToolResult, error) {
+				return jpf.ToolResult{Content: "again"}, nil
+			},
 		},
 	})
 
@@ -306,7 +308,7 @@ func TestNewAgentIncludesBuiltinTools(t *testing.T) {
 		t.Fatalf("expected builtin skill tools to be present, got %v", names)
 	}
 
-	agent.SetToolCatalogue([]Tool{{Schema: jpf.ToolSchema{Name: "custom"}}})
+	agent.SetToolCatalogue([]jpf.Tool{{Schema: jpf.ToolSchema{Name: "custom"}}})
 	names = names[:0]
 	for _, tool := range agent.toolCatalogue {
 		names = append(names, tool.Schema.Name)
@@ -394,14 +396,14 @@ func TestAgentIncludesSystemAndHeadStateMessages(t *testing.T) {
 }
 
 func TestRequiredAndOptionalArg(t *testing.T) {
-	args := map[string]any{"name": "josh"}
-	if got := RequiredArg[string](args, "name"); got != "josh" {
+	args := jpf.ToolArgs{"name": "josh"}
+	if got := args.RequiredString("name"); got != "josh" {
 		t.Fatalf("RequiredArg: got %q", got)
 	}
-	if got, ok := OptionalArg[string](args, "name"); !ok || got != "josh" {
+	if got, ok := args.OptionalString("name", ""); !ok || got != "josh" {
 		t.Fatalf("OptionalArg present: got %q, %v", got, ok)
 	}
-	if got, ok := OptionalArg[string](args, "missing"); ok || got != "" {
+	if got, ok := args.OptionalString("missing", ""); ok || got != "" {
 		t.Fatalf("OptionalArg missing: got %q, %v", got, ok)
 	}
 }

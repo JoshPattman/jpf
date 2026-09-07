@@ -159,8 +159,8 @@ func TestOpenAIResponsesTools(t *testing.T) {
 	tools := m.tools([]jpf.ToolSchema{
 		{
 			Name: "search",
-			Args: []jpf.ToolArg{
-				{Name: "q", Type: jpf.ToolArgString, Required: true},
+			Params: []jpf.ToolParam{
+				{Name: "q", Type: jpf.ToolParamString, Required: true},
 			},
 		},
 	})

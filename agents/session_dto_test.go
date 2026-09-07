@@ -20,7 +20,7 @@ func TestAgentSessionDTORoundTrip(t *testing.T) {
 			}},
 			jpf.ToolResultMessage{CallID: "c1", Result: "done"},
 		},
-		CurrentDeferredToolCalls: []DeferredToolCall{
+		CurrentDeferredToolCalls: []jpf.DeferredToolCall{
 			{ToolName: "read_file", CallID: "c2", Args: map[string]any{"path": "/tmp"}},
 		},
 		ActiveSkillNames: []string{"skill-a", "skill-b"},

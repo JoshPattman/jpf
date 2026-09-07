@@ -156,10 +156,10 @@ func TestAnthropicTools(t *testing.T) {
 		{
 			Name:        "search",
 			Description: "search the web",
-			Args: []jpf.ToolArg{
-				{Name: "q", Type: jpf.ToolArgString, Description: "query", Required: true},
-				{Name: "n", Type: jpf.ToolArgInt, Description: "count"},
-				{Name: "f", Type: jpf.ToolArgFloat, Description: "factor"},
+			Params: []jpf.ToolParam{
+				{Name: "q", Type: jpf.ToolParamString, Description: "query", Required: true},
+				{Name: "n", Type: jpf.ToolParamInt, Description: "count"},
+				{Name: "f", Type: jpf.ToolParamFloat, Description: "factor"},
 			},
 		},
 	})

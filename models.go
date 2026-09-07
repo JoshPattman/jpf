@@ -150,7 +150,7 @@ type AssistantMessage struct {
 type ToolCall struct {
 	ID   string
 	Tool string
-	Args map[string]any
+	Args ToolArgs
 }
 
 func (m AssistantMessage) String() string {
@@ -239,25 +239,4 @@ func (i *ImageAttachment) ToBase64Encoded(useCompression bool) (string, error) {
 		}
 		return "data:image/png;base64," + base64.StdEncoding.EncodeToString(buf.Bytes()), nil
 	}
-}
-
-type ToolSchema struct {
-	Name        string
-	Description string
-	Args        []ToolArg
-}
-
-type ToolArgType uint8
-
-const (
-	ToolArgInt ToolArgType = iota
-	ToolArgFloat
-	ToolArgString
-)
-
-type ToolArg struct {
-	Name        string
-	Description string
-	Type        ToolArgType
-	Required    bool
 }

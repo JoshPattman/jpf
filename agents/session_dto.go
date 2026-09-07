@@ -39,7 +39,7 @@ type DeferredToolCallDTO struct {
 }
 
 // LoadDeferredToolCall populates the DTO in place from call, replacing any existing contents.
-func (d *DeferredToolCallDTO) LoadDeferredToolCall(call DeferredToolCall) {
+func (d *DeferredToolCallDTO) LoadDeferredToolCall(call jpf.DeferredToolCall) {
 	*d = DeferredToolCallDTO{
 		ToolName: call.ToolName,
 		CallID:   call.CallID,
@@ -48,8 +48,8 @@ func (d *DeferredToolCallDTO) LoadDeferredToolCall(call DeferredToolCall) {
 }
 
 // ToDeferredToolCall converts the DTO back into the DeferredToolCall it represents.
-func (d *DeferredToolCallDTO) ToDeferredToolCall() DeferredToolCall {
-	return DeferredToolCall{
+func (d *DeferredToolCallDTO) ToDeferredToolCall() jpf.DeferredToolCall {
+	return jpf.DeferredToolCall{
 		ToolName: d.ToolName,
 		CallID:   d.CallID,
 		Args:     maps.Clone(d.Args),

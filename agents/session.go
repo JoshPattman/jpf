@@ -28,7 +28,7 @@ type AgentSession struct {
 	// The messages, excluding system and other special messages.
 	CoreMessages []jpf.Message
 	// The current tool calls that have been deferred, with their validated args.
-	CurrentDeferredToolCalls []DeferredToolCall
+	CurrentDeferredToolCalls []jpf.DeferredToolCall
 	// The names of the skills that should currently be active.
 	ActiveSkillNames []string
 }

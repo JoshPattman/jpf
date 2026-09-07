@@ -22,27 +22,27 @@ func main() {
 	model = models.Retry(model, 3, models.WithDelay(time.Second))
 
 	agent := agents.NewAgent(model)
-	agent.SetToolCatalogue([]agents.Tool{
+	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{
 				Name:        "ping_user",
 				Description: "Ping the user, only use when asked to ping",
-				Args:        nil,
+				Params:      nil,
 			},
-			Call: func(_ context.Context, m map[string]any) (agents.ToolResult, error) {
+			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
 				fmt.Println("PING")
-				return agents.ToolResult{Content: "the user has been pinged, you **must** now call the pong tool"}, nil
+				return jpf.ToolResult{Content: "the user has been pinged, you **must** now call the pong tool"}, nil
 			},
 		},
 		{
 			Schema: jpf.ToolSchema{
 				Name:        "pong_user",
 				Description: "Pong the user, only used when asked to pong",
-				Args:        nil,
+				Params:      nil,
 			},
-			Call: func(_ context.Context, m map[string]any) (agents.ToolResult, error) {
+			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
 				fmt.Println("PONG")
-				return agents.ToolResult{Content: "the user has been ponged"}, nil
+				return jpf.ToolResult{Content: "the user has been ponged"}, nil
 			},
 		},
 	})
