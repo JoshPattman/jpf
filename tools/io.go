@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,18 +26,18 @@ const (
 // depend on level: ReadFSLevel gives read-only tools, WriteFSLevel adds the
 // tools that create, modify, and delete files and directories.
 func BuildIOTools(level IOToolLevel, workspaceRoot string) []jpf.Tool {
-	readFileSizeLimit := 50000
+	fileSizeLimit := 50000
 	readDirNumLimit := 250
 	ts := []jpf.Tool{
 		newWorkspaceRootTool(workspaceRoot),
-		newFileReadTool(workspaceRoot, readFileSizeLimit),
+		newFileReadTool(workspaceRoot, fileSizeLimit),
 		newDirReadTool(workspaceRoot, readDirNumLimit),
 	}
 	if level == WriteFSLevel {
 		ts = append(
 			ts,
 			newFileCreateTool(workspaceRoot),
-			newFileModifyTool(workspaceRoot),
+			newFileModifyTool(workspaceRoot, fileSizeLimit),
 			newFileDeleteTool(workspaceRoot),
 			newDirCreateTool(workspaceRoot),
 			newDirDeleteTool(workspaceRoot),
@@ -46,12 +47,19 @@ func BuildIOTools(level IOToolLevel, workspaceRoot string) []jpf.Tool {
 }
 
 // resolveAndCheckPath resolves path to an absolute path (relative paths are
-// taken relative to root) and verifies that the result is root itself or a
-// child of root. It returns an error if the path escapes root.
-func resolveAndCheckPath(root, path string) (string, error) {
-	absRoot, err := filepath.Abs(root)
+// taken relative to the workspace root) and verifies that the result is the
+// workspace root itself or somewhere beneath it. It returns an error if the
+// path escapes the workspace root.
+//
+// The check is purely lexical: symlinks are deliberately not resolved, so a
+// directory symlinked into the workspace can be used by the agent as if its
+// contents really lived there. The one consequence is that ".." is resolved
+// against a symlink's location in the workspace rather than its target, so the
+// agent cannot walk out of the workspace through a symlinked directory.
+func resolveAndCheckPath(workspaceRoot, path string) (string, error) {
+	absRoot, err := filepath.Abs(workspaceRoot)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve the root directory: %w", err)
+		return "", fmt.Errorf("failed to resolve the workspace root: %w", err)
 	}
 	if !filepath.IsAbs(path) {
 		path = filepath.Join(absRoot, path)
@@ -59,12 +67,32 @@ func resolveAndCheckPath(root, path string) (string, error) {
 	abs := filepath.Clean(path)
 	rel, err := filepath.Rel(absRoot, abs)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", fmt.Errorf("that path is outside the permitted root directory")
+		return "", fmt.Errorf("that path is outside the workspace root")
 	}
 	return abs, nil
 }
 
-func newFileReadTool(root string, sizeLimit int) jpf.Tool {
+// readFileCapped reads the file at path into a pre-allocated buffer of limit+1
+// bytes. If the file does not fit, it returns an error without reading the rest
+// of the file, so at most limit+1 bytes are ever held in memory.
+func readFileCapped(path string, limit int) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	buf := make([]byte, limit+1)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	if n > limit {
+		return nil, fmt.Errorf("that file is larger than the maximum size limit of %d bytes, so it cannot be read", limit)
+	}
+	return buf[:n], nil
+}
+
+func newFileReadTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_file",
@@ -79,16 +107,13 @@ func newFileReadTool(root string, sizeLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
-			contents, err := os.ReadFile(path)
+			contents, err := readFileCapped(path, sizeLimit)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to read that file"), err)
-			}
-			if len(contents) > sizeLimit {
-				return jpf.ToolResult{}, fmt.Errorf("that file is larger than the maximum size limit, so you cannot read it (%d > %d).", len(contents), sizeLimit)
 			}
 			return jpf.ToolResult{
 				Content: string(contents),
@@ -97,7 +122,7 @@ func newFileReadTool(root string, sizeLimit int) jpf.Tool {
 	}
 }
 
-func newDirReadTool(root string, numLimit int) jpf.Tool {
+func newDirReadTool(workspaceRoot string, numLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_dir",
@@ -112,7 +137,7 @@ func newDirReadTool(root string, numLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -138,7 +163,7 @@ func newDirReadTool(root string, numLimit int) jpf.Tool {
 	}
 }
 
-func newFileCreateTool(root string) jpf.Tool {
+func newFileCreateTool(workspaceRoot string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "create_file",
@@ -153,7 +178,7 @@ func newFileCreateTool(root string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -171,7 +196,7 @@ func newFileCreateTool(root string) jpf.Tool {
 	}
 }
 
-func newFileDeleteTool(root string) jpf.Tool {
+func newFileDeleteTool(workspaceRoot string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "delete_file",
@@ -186,7 +211,7 @@ func newFileDeleteTool(root string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -207,7 +232,7 @@ func newFileDeleteTool(root string) jpf.Tool {
 	}
 }
 
-func newFileModifyTool(root string) jpf.Tool {
+func newFileModifyTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "modify_file",
@@ -234,14 +259,14 @@ func newFileModifyTool(root string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
 			oldText := ta.RequiredString("old_text")
 			newText := ta.RequiredString("new_text")
 
-			contents, err := os.ReadFile(path)
+			contents, err := readFileCapped(path, sizeLimit)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to read that file"), err)
 			}
@@ -259,6 +284,9 @@ func newFileModifyTool(root string) jpf.Tool {
 				}
 				updated = strings.Replace(string(contents), oldText, newText, 1)
 			}
+			if len(updated) > sizeLimit {
+				return jpf.ToolResult{}, fmt.Errorf("the modified file would be larger than the maximum size limit of %d bytes", sizeLimit)
+			}
 
 			info, err := os.Stat(path)
 			if err != nil {
@@ -274,7 +302,7 @@ func newFileModifyTool(root string) jpf.Tool {
 	}
 }
 
-func newDirCreateTool(root string) jpf.Tool {
+func newDirCreateTool(workspaceRoot string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "create_dir",
@@ -289,7 +317,7 @@ func newDirCreateTool(root string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -303,7 +331,7 @@ func newDirCreateTool(root string) jpf.Tool {
 	}
 }
 
-func newDirDeleteTool(root string) jpf.Tool {
+func newDirDeleteTool(workspaceRoot string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "delete_dir",
@@ -318,7 +346,7 @@ func newDirDeleteTool(root string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -340,7 +368,7 @@ func newDirDeleteTool(root string) jpf.Tool {
 	}
 }
 
-func newWorkspaceRootTool(root string) jpf.Tool {
+func newWorkspaceRootTool(workspaceRoot string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "workspace_root",
@@ -348,7 +376,7 @@ func newWorkspaceRootTool(root string) jpf.Tool {
 			Params:      []jpf.ToolParam{},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			absRoot, err := filepath.Abs(root)
+			absRoot, err := filepath.Abs(workspaceRoot)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to resolve the workspace root"), err)
 			}
