@@ -72,7 +72,7 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "echo", Args: map[string]any{"msg": "hi"}}),
 		assistantTurn("done"),
 	}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{Name: "echo", Params: []jpf.ToolParam{{Name: "msg", Type: jpf.ToolParamString, Required: true}}},
@@ -83,7 +83,7 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 	})
 
 	rec := &recordingStreamer{}
-	err := agent.Run(context.Background(), "hello", WithStreamer(rec))
+	err := agent.Run(context.Background(), "hello", jpf.WithStreamActions(rec))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
@@ -102,7 +102,7 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 }
 
 func TestAgentRunErrorsWhenAwaitingDeferredCalls(t *testing.T) {
-	agent := NewAgent(&fakeModel{})
+	agent := NewReAct(&fakeModel{})
 	sess := agent.Session()
 	sess.CurrentDeferredToolCalls = []jpf.DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
@@ -117,18 +117,18 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 	model := &fakeModel{turns: []fakeModelTurn{
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "fetch", Args: map[string]any{"url": "http://x"}}),
 	}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString, Required: true}}}},
 	})
 
 	runRec := &recordingStreamer{}
-	err := agent.Run(context.Background(), "go fetch", WithStreamer(runRec))
+	err := agent.Run(context.Background(), "go fetch", jpf.WithStreamActions(runRec))
 	if err != nil {
 		t.Fatalf("Run: %v", err)
 	}
 
-	deferred := agent.CurrentDeferredToolCalls()
+	deferred := agent.Session().CurrentDeferredToolCalls
 	if len(deferred) != 1 || deferred[0].ToolName != "fetch" || deferred[0].CallID != "c1" || deferred[0].Args["url"] != "http://x" {
 		t.Fatalf("unexpected deferred calls: %+v", deferred)
 	}
@@ -145,12 +145,12 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 
 	model.turns = append(model.turns, assistantTurn("got it"))
 	resumeRec := &recordingStreamer{}
-	err = agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "c1", Content: "42"}}, WithStreamer(resumeRec))
+	err = agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "c1", Content: "42"}}, jpf.WithStreamActions(resumeRec))
 	if err != nil {
 		t.Fatalf("Resume: %v", err)
 	}
-	if len(agent.CurrentDeferredToolCalls()) != 0 {
-		t.Fatalf("expected no deferred calls after resume, got %+v", agent.CurrentDeferredToolCalls())
+	if len(agent.Session().CurrentDeferredToolCalls) != 0 {
+		t.Fatalf("expected no deferred calls after resume, got %+v", agent.Session().CurrentDeferredToolCalls)
 	}
 	requireMessages(t, agent.Session().CoreMessages, []jpf.Message{
 		jpf.UserMessage{Content: "go fetch"},
@@ -167,7 +167,7 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 }
 
 func TestAgentResumeErrorsWhenNotAwaitingDeferredCalls(t *testing.T) {
-	agent := NewAgent(&fakeModel{})
+	agent := NewReAct(&fakeModel{})
 	err := agent.Resume(context.Background(), []jpf.DeferredCallResult{{CallID: "c1", Content: "x"}})
 	if err == nil || !strings.Contains(err.Error(), "run instead") {
 		t.Fatalf("expected an error mentioning run instead, got: %v", err)
@@ -175,7 +175,7 @@ func TestAgentResumeErrorsWhenNotAwaitingDeferredCalls(t *testing.T) {
 }
 
 func TestAgentResumeErrorsOnCallCountMismatch(t *testing.T) {
-	agent := NewAgent(&fakeModel{})
+	agent := NewReAct(&fakeModel{})
 	sess := agent.Session()
 	sess.CurrentDeferredToolCalls = []jpf.DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
@@ -187,7 +187,7 @@ func TestAgentResumeErrorsOnCallCountMismatch(t *testing.T) {
 }
 
 func TestAgentResumeErrorsOnUnknownCallID(t *testing.T) {
-	agent := NewAgent(&fakeModel{})
+	agent := NewReAct(&fakeModel{})
 	sess := agent.Session()
 	sess.CurrentDeferredToolCalls = []jpf.DeferredToolCall{{ToolName: "fetch", CallID: "c1"}}
 	agent.SetSession(sess)
@@ -202,7 +202,7 @@ func TestAgentDeferredCallArgsAreValidatedAndCoerced(t *testing.T) {
 	model := &fakeModel{turns: []fakeModelTurn{
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "count", Args: map[string]any{"n": float64(5)}}),
 	}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{Schema: jpf.ToolSchema{Name: "count", Params: []jpf.ToolParam{{Name: "n", Type: jpf.ToolParamInt, Required: true}}}},
 	})
@@ -210,7 +210,7 @@ func TestAgentDeferredCallArgsAreValidatedAndCoerced(t *testing.T) {
 	if err := agent.Run(context.Background(), "count to 5"); err != nil {
 		t.Fatalf("Run: %v", err)
 	}
-	deferred := agent.CurrentDeferredToolCalls()
+	deferred := agent.Session().CurrentDeferredToolCalls
 	if len(deferred) != 1 {
 		t.Fatalf("expected 1 deferred call, got %d", len(deferred))
 	}
@@ -224,7 +224,7 @@ func TestAgentUnknownToolProducesErrorResult(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "missing_tool"}),
 		assistantTurn("ok"),
 	}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 
 	if err := agent.Run(context.Background(), "hi"); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -241,7 +241,7 @@ func TestAgentInvalidArgsProducesErrorResult(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "greet"}),
 		assistantTurn("ok"),
 	}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{Name: "greet", Params: []jpf.ToolParam{{Name: "name", Type: jpf.ToolParamString, Required: true}}},
@@ -268,7 +268,7 @@ func TestAgentMaxIterationsStopsLoop(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c2", Tool: "loop"}),
 		assistantTurn("", jpf.ToolCall{ID: "c3", Tool: "loop"}),
 	}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 	agent.SetMaxIterations(3)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
@@ -289,7 +289,7 @@ func TestAgentMaxIterationsStopsLoop(t *testing.T) {
 }
 
 func TestAgentSessionIsCloned(t *testing.T) {
-	agent := NewAgent(&fakeModel{})
+	agent := NewReAct(&fakeModel{})
 	sess := agent.Session()
 	sess.CoreMessages = append(sess.CoreMessages, jpf.UserMessage{Content: "leak"})
 
@@ -299,9 +299,9 @@ func TestAgentSessionIsCloned(t *testing.T) {
 }
 
 func TestNewAgentIncludesBuiltinTools(t *testing.T) {
-	agent := NewAgent(&fakeModel{})
-	names := make([]string, len(agent.toolCatalogue))
-	for i, tool := range agent.toolCatalogue {
+	agent := NewReAct(&fakeModel{})
+	names := make([]string, len(agent.(*reactAgent).toolCatalogue))
+	for i, tool := range agent.(*reactAgent).toolCatalogue {
 		names[i] = tool.Schema.Name
 	}
 	if !slices.Contains(names, "activate_skill") || !slices.Contains(names, "deactivate_skill") {
@@ -310,7 +310,7 @@ func TestNewAgentIncludesBuiltinTools(t *testing.T) {
 
 	agent.SetToolCatalogue([]jpf.Tool{{Schema: jpf.ToolSchema{Name: "custom"}}})
 	names = names[:0]
-	for _, tool := range agent.toolCatalogue {
+	for _, tool := range agent.(*reactAgent).toolCatalogue {
 		names = append(names, tool.Schema.Name)
 	}
 	if !slices.Contains(names, "activate_skill") || !slices.Contains(names, "deactivate_skill") || !slices.Contains(names, "custom") {
@@ -323,8 +323,8 @@ func TestAgentActivateAndDeactivateSkill(t *testing.T) {
 		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "activate_skill", Args: map[string]any{"skill_name": "golang"}}),
 		assistantTurn("activated"),
 	}}
-	agent := NewAgent(model)
-	agent.SetSkillCatalogue([]Skill{{Name: "golang", Description: "go help", Content: "use gofmt"}})
+	agent := NewReAct(model)
+	agent.SetSkillCatalogue([]jpf.Skill{{Name: "golang", Description: "go help", Content: "use gofmt"}})
 
 	if err := agent.Run(context.Background(), "help me with go"); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -356,8 +356,8 @@ func TestAgentActivateAndDeactivateSkill(t *testing.T) {
 
 func TestAgentDeactivatesMissingActiveSkills(t *testing.T) {
 	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
-	agent := NewAgent(model)
-	agent.SetSkillCatalogue([]Skill{{Name: "kept", Description: "d", Content: "c"}})
+	agent := NewReAct(model)
+	agent.SetSkillCatalogue([]jpf.Skill{{Name: "kept", Description: "d", Content: "c"}})
 
 	sess := agent.Session()
 	sess.ActiveSkillNames = []string{"kept", "stale"}
@@ -373,8 +373,8 @@ func TestAgentDeactivatesMissingActiveSkills(t *testing.T) {
 
 func TestAgentIncludesSystemAndHeadStateMessages(t *testing.T) {
 	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
-	agent := NewAgent(model)
-	agent.SetSkillCatalogue([]Skill{{Name: "golang", Description: "when writing go code", Content: "use gofmt"}})
+	agent := NewReAct(model)
+	agent.SetSkillCatalogue([]jpf.Skill{{Name: "golang", Description: "when writing go code", Content: "use gofmt"}})
 
 	if err := agent.Run(context.Background(), "hi"); err != nil {
 		t.Fatalf("Run: %v", err)
@@ -411,7 +411,7 @@ func TestRequiredAndOptionalArg(t *testing.T) {
 func TestFakeModelSurfacesModelError(t *testing.T) {
 	wantErr := errors.New("boom")
 	model := &fakeModel{turns: []fakeModelTurn{{Err: wantErr}}}
-	agent := NewAgent(model)
+	agent := NewReAct(model)
 
 	err := agent.Run(context.Background(), "hi")
 	if err == nil || !errors.Is(err, wantErr) {

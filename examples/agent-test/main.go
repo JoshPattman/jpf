@@ -21,7 +21,7 @@ func main() {
 	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
 	model = models.Retry(model, 3, models.WithDelay(time.Second))
 
-	agent := agents.NewAgent(model)
+	agent := agents.NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{
@@ -49,7 +49,7 @@ func main() {
 	err := agent.Run(
 		context.Background(),
 		"Ping me",
-		agents.WithStreamer(printStreamer{}),
+		jpf.WithStreamActions(printStreamer{}),
 	)
 	if err != nil {
 		panic(err)

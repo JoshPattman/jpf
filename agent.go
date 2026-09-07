@@ -1,8 +1,25 @@
 package jpf
 
 import (
+	"context"
 	"slices"
 )
+
+type Agent interface {
+	Session() AgentSession
+	SetSession(AgentSession)
+	SetMaxIterations(int)
+	SetToolCatalogue([]Tool)
+	SetSkillCatalogue([]Skill)
+	Run(context.Context, string, ...AgentResponseOpt) error
+	Resume(context.Context, []DeferredCallResult, ...AgentResponseOpt) error
+}
+
+type Skill struct {
+	Name        string
+	Description string
+	Content     string
+}
 
 const defaultAgentPrompt = `You are a ReAct agent.
 You will call tools until your job is complete, then you will provide a final response with no further tool calls to indicate you are finished iterating until the next task / message.`
@@ -48,4 +65,35 @@ func DefaultAgentSession() AgentSession {
 		TaskPrompt:        defaultTaskPrompt,
 		PersonalityPrompt: defaultPersonalityPrompt,
 	}
+}
+
+type AgentStreamer interface {
+	OnMessageComplete(Message)
+}
+
+type AgentResponseKwargs struct {
+	Streamer AgentStreamer
+}
+
+type AgentResponseOpt func(*AgentResponseKwargs)
+
+func WithStreamActions(streamer AgentStreamer) AgentResponseOpt {
+	return func(ark *AgentResponseKwargs) {
+		ark.Streamer = streamer
+	}
+}
+
+type nullStreamer struct{}
+
+func (nullStreamer) OnMessageComplete(Message) {}
+
+func GetAgentResponseKwargs(opts []AgentResponseOpt) AgentResponseKwargs {
+	kwargs := AgentResponseKwargs{}
+	for _, o := range opts {
+		o(&kwargs)
+	}
+	if kwargs.Streamer == nil {
+		kwargs.Streamer = nullStreamer{}
+	}
+	return kwargs
 }

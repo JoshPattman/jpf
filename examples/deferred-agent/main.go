@@ -27,7 +27,7 @@ func main() {
 	err := agent.Run(
 		context.Background(),
 		"Ping me",
-		agents.WithStreamer(streamer),
+		jpf.WithStreamActions(streamer),
 	)
 	if err != nil {
 		panic(err)
@@ -41,8 +41,8 @@ func main() {
 	// e.g. there could be one loop that dispatches tasks, and another
 	// in paralell that checks if they are done, and if they are it resumes
 	// the agent. This very much needs to be tailored to your usecase.
-	for len(agent.CurrentDeferredToolCalls()) > 0 {
-		defCalls := agent.CurrentDeferredToolCalls()
+	for len(agent.Session().CurrentDeferredToolCalls) > 0 {
+		defCalls := agent.Session().CurrentDeferredToolCalls
 		// Note that although we keep them ordered here, deferred responses do not need to be ordered.
 		defResponses := make([]jpf.DeferredCallResult, len(defCalls))
 		wg := &sync.WaitGroup{}
@@ -86,7 +86,7 @@ func main() {
 			panic(err)
 		}
 		agent2.SetSession(session2)
-		if err := agent2.Resume(context.Background(), defResponses, agents.WithStreamer(streamer)); err != nil {
+		if err := agent2.Resume(context.Background(), defResponses, jpf.WithStreamActions(streamer)); err != nil {
 			panic(err)
 		}
 
@@ -95,10 +95,10 @@ func main() {
 	}
 }
 
-func createEmptyAgent() *agents.Agent {
+func createEmptyAgent() jpf.Agent {
 	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
 	model = models.Retry(model, 3, models.WithDelay(time.Second))
-	agent := agents.NewAgent(model)
+	agent := agents.NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{
