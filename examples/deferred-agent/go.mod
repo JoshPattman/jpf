@@ -1,6 +1,6 @@
 module deferred_agent
 
-go 1.24.0
+go 1.25.0
 
 require github.com/JoshPattman/jpf v0.11.0-beta.5
 

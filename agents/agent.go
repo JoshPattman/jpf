@@ -10,8 +10,8 @@ import (
 	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-func NewAgent(model jpf.Model) *Agent {
-	a := &Agent{
+func NewReAct(model jpf.Model) jpf.Agent {
+	a := &reactAgent{
 		jpf.DefaultAgentSession(),
 		nil,
 		nil,
@@ -23,63 +23,40 @@ func NewAgent(model jpf.Model) *Agent {
 	return a
 }
 
-type Agent struct {
+type reactAgent struct {
 	session        jpf.AgentSession
 	toolCatalogue  []jpf.Tool
-	skillCatalogue []Skill
+	skillCatalogue []jpf.Skill
 	maxIterations  int
 	model          jpf.Model
 }
 
-func (a *Agent) Session() jpf.AgentSession {
+func (a *reactAgent) Session() jpf.AgentSession {
 	return a.session.Clone()
 }
 
-func (a *Agent) SetSession(sess jpf.AgentSession) {
+func (a *reactAgent) SetSession(sess jpf.AgentSession) {
 	a.session = sess.Clone()
 }
 
-func (a *Agent) SetMaxIterations(n int) {
+func (a *reactAgent) SetMaxIterations(n int) {
 	a.maxIterations = n
 }
 
-func (a *Agent) SetToolCatalogue(tools []jpf.Tool) {
+func (a *reactAgent) SetToolCatalogue(tools []jpf.Tool) {
 	a.toolCatalogue = slices.Concat(a.getBuiltinTools(), slices.Clone(tools))
 }
 
-func (a *Agent) SetSkillCatalogue(skills []Skill) {
+func (a *reactAgent) SetSkillCatalogue(skills []jpf.Skill) {
 	a.skillCatalogue = slices.Clone(skills)
-}
-
-type AgentResponseOpt func(*agentResponseKwargs)
-
-type agentResponseKwargs struct {
-	Streamer AgentStreamer
-}
-
-func WithStreamer(streamer AgentStreamer) AgentResponseOpt {
-	return func(ark *agentResponseKwargs) {
-		ark.Streamer = streamer
-	}
-}
-
-func getKwargs(opts []AgentResponseOpt) agentResponseKwargs {
-	kwargs := agentResponseKwargs{}
-	for _, o := range opts {
-		o(&kwargs)
-	}
-	if kwargs.Streamer == nil {
-		kwargs.Streamer = &AgentStreamerBase{}
-	}
-	return kwargs
 }
 
 // Run the agent from a new message to add into the conversation.
 // Should only be called if the agent is not currently awaiting deferred tool responses.
 // May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
-func (a *Agent) Run(ctx context.Context, query string, opts ...AgentResponseOpt) error {
-	kwargs := getKwargs(opts)
-	if len(a.CurrentDeferredToolCalls()) != 0 {
+func (a *reactAgent) Run(ctx context.Context, query string, opts ...jpf.AgentResponseOpt) error {
+	kwargs := jpf.GetAgentResponseKwargs(opts)
+	if len(a.Session().CurrentDeferredToolCalls) != 0 {
 		return fmt.Errorf("cannot run an agent from fresh when it is awaiting deferred calls, please use resume instead")
 	}
 	msg := jpf.UserMessage{Content: query}
@@ -91,9 +68,9 @@ func (a *Agent) Run(ctx context.Context, query string, opts ...AgentResponseOpt)
 // Resume the agent from a set of responses to deferred tool calls to add into the conversation.
 // Should only be called if the agent is currently awaiting deferred tool responses.
 // May terminate because the agent is done, has hit max iterations, or is awaiting deferred tool responses.
-func (a *Agent) Resume(ctx context.Context, callResults []jpf.DeferredCallResult, opts ...AgentResponseOpt) error {
-	kwargs := getKwargs(opts)
-	defCalls := a.CurrentDeferredToolCalls()
+func (a *reactAgent) Resume(ctx context.Context, callResults []jpf.DeferredCallResult, opts ...jpf.AgentResponseOpt) error {
+	kwargs := jpf.GetAgentResponseKwargs(opts)
+	defCalls := a.Session().CurrentDeferredToolCalls
 	if len(defCalls) == 0 {
 		return fmt.Errorf("cannot resume an agent when it is not awaiting deferred calls, please use run instead")
 	}
@@ -146,7 +123,7 @@ func (a *Agent) Resume(ctx context.Context, callResults []jpf.DeferredCallResult
 	return a.runOrResumeHelper(ctx, kwargs)
 }
 
-func (a *Agent) runOrResumeHelper(ctx context.Context, kwargs agentResponseKwargs) error {
+func (a *reactAgent) runOrResumeHelper(ctx context.Context, kwargs jpf.AgentResponseKwargs) error {
 	a.deactivateMissingActiveSkills()
 	for range a.maxIterations {
 		nextAction, err := a.determineNextAction(ctx, kwargs.Streamer.OnMessageComplete)
@@ -168,11 +145,7 @@ func (a *Agent) runOrResumeHelper(ctx context.Context, kwargs agentResponseKwarg
 	return nil
 }
 
-func (a *Agent) CurrentDeferredToolCalls() []jpf.DeferredToolCall {
-	return slices.Clone(a.Session().CurrentDeferredToolCalls)
-}
-
-func (a *Agent) deactivateMissingActiveSkills() {
+func (a *reactAgent) deactivateMissingActiveSkills() {
 	nextActiveSkills := make([]string, 0)
 	for _, s := range a.session.ActiveSkillNames {
 		_, err := a.lookupSkill(s)
@@ -183,7 +156,7 @@ func (a *Agent) deactivateMissingActiveSkills() {
 	a.session.ActiveSkillNames = nextActiveSkills
 }
 
-func (a *Agent) getBuiltinTools() []jpf.Tool {
+func (a *reactAgent) getBuiltinTools() []jpf.Tool {
 	activateSkillTool := jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "activate_skill",
@@ -243,7 +216,7 @@ func (a *Agent) getBuiltinTools() []jpf.Tool {
 	}
 }
 
-func (a *Agent) determineNextAction(ctx context.Context, messageCallback func(jpf.Message)) (jpf.AssistantMessage, error) {
+func (a *reactAgent) determineNextAction(ctx context.Context, messageCallback func(jpf.Message)) (jpf.AssistantMessage, error) {
 	llmMessages := a.getMessagesForLLM()
 	response, err := a.model.Respond(
 		ctx,
@@ -258,7 +231,7 @@ func (a *Agent) determineNextAction(ctx context.Context, messageCallback func(jp
 	return response.Message, nil
 }
 
-func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.Message), action jpf.AssistantMessage) error {
+func (a *reactAgent) executeToolCalls(ctx context.Context, messageCallback func(jpf.Message), action jpf.AssistantMessage) error {
 	tools := make([]jpf.Tool, len(action.ToolCalls))
 	for i, call := range action.ToolCalls {
 		tool, err := a.lookupTool(call.Tool)
@@ -309,7 +282,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, messageCallback func(jpf.M
 	return nil
 }
 
-func (a *Agent) lookupTool(name string) (jpf.Tool, error) {
+func (a *reactAgent) lookupTool(name string) (jpf.Tool, error) {
 	for _, t := range a.toolCatalogue {
 		if t.Schema.Name == name {
 			return t, nil
@@ -318,7 +291,7 @@ func (a *Agent) lookupTool(name string) (jpf.Tool, error) {
 	return jpf.Tool{}, fmt.Errorf("could not find tool with name '%s'", name)
 }
 
-func (a *Agent) toolSchemas() []jpf.ToolSchema {
+func (a *reactAgent) toolSchemas() []jpf.ToolSchema {
 	schemas := make([]jpf.ToolSchema, len(a.toolCatalogue))
 	for i, t := range a.toolCatalogue {
 		schemas[i] = t.Schema
@@ -326,7 +299,7 @@ func (a *Agent) toolSchemas() []jpf.ToolSchema {
 	return schemas
 }
 
-func (a *Agent) getMessagesForLLM() []jpf.Message {
+func (a *reactAgent) getMessagesForLLM() []jpf.Message {
 	llmMessages := []jpf.Message{}
 	systemMessage := a.systemMessage()
 	if systemMessage != nil {
@@ -340,8 +313,8 @@ func (a *Agent) getMessagesForLLM() []jpf.Message {
 	return llmMessages
 }
 
-func (a *Agent) getActiveSkills() []Skill {
-	activeSkills := make([]Skill, 0)
+func (a *reactAgent) getActiveSkills() []jpf.Skill {
+	activeSkills := make([]jpf.Skill, 0)
 	for _, name := range a.session.ActiveSkillNames {
 		s, err := a.lookupSkill(name)
 		if err != nil {
@@ -352,16 +325,16 @@ func (a *Agent) getActiveSkills() []Skill {
 	return activeSkills
 }
 
-func (a *Agent) lookupSkill(name string) (Skill, error) {
+func (a *reactAgent) lookupSkill(name string) (jpf.Skill, error) {
 	for _, s := range a.skillCatalogue {
 		if s.Name == name {
 			return s, nil
 		}
 	}
-	return Skill{}, fmt.Errorf("could not find skill with name '%s'", name)
+	return jpf.Skill{}, fmt.Errorf("could not find skill with name '%s'", name)
 }
 
-func (a *Agent) headStateMessage() jpf.Message {
+func (a *reactAgent) headStateMessage() jpf.Message {
 	if len(a.skillCatalogue) == 0 {
 		return nil
 	}
@@ -381,7 +354,7 @@ func (a *Agent) headStateMessage() jpf.Message {
 	return jpf.DeveloperMessage{Content: headState.String()}
 }
 
-func (a *Agent) systemMessage() jpf.Message {
+func (a *reactAgent) systemMessage() jpf.Message {
 	prompt := fmt.Sprintf("# Instructions\n%s\n\n# Personality\n%s\n\n# Task\n%s", a.session.AgentPrompt, a.session.PersonalityPrompt, a.session.TaskPrompt)
 	return jpf.SystemMessage{Content: prompt}
 }
