@@ -9,6 +9,7 @@ import (
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/agents"
 	"github.com/JoshPattman/jpf/models"
+	"github.com/JoshPattman/jpf/tools"
 )
 
 type printStreamer struct{}
@@ -54,4 +55,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	agent.SetToolCatalogue(tools.NewReadonlyFSTools())
+	err = agent.Run(
+		context.Background(),
+		"Ok now list the files in the dir you are currently in",
+		jpf.WithStreamActions(printStreamer{}),
+	)
+	if err != nil {
+		panic(err)
+	}
+
 }
