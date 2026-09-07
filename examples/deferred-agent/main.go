@@ -12,6 +12,7 @@ import (
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/agents"
 	"github.com/JoshPattman/jpf/models"
+	"github.com/JoshPattman/jpf/serialisation"
 )
 
 type printStreamer struct{}
@@ -60,7 +61,7 @@ func main() {
 		}
 		// Now we have set off the tasks, its safe to save the agent to a json file
 		file := bytes.NewBuffer(nil)
-		sessionDTO := agents.AgentSessionDTO{}
+		sessionDTO := serialisation.AgentSessionDTO{}
 		err = sessionDTO.LoadSession(agent.Session())
 		if err != nil {
 			panic(err)
@@ -75,7 +76,7 @@ func main() {
 		// This could be a completely different service - notice how only data that can be serialised is needed
 		fmt.Println("Resuming agent")
 		agent2 := createEmptyAgent()
-		sessionDTO2 := agents.AgentSessionDTO{}
+		sessionDTO2 := serialisation.AgentSessionDTO{}
 		err = json.NewDecoder(file).Decode(&sessionDTO2)
 		if err != nil {
 			panic(err)

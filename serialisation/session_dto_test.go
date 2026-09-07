@@ -1,4 +1,4 @@
-package agents
+package serialisation
 
 import (
 	"encoding/json"
@@ -95,7 +95,7 @@ func TestAgentSessionDTOEmptyRoundTrip(t *testing.T) {
 }
 
 func TestAgentSessionDTOLoadSessionResetsState(t *testing.T) {
-	dto := AgentSessionDTO{ActiveSkillNames: []string{"stale"}, CoreMessages: []jpf.MessageDTO{{Role: jpf.MessageRoleUser}}}
+	dto := AgentSessionDTO{ActiveSkillNames: []string{"stale"}, CoreMessages: []MessageDTO{{Role: MessageRoleUser}}}
 	if err := dto.LoadSession(jpf.DefaultAgentSession()); err != nil {
 		t.Fatalf("LoadSession: %v", err)
 	}

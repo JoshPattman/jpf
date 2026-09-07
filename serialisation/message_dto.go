@@ -1,4 +1,4 @@
-package jpf
+package serialisation
 
 import (
 	"bytes"
@@ -9,6 +9,8 @@ import (
 	_ "image/png"
 	"slices"
 	"strings"
+
+	"github.com/JoshPattman/jpf"
 )
 
 // MessageRole identifies which concrete Message type a MessageDTO represents.
@@ -47,7 +49,7 @@ type MessageDTO struct {
 	// round-trip caveats.
 	Images []string `json:"images,omitempty"`
 	// Requested tool calls, for assistant messages.
-	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+	ToolCalls []jpf.ToolCall `json:"tool_calls,omitempty"`
 	// The id of the tool call being responded to, for tool result messages.
 	CallID string `json:"call_id,omitempty"`
 	// The tool output, for tool result messages.
@@ -55,10 +57,10 @@ type MessageDTO struct {
 }
 
 // LoadMessage populates the DTO in place from msg, replacing any existing contents.
-func (d *MessageDTO) LoadMessage(msg Message) error {
+func (d *MessageDTO) LoadMessage(msg jpf.Message) error {
 	*d = MessageDTO{}
 	switch msg := msg.(type) {
-	case UserMessage:
+	case jpf.UserMessage:
 		d.Role = MessageRoleUser
 		d.Content = msg.Content
 		for _, img := range msg.Images {
@@ -68,17 +70,17 @@ func (d *MessageDTO) LoadMessage(msg Message) error {
 			}
 			d.Images = append(d.Images, encoded)
 		}
-	case AssistantMessage:
+	case jpf.AssistantMessage:
 		d.Role = MessageRoleAssistant
 		d.Content = msg.Content
 		d.ToolCalls = slices.Clone(msg.ToolCalls)
-	case DeveloperMessage:
+	case jpf.DeveloperMessage:
 		d.Role = MessageRoleDeveloper
 		d.Content = msg.Content
-	case SystemMessage:
+	case jpf.SystemMessage:
 		d.Role = MessageRoleSystem
 		d.Content = msg.Content
-	case ToolResultMessage:
+	case jpf.ToolResultMessage:
 		d.Role = MessageRoleToolResult
 		d.CallID = msg.CallID
 		d.Result = msg.Result
@@ -89,26 +91,26 @@ func (d *MessageDTO) LoadMessage(msg Message) error {
 }
 
 // ToMessage converts the DTO into the concrete Message that its Role describes.
-func (d *MessageDTO) ToMessage() (Message, error) {
+func (d *MessageDTO) ToMessage() (jpf.Message, error) {
 	switch d.Role {
 	case MessageRoleUser:
-		var images []ImageAttachment
+		var images []jpf.ImageAttachment
 		for _, encoded := range d.Images {
 			img, err := decodeDataURIImage(encoded)
 			if err != nil {
 				return nil, fmt.Errorf("failed to decode image attachment: %w", err)
 			}
-			images = append(images, ImageAttachment{Source: img})
+			images = append(images, jpf.ImageAttachment{Source: img})
 		}
-		return UserMessage{Content: d.Content, Images: images}, nil
+		return jpf.UserMessage{Content: d.Content, Images: images}, nil
 	case MessageRoleAssistant:
-		return AssistantMessage{Content: d.Content, ToolCalls: slices.Clone(d.ToolCalls)}, nil
+		return jpf.AssistantMessage{Content: d.Content, ToolCalls: slices.Clone(d.ToolCalls)}, nil
 	case MessageRoleDeveloper:
-		return DeveloperMessage{Content: d.Content}, nil
+		return jpf.DeveloperMessage{Content: d.Content}, nil
 	case MessageRoleSystem:
-		return SystemMessage{Content: d.Content}, nil
+		return jpf.SystemMessage{Content: d.Content}, nil
 	case MessageRoleToolResult:
-		return ToolResultMessage{CallID: d.CallID, Result: d.Result}, nil
+		return jpf.ToolResultMessage{CallID: d.CallID, Result: d.Result}, nil
 	default:
 		return nil, fmt.Errorf("cannot convert message with unknown role %q", d.Role)
 	}

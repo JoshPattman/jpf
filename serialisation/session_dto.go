@@ -1,4 +1,4 @@
-package agents
+package serialisation
 
 import (
 	"fmt"
@@ -14,7 +14,7 @@ import (
 //
 // Round-tripping is not exactly lossless:
 //
-//   - Every message in CoreMessages carries the jpf.MessageDTO caveats (tool-arg
+//   - Every message in CoreMessages carries the MessageDTO caveats (tool-arg
 //     numbers come back as float64, image attachments are re-encoded as PNG and
 //     will not compare Eq).
 //   - The arguments of a deferred tool call also pass through JSON as float64. These
@@ -26,7 +26,7 @@ type AgentSessionDTO struct {
 	AgentPrompt              string                `json:"agent_prompt"`
 	TaskPrompt               string                `json:"task_prompt"`
 	PersonalityPrompt        string                `json:"personality_prompt"`
-	CoreMessages             []jpf.MessageDTO      `json:"core_messages,omitempty"`
+	CoreMessages             []MessageDTO          `json:"core_messages,omitempty"`
 	CurrentDeferredToolCalls []DeferredToolCallDTO `json:"current_deferred_tool_calls,omitempty"`
 	ActiveSkillNames         []string              `json:"active_skill_names,omitempty"`
 }
@@ -65,7 +65,7 @@ func (d *AgentSessionDTO) LoadSession(sess jpf.AgentSession) error {
 		ActiveSkillNames:  slices.Clone(sess.ActiveSkillNames),
 	}
 	for i, msg := range sess.CoreMessages {
-		var msgDTO jpf.MessageDTO
+		var msgDTO MessageDTO
 		if err := msgDTO.LoadMessage(msg); err != nil {
 			return fmt.Errorf("failed to load core message %d: %w", i, err)
 		}
