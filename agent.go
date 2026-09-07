@@ -1,9 +1,7 @@
-package agents
+package jpf
 
 import (
 	"slices"
-
-	"github.com/JoshPattman/jpf"
 )
 
 const defaultAgentPrompt = `You are a ReAct agent.
@@ -26,9 +24,9 @@ type AgentSession struct {
 	// if not specified will speak neutrally and refer to itself as AI Assistant.
 	PersonalityPrompt string
 	// The messages, excluding system and other special messages.
-	CoreMessages []jpf.Message
+	CoreMessages []Message
 	// The current tool calls that have been deferred, with their validated args.
-	CurrentDeferredToolCalls []jpf.DeferredToolCall
+	CurrentDeferredToolCalls []DeferredToolCall
 	// The names of the skills that should currently be active.
 	ActiveSkillNames []string
 }
@@ -44,7 +42,7 @@ func (a AgentSession) Clone() AgentSession {
 	}
 }
 
-func DefaultSession() AgentSession {
+func DefaultAgentSession() AgentSession {
 	return AgentSession{
 		AgentPrompt:       defaultAgentPrompt,
 		TaskPrompt:        defaultTaskPrompt,
