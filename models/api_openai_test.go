@@ -181,10 +181,10 @@ func TestOpenAITools(t *testing.T) {
 		{
 			Name:        "search",
 			Description: "search the web",
-			Args: []jpf.ToolArg{
-				{Name: "q", Type: jpf.ToolArgString, Required: true, Description: "query"},
-				{Name: "n", Type: jpf.ToolArgInt},
-				{Name: "score", Type: jpf.ToolArgFloat},
+			Params: []jpf.ToolParam{
+				{Name: "q", Type: jpf.ToolParamString, Required: true, Description: "query"},
+				{Name: "n", Type: jpf.ToolParamInt},
+				{Name: "score", Type: jpf.ToolParamFloat},
 			},
 		},
 	})

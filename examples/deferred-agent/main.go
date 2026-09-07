@@ -43,7 +43,7 @@ func main() {
 	for len(agent.CurrentDeferredToolCalls()) > 0 {
 		defCalls := agent.CurrentDeferredToolCalls()
 		// Note that although we keep them ordered here, deferred responses do not need to be ordered.
-		defResponses := make([]agents.DeferredCallResponse, len(defCalls))
+		defResponses := make([]jpf.DeferredCallResult, len(defCalls))
 		wg := &sync.WaitGroup{}
 		for i, defCall := range defCalls {
 			switch defCall.ToolName {
@@ -52,7 +52,7 @@ func main() {
 					fmt.Println("Ping requested")
 					time.Sleep(time.Second * 5)
 					fmt.Println("Sending pong")
-					defResponses[i] = agents.DeferredCallResponse{CallID: defCall.CallID, Result: "User has sent PONG, let the user know you got it"}
+					defResponses[i] = jpf.DeferredCallResult{CallID: defCall.CallID, Content: "User has sent PONG, let the user know you got it"}
 				})
 			default:
 				panic("not possible")
@@ -98,12 +98,12 @@ func createEmptyAgent() *agents.Agent {
 	model := models.NewRemote(models.OpenAIChatCompletions, "gpt-5.4", os.Getenv("OPENAI_KEY"))
 	model = models.Retry(model, 3, models.WithDelay(time.Second))
 	agent := agents.NewAgent(model)
-	agent.SetToolCatalogue([]agents.Tool{
+	agent.SetToolCatalogue([]jpf.Tool{
 		{
 			Schema: jpf.ToolSchema{
 				Name:        "ping_user",
 				Description: "Ping the user, only use when asked to ping. When they are ready, they will pong you back.",
-				Args:        nil,
+				Params:      nil,
 			},
 			Call: nil, // To make a call deferred, simply do not include an auto-run function.
 		},

@@ -350,15 +350,15 @@ func (m *apiOpenAIResponsesModel) tools(toolSchemas []jpf.ToolSchema) []any {
 		props := map[string]any{}
 		required := []string{}
 
-		for _, arg := range tool.Args {
+		for _, arg := range tool.Params {
 			t := "string"
 
 			switch arg.Type {
-			case jpf.ToolArgString:
+			case jpf.ToolParamString:
 				t = "string"
-			case jpf.ToolArgInt:
+			case jpf.ToolParamInt:
 				t = "integer"
-			case jpf.ToolArgFloat:
+			case jpf.ToolParamFloat:
 				t = "number"
 			default:
 				panic("unreachable")
