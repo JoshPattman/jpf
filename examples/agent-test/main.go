@@ -56,10 +56,26 @@ func main() {
 		panic(err)
 	}
 
-	agent.SetToolCatalogue(tools.NewReadonlyFSTools())
+	agent.SetToolCatalogue([]jpf.Tool{
+		tools.NewFileReadTool(10000),
+		tools.NewPWDTool(),
+		tools.NewDirReadTool(100),
+		tools.NewFileCreateTool(),
+		tools.NewFileModifyTool(),
+		tools.NewDirCreateTool(),
+	})
 	err = agent.Run(
 		context.Background(),
 		"Ok now list the files in the dir you are currently in",
+		jpf.WithStreamActions(printStreamer{}),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = agent.Run(
+		context.Background(),
+		"Make a directory called scratch, then create an empty file called notes.txt inside it, then add a poem to that file",
 		jpf.WithStreamActions(printStreamer{}),
 	)
 	if err != nil {
