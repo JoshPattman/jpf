@@ -12,7 +12,7 @@ import (
 
 func NewAgent(model jpf.Model) *Agent {
 	a := &Agent{
-		DefaultSession(),
+		jpf.DefaultAgentSession(),
 		nil,
 		nil,
 		20,
@@ -24,18 +24,18 @@ func NewAgent(model jpf.Model) *Agent {
 }
 
 type Agent struct {
-	session        AgentSession
+	session        jpf.AgentSession
 	toolCatalogue  []jpf.Tool
 	skillCatalogue []Skill
 	maxIterations  int
 	model          jpf.Model
 }
 
-func (a *Agent) Session() AgentSession {
+func (a *Agent) Session() jpf.AgentSession {
 	return a.session.Clone()
 }
 
-func (a *Agent) SetSession(sess AgentSession) {
+func (a *Agent) SetSession(sess jpf.AgentSession) {
 	a.session = sess.Clone()
 }
 

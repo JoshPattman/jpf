@@ -8,7 +8,7 @@ import (
 )
 
 func TestAgentSessionDTORoundTrip(t *testing.T) {
-	sess := AgentSession{
+	sess := jpf.AgentSession{
 		AgentPrompt:       "agent",
 		TaskPrompt:        "task",
 		PersonalityPrompt: "personality",
@@ -69,7 +69,7 @@ func TestAgentSessionDTORoundTrip(t *testing.T) {
 }
 
 func TestAgentSessionDTOEmptyRoundTrip(t *testing.T) {
-	sess := DefaultSession()
+	sess := jpf.DefaultAgentSession()
 
 	var dto AgentSessionDTO
 	if err := dto.LoadSession(sess); err != nil {
@@ -96,7 +96,7 @@ func TestAgentSessionDTOEmptyRoundTrip(t *testing.T) {
 
 func TestAgentSessionDTOLoadSessionResetsState(t *testing.T) {
 	dto := AgentSessionDTO{ActiveSkillNames: []string{"stale"}, CoreMessages: []jpf.MessageDTO{{Role: jpf.MessageRoleUser}}}
-	if err := dto.LoadSession(DefaultSession()); err != nil {
+	if err := dto.LoadSession(jpf.DefaultAgentSession()); err != nil {
 		t.Fatalf("LoadSession: %v", err)
 	}
 	if dto.ActiveSkillNames != nil || dto.CoreMessages != nil {

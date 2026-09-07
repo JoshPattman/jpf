@@ -57,7 +57,7 @@ func (d *DeferredToolCallDTO) ToDeferredToolCall() jpf.DeferredToolCall {
 }
 
 // LoadSession populates the DTO in place from sess, replacing any existing contents.
-func (d *AgentSessionDTO) LoadSession(sess AgentSession) error {
+func (d *AgentSessionDTO) LoadSession(sess jpf.AgentSession) error {
 	*d = AgentSessionDTO{
 		AgentPrompt:       sess.AgentPrompt,
 		TaskPrompt:        sess.TaskPrompt,
@@ -80,8 +80,8 @@ func (d *AgentSessionDTO) LoadSession(sess AgentSession) error {
 }
 
 // ToSession converts the DTO back into the AgentSession it represents.
-func (d *AgentSessionDTO) ToSession() (AgentSession, error) {
-	sess := AgentSession{
+func (d *AgentSessionDTO) ToSession() (jpf.AgentSession, error) {
+	sess := jpf.AgentSession{
 		AgentPrompt:       d.AgentPrompt,
 		TaskPrompt:        d.TaskPrompt,
 		PersonalityPrompt: d.PersonalityPrompt,
@@ -90,7 +90,7 @@ func (d *AgentSessionDTO) ToSession() (AgentSession, error) {
 	for i, msgDTO := range d.CoreMessages {
 		msg, err := msgDTO.ToMessage()
 		if err != nil {
-			return AgentSession{}, fmt.Errorf("failed to convert core message %d: %w", i, err)
+			return jpf.AgentSession{}, fmt.Errorf("failed to convert core message %d: %w", i, err)
 		}
 		sess.CoreMessages = append(sess.CoreMessages, msg)
 	}
