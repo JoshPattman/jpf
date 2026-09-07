@@ -9,6 +9,7 @@ import (
 	"github.com/JoshPattman/jpf"
 	"github.com/JoshPattman/jpf/agents"
 	"github.com/JoshPattman/jpf/models"
+	"github.com/JoshPattman/jpf/tools"
 )
 
 type printStreamer struct{}
@@ -54,4 +55,28 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
+	root, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	agent.SetToolCatalogue(tools.BuildIOTools(tools.WriteFSLevel, root))
+	err = agent.Run(
+		context.Background(),
+		"Ok now list the files in the dir you are currently in",
+		jpf.WithStreamActions(printStreamer{}),
+	)
+	if err != nil {
+		panic(err)
+	}
+
+	err = agent.Run(
+		context.Background(),
+		"Make a directory called scratch, then create an empty file called notes.txt inside it, then add a poem to that file. finally, try to tell me the directories that exist at ../",
+		jpf.WithStreamActions(printStreamer{}),
+	)
+	if err != nil {
+		panic(err)
+	}
+
 }
