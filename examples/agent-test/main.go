@@ -60,14 +60,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	agent.SetToolCatalogue([]jpf.Tool{
-		tools.NewFileReadTool(root, 10000),
-		tools.NewPWDTool(root),
-		tools.NewDirReadTool(root, 100),
-		tools.NewFileCreateTool(root),
-		tools.NewFileModifyTool(root),
-		tools.NewDirCreateTool(root),
-	})
+	agent.SetToolCatalogue(tools.BuildIOTools(tools.WriteFSLevel, root))
 	err = agent.Run(
 		context.Background(),
 		"Ok now list the files in the dir you are currently in",

@@ -5,12 +5,45 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/JoshPattman/jpf"
 )
+
+type IOToolLevel uint8
+
+const (
+	// Readonly access to the filesystem.
+	ReadFSLevel IOToolLevel = iota
+	// Read and write access to the filesystem.
+	WriteFSLevel
+)
+
+// BuildIOTools builds the set of filesystem tools for an agent to interact with
+// its workspace. All tools are sandboxed to workspaceRoot. The tools included
+// depend on level: ReadFSLevel gives read-only tools, WriteFSLevel adds the
+// tools that create, modify, and delete files and directories.
+func BuildIOTools(level IOToolLevel, workspaceRoot string) []jpf.Tool {
+	readFileSizeLimit := 50000
+	readDirNumLimit := 250
+	ts := []jpf.Tool{
+		newWorkspaceRootTool(workspaceRoot),
+		newFileReadTool(workspaceRoot, readFileSizeLimit),
+		newDirReadTool(workspaceRoot, readDirNumLimit),
+	}
+	if level == WriteFSLevel {
+		ts = append(
+			ts,
+			newFileCreateTool(workspaceRoot),
+			newFileModifyTool(workspaceRoot),
+			newFileDeleteTool(workspaceRoot),
+			newDirCreateTool(workspaceRoot),
+			newDirDeleteTool(workspaceRoot),
+		)
+	}
+	return ts
+}
 
 // resolveAndCheckPath resolves path to an absolute path (relative paths are
 // taken relative to root) and verifies that the result is root itself or a
@@ -31,7 +64,7 @@ func resolveAndCheckPath(root, path string) (string, error) {
 	return abs, nil
 }
 
-func NewFileReadTool(root string, sizeLimit int) jpf.Tool {
+func newFileReadTool(root string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_file",
@@ -64,7 +97,7 @@ func NewFileReadTool(root string, sizeLimit int) jpf.Tool {
 	}
 }
 
-func NewDirReadTool(root string, numLimit int) jpf.Tool {
+func newDirReadTool(root string, numLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_dir",
@@ -105,7 +138,7 @@ func NewDirReadTool(root string, numLimit int) jpf.Tool {
 	}
 }
 
-func NewFileCreateTool(root string) jpf.Tool {
+func newFileCreateTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "create_file",
@@ -138,7 +171,7 @@ func NewFileCreateTool(root string) jpf.Tool {
 	}
 }
 
-func NewFileDeleteTool(root string) jpf.Tool {
+func newFileDeleteTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "delete_file",
@@ -174,7 +207,7 @@ func NewFileDeleteTool(root string) jpf.Tool {
 	}
 }
 
-func NewFileModifyTool(root string) jpf.Tool {
+func newFileModifyTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "modify_file",
@@ -241,7 +274,7 @@ func NewFileModifyTool(root string) jpf.Tool {
 	}
 }
 
-func NewDirCreateTool(root string) jpf.Tool {
+func newDirCreateTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "create_dir",
@@ -270,7 +303,7 @@ func NewDirCreateTool(root string) jpf.Tool {
 	}
 }
 
-func NewDirDeleteTool(root string) jpf.Tool {
+func newDirDeleteTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "delete_dir",
@@ -307,49 +340,20 @@ func NewDirDeleteTool(root string) jpf.Tool {
 	}
 }
 
-func NewRunBashCommandTool(workDir string) jpf.Tool {
+func newWorkspaceRootTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
-			Name:        "run_bash_command",
-			Description: "run a shell command via 'bash -c' from the root directory, dumping its combined stdout and stderr into your context. A non-zero exit code is reported as an error.",
-			Params: []jpf.ToolParam{
-				{
-					Name:        "command",
-					Description: "the command to run, as a single string passed to 'bash -c'",
-					Type:        jpf.ToolParamString,
-					Required:    true,
-				},
-			},
-		},
-		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			command := ta.RequiredString("command")
-			cmd := exec.CommandContext(ctx, "bash", "-c", command)
-			cmd.Dir = workDir
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				return jpf.ToolResult{}, errors.Join(fmt.Errorf("that command failed: %s", strings.TrimSpace(string(output))), err)
-			}
-			return jpf.ToolResult{
-				Content: string(output),
-			}, nil
-		},
-	}
-}
-
-func NewPWDTool(root string) jpf.Tool {
-	return jpf.Tool{
-		Schema: jpf.ToolSchema{
-			Name:        "pwd",
-			Description: "get the current working directory, dumping the result in your context.",
+			Name:        "workspace_root",
+			Description: "get the absolute path of the workspace root directory, dumping the result in your context. All file and directory paths you use must resolve to somewhere inside this directory.",
 			Params:      []jpf.ToolParam{},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			wd, err := filepath.Abs(root)
+			absRoot, err := filepath.Abs(root)
 			if err != nil {
-				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to get the working directory"), err)
+				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to resolve the workspace root"), err)
 			}
 			return jpf.ToolResult{
-				Content: wd,
+				Content: absRoot,
 			}, nil
 		},
 	}
