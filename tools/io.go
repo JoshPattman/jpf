@@ -5,12 +5,33 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/JoshPattman/jpf"
 )
 
-func NewFileReadTool(sizeLimit int) jpf.Tool {
+// resolveAndCheckPath resolves path to an absolute path (relative paths are
+// taken relative to root) and verifies that the result is root itself or a
+// child of root. It returns an error if the path escapes root.
+func resolveAndCheckPath(root, path string) (string, error) {
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve the root directory: %w", err)
+	}
+	if !filepath.IsAbs(path) {
+		path = filepath.Join(absRoot, path)
+	}
+	abs := filepath.Clean(path)
+	rel, err := filepath.Rel(absRoot, abs)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("that path is outside the permitted root directory")
+	}
+	return abs, nil
+}
+
+func NewFileReadTool(root string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_file",
@@ -25,7 +46,11 @@ func NewFileReadTool(sizeLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			contents, err := os.ReadFile(ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
+			contents, err := os.ReadFile(path)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to read that file"), err)
 			}
@@ -39,7 +64,7 @@ func NewFileReadTool(sizeLimit int) jpf.Tool {
 	}
 }
 
-func NewDirReadTool(numLimit int) jpf.Tool {
+func NewDirReadTool(root string, numLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_dir",
@@ -54,7 +79,11 @@ func NewDirReadTool(numLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			entries, err := os.ReadDir(ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
+			entries, err := os.ReadDir(path)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to read that directory"), err)
 			}
@@ -76,7 +105,7 @@ func NewDirReadTool(numLimit int) jpf.Tool {
 	}
 }
 
-func NewFileCreateTool() jpf.Tool {
+func NewFileCreateTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "create_file",
@@ -91,7 +120,10 @@ func NewFileCreateTool() jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path := ta.RequiredString("path")
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
 			f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to create that file"), err)
@@ -106,7 +138,7 @@ func NewFileCreateTool() jpf.Tool {
 	}
 }
 
-func NewFileDeleteTool() jpf.Tool {
+func NewFileDeleteTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "delete_file",
@@ -121,7 +153,10 @@ func NewFileDeleteTool() jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path := ta.RequiredString("path")
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
 			info, err := os.Stat(path)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to delete that file"), err)
@@ -139,7 +174,7 @@ func NewFileDeleteTool() jpf.Tool {
 	}
 }
 
-func NewFileModifyTool() jpf.Tool {
+func NewFileModifyTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "modify_file",
@@ -166,7 +201,10 @@ func NewFileModifyTool() jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path := ta.RequiredString("path")
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
 			oldText := ta.RequiredString("old_text")
 			newText := ta.RequiredString("new_text")
 
@@ -203,7 +241,7 @@ func NewFileModifyTool() jpf.Tool {
 	}
 }
 
-func NewDirCreateTool() jpf.Tool {
+func NewDirCreateTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "create_dir",
@@ -218,7 +256,10 @@ func NewDirCreateTool() jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path := ta.RequiredString("path")
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
 			if err := os.MkdirAll(path, 0755); err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to create that directory"), err)
 			}
@@ -229,7 +270,7 @@ func NewDirCreateTool() jpf.Tool {
 	}
 }
 
-func NewDirDeleteTool() jpf.Tool {
+func NewDirDeleteTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "delete_dir",
@@ -244,7 +285,10 @@ func NewDirDeleteTool() jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path := ta.RequiredString("path")
+			path, err := resolveAndCheckPath(root, ta.RequiredString("path"))
+			if err != nil {
+				return jpf.ToolResult{}, err
+			}
 			info, err := os.Stat(path)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to delete that directory"), err)
@@ -263,7 +307,36 @@ func NewDirDeleteTool() jpf.Tool {
 	}
 }
 
-func NewPWDTool() jpf.Tool {
+func NewRunBashCommandTool(workDir string) jpf.Tool {
+	return jpf.Tool{
+		Schema: jpf.ToolSchema{
+			Name:        "run_bash_command",
+			Description: "run a shell command via 'bash -c' from the root directory, dumping its combined stdout and stderr into your context. A non-zero exit code is reported as an error.",
+			Params: []jpf.ToolParam{
+				{
+					Name:        "command",
+					Description: "the command to run, as a single string passed to 'bash -c'",
+					Type:        jpf.ToolParamString,
+					Required:    true,
+				},
+			},
+		},
+		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
+			command := ta.RequiredString("command")
+			cmd := exec.CommandContext(ctx, "bash", "-c", command)
+			cmd.Dir = workDir
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return jpf.ToolResult{}, errors.Join(fmt.Errorf("that command failed: %s", strings.TrimSpace(string(output))), err)
+			}
+			return jpf.ToolResult{
+				Content: string(output),
+			}, nil
+		},
+	}
+}
+
+func NewPWDTool(root string) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "pwd",
@@ -271,7 +344,7 @@ func NewPWDTool() jpf.Tool {
 			Params:      []jpf.ToolParam{},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			wd, err := os.Getwd()
+			wd, err := filepath.Abs(root)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to get the working directory"), err)
 			}

@@ -56,13 +56,17 @@ func main() {
 		panic(err)
 	}
 
+	root, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
 	agent.SetToolCatalogue([]jpf.Tool{
-		tools.NewFileReadTool(10000),
-		tools.NewPWDTool(),
-		tools.NewDirReadTool(100),
-		tools.NewFileCreateTool(),
-		tools.NewFileModifyTool(),
-		tools.NewDirCreateTool(),
+		tools.NewFileReadTool(root, 10000),
+		tools.NewPWDTool(root),
+		tools.NewDirReadTool(root, 100),
+		tools.NewFileCreateTool(root),
+		tools.NewFileModifyTool(root),
+		tools.NewDirCreateTool(root),
 	})
 	err = agent.Run(
 		context.Background(),
@@ -75,7 +79,7 @@ func main() {
 
 	err = agent.Run(
 		context.Background(),
-		"Make a directory called scratch, then create an empty file called notes.txt inside it, then add a poem to that file",
+		"Make a directory called scratch, then create an empty file called notes.txt inside it, then add a poem to that file. finally, try to tell me the directories that exist at ../",
 		jpf.WithStreamActions(printStreamer{}),
 	)
 	if err != nil {
