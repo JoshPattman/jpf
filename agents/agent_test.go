@@ -395,6 +395,149 @@ func TestAgentIncludesSystemAndHeadStateMessages(t *testing.T) {
 	}
 }
 
+func headStateContent(t *testing.T, msgs []jpf.Message) (string, bool) {
+	t.Helper()
+	for _, m := range msgs {
+		if dev, ok := m.(jpf.DeveloperMessage); ok {
+			return dev.Content, true
+		}
+	}
+	return "", false
+}
+
+func TestAgentRendersPromptFragmentsWithoutSkillCatalogue(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+	agent := NewReAct(model)
+
+	sess := agent.Session()
+	sess.PromptFragments = map[string]string{"notes": "remember to be concise"}
+	agent.SetSession(sess)
+
+	if err := agent.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	content, ok := headStateContent(t, model.calls[0].Messages)
+	if !ok {
+		t.Fatalf("expected a head state message even without a skill catalogue, got %v", model.calls[0].Messages)
+	}
+	if !strings.Contains(content, "# Extra context") || !strings.Contains(content, "remember to be concise") {
+		t.Fatalf("head state did not contain the fragment: %q", content)
+	}
+}
+
+func TestAgentHasNoHeadStateWithoutSkillsOrFragments(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+	agent := NewReAct(model)
+
+	if err := agent.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if _, ok := headStateContent(t, model.calls[0].Messages); ok {
+		t.Fatalf("expected no head state message, got %v", model.calls[0].Messages)
+	}
+}
+
+func TestAgentToolCanSetAndRemovePromptFragments(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{
+		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "set_fragment"}),
+		assistantTurn("", jpf.ToolCall{ID: "c2", Tool: "clear_fragment"}),
+		assistantTurn("done"),
+	}}
+	agent := NewReAct(model)
+	agent.SetToolCatalogue([]jpf.Tool{
+		{
+			Schema: jpf.ToolSchema{Name: "set_fragment"},
+			Call: func(_ context.Context, _ jpf.ToolArgs) (jpf.ToolResult, error) {
+				return jpf.ToolResult{
+					Content:         "set",
+					PromptFragments: map[string]string{"todo": "- ship it"},
+				}, nil
+			},
+		},
+		{
+			Schema: jpf.ToolSchema{Name: "clear_fragment"},
+			Call: func(_ context.Context, _ jpf.ToolArgs) (jpf.ToolResult, error) {
+				return jpf.ToolResult{
+					Content:         "cleared",
+					PromptFragments: map[string]string{"todo": ""},
+				}, nil
+			},
+		},
+	})
+
+	if err := agent.Run(context.Background(), "go"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// The fragment set by the first tool call is visible on the second model call.
+	content, ok := headStateContent(t, model.calls[1].Messages)
+	if !ok || !strings.Contains(content, "- ship it") {
+		t.Fatalf("expected fragment to be rendered on the second model call, got %q", content)
+	}
+
+	// The second tool call clears it with an empty value, so it is gone by the third.
+	if _, ok := headStateContent(t, model.calls[2].Messages); ok {
+		t.Fatalf("expected no head state on the third model call after the fragment was cleared")
+	}
+	if _, ok := agent.Session().PromptFragments["todo"]; ok {
+		t.Fatalf("expected 'todo' fragment to be removed, got %+v", agent.Session().PromptFragments)
+	}
+}
+
+func TestAgentPromptFragmentsAreRenderedInKeyOrder(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+	agent := NewReAct(model)
+
+	sess := agent.Session()
+	sess.PromptFragments = map[string]string{
+		"zebra": "ZEBRA_VALUE",
+		"alpha": "ALPHA_VALUE",
+		"mike":  "MIKE_VALUE",
+	}
+	agent.SetSession(sess)
+
+	if err := agent.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	content, ok := headStateContent(t, model.calls[0].Messages)
+	if !ok {
+		t.Fatalf("expected a head state message")
+	}
+	ai, mi, zi := strings.Index(content, "ALPHA_VALUE"), strings.Index(content, "MIKE_VALUE"), strings.Index(content, "ZEBRA_VALUE")
+	if !(ai < mi && mi < zi) {
+		t.Fatalf("fragments not rendered in key order: alpha=%d mike=%d zebra=%d\n%s", ai, mi, zi, content)
+	}
+}
+
+func TestAgentDeferredCallCanSetPromptFragment(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{
+		assistantTurn("", jpf.ToolCall{ID: "c1", Tool: "fetch", Args: map[string]any{"url": "http://x"}}),
+	}}
+	agent := NewReAct(model)
+	agent.SetToolCatalogue([]jpf.Tool{
+		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString, Required: true}}}},
+	})
+
+	if err := agent.Run(context.Background(), "go fetch"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	model.turns = append(model.turns, assistantTurn("got it"))
+	err := agent.Resume(context.Background(), []jpf.DeferredCallResult{
+		{CallID: "c1", Content: "42", PromptFragments: map[string]string{"last_fetch": "http://x -> 42"}},
+	})
+	if err != nil {
+		t.Fatalf("Resume: %v", err)
+	}
+	if got := agent.Session().PromptFragments["last_fetch"]; got != "http://x -> 42" {
+		t.Fatalf("expected deferred call to set the fragment, got %q", got)
+	}
+	content, ok := headStateContent(t, model.calls[len(model.calls)-1].Messages)
+	if !ok || !strings.Contains(content, "http://x -> 42") {
+		t.Fatalf("expected fragment from the deferred call to be rendered, got %q", content)
+	}
+}
+
 func TestRequiredAndOptionalArg(t *testing.T) {
 	args := jpf.ToolArgs{"name": "josh"}
 	if got := args.RequiredString("name"); got != "josh" {

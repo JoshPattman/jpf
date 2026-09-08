@@ -29,6 +29,7 @@ type AgentSessionDTO struct {
 	CoreMessages             []MessageDTO          `json:"core_messages,omitempty"`
 	CurrentDeferredToolCalls []DeferredToolCallDTO `json:"current_deferred_tool_calls,omitempty"`
 	ActiveSkillNames         []string              `json:"active_skill_names,omitempty"`
+	PromptFragments          map[string]string     `json:"prompt_fragments,omitempty"`
 }
 
 // DeferredToolCallDTO is a JSON-serialisable representation of a DeferredToolCall.
@@ -63,6 +64,7 @@ func (d *AgentSessionDTO) LoadSession(sess jpf.AgentSession) error {
 		TaskPrompt:        sess.TaskPrompt,
 		PersonalityPrompt: sess.PersonalityPrompt,
 		ActiveSkillNames:  slices.Clone(sess.ActiveSkillNames),
+		PromptFragments:   maps.Clone(sess.PromptFragments),
 	}
 	for i, msg := range sess.CoreMessages {
 		var msgDTO MessageDTO
@@ -86,6 +88,7 @@ func (d *AgentSessionDTO) ToSession() (jpf.AgentSession, error) {
 		TaskPrompt:        d.TaskPrompt,
 		PersonalityPrompt: d.PersonalityPrompt,
 		ActiveSkillNames:  slices.Clone(d.ActiveSkillNames),
+		PromptFragments:   maps.Clone(d.PromptFragments),
 	}
 	for i, msgDTO := range d.CoreMessages {
 		msg, err := msgDTO.ToMessage()

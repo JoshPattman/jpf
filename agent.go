@@ -2,6 +2,7 @@ package jpf
 
 import (
 	"context"
+	"maps"
 	"slices"
 )
 
@@ -46,6 +47,10 @@ type AgentSession struct {
 	CurrentDeferredToolCalls []DeferredToolCall
 	// The names of the skills that should currently be active.
 	ActiveSkillNames []string
+	// PromptFragments are extra blocks of keyed text rendered in the head state,
+	// ordered by key. A tool can add or overwrite a fragment by returning it in
+	// its result; returning a key with an empty value removes that fragment.
+	PromptFragments map[string]string
 }
 
 func (a AgentSession) Clone() AgentSession {
@@ -56,6 +61,7 @@ func (a AgentSession) Clone() AgentSession {
 		slices.Clone(a.CoreMessages),
 		slices.Clone(a.CurrentDeferredToolCalls),
 		slices.Clone(a.ActiveSkillNames),
+		maps.Clone(a.PromptFragments),
 	}
 }
 
@@ -64,6 +70,7 @@ func DefaultAgentSession() AgentSession {
 		AgentPrompt:       defaultAgentPrompt,
 		TaskPrompt:        defaultTaskPrompt,
 		PersonalityPrompt: defaultPersonalityPrompt,
+		PromptFragments:   make(map[string]string),
 	}
 }
 

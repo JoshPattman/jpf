@@ -55,6 +55,10 @@ type DeferredToolCall struct {
 // ToolResult is what a Tool.Call returns when it is run by the agent framework.
 type ToolResult struct {
 	Content string
+	// PromptFragments are prompt fragments to apply to the agent session, keyed
+	// by fragment key. A non-empty value adds or overwrites that fragment; an
+	// empty value removes it. Keys that are not present are left unchanged.
+	PromptFragments map[string]string
 }
 
 // DeferredCallResult is what results from your code (not the agent framework)
@@ -62,7 +66,11 @@ type ToolResult struct {
 type DeferredCallResult struct {
 	CallID  string
 	Content string
-	Err     error
+	// PromptFragments behaves as documented on ToolResult.PromptFragments: a
+	// non-empty value adds or overwrites the fragment, an empty value removes it,
+	// and keys that are not present are left unchanged.
+	PromptFragments map[string]string
+	Err             error
 }
 
 // Takes the raw arguments (from json decoding) and
