@@ -67,27 +67,87 @@ func (m *apiGeminiModel) Respond(ctx context.Context, msgs []jpf.Message, opts .
 		return failedResponseAfter(usage), fmt.Errorf("response had no content: %s", string(rawRespBytes))
 	}
 
+	content, toolCalls, reasoning := m.extractOutput(respTyped.Candidates[0].Content.Parts)
+	return jpf.ModelResponse{
+		Message: jpf.AssistantMessage{Content: content, ToolCalls: toolCalls, Reasoning: reasoning},
+		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
+	}, nil
+}
+
+func (m *apiGeminiModel) formatFamily() string {
+	return formatFamily(Google, m.name)
+}
+
+// geminiThinkingBudget maps a ReasoningEffort onto a thinkingBudget token count.
+// The values sit inside the range every Gemini 2.5 model accepts; Gemini clamps
+// anything out of range for the specific model.
+func geminiThinkingBudget(re ReasoningEffort) int {
+	switch re {
+	case LowReasoning:
+		return 2048
+	case MediumReasoning:
+		return 8192
+	case HighReasoning:
+		return 16384
+	case XHighReasoning:
+		return 24576
+	default:
+		return 0
+	}
+}
+
+// thinkingConfig builds the generationConfig.thinkingConfig block, or nil when
+// nothing needs to be set. WithReasoningEffort sets an explicit thinkingBudget;
+// WithStoreReasoning asks for thought parts so signatures come back.
+func (m *apiGeminiModel) thinkingConfig() map[string]any {
+	cfg := map[string]any{}
+	if m.settings.storeReasoning {
+		cfg["includeThoughts"] = true
+	}
+	if m.settings.reasoning != nil && *m.settings.reasoning != NoneReasoning {
+		cfg["thinkingBudget"] = geminiThinkingBudget(*m.settings.reasoning)
+	}
+	if len(cfg) == 0 {
+		return nil
+	}
+	return cfg
+}
+
+func (m *apiGeminiModel) extractOutput(parts []geminiResponsePart) (string, []jpf.ToolCall, []jpf.OpaqueReasoningBlock) {
 	toolCalls := []jpf.ToolCall{}
 	var text strings.Builder
+	var turnReasoning []jpf.OpaqueReasoningBlock
+	// A thought signature may arrive on the functionCall part itself or on a
+	// preceding thought part, so carry it forward to the next call.
+	var pendingSig string
 
-	for _, part := range respTyped.Candidates[0].Content.Parts {
-
-		if part.Text != "" {
+	for _, part := range parts {
+		if part.Text != "" && !part.Thought {
 			text.WriteString(part.Text)
 		}
 
 		if part.FunctionCall != nil {
-			toolCalls = append(toolCalls, jpf.ToolCall{
+			tc := jpf.ToolCall{
 				ID:   part.FunctionCall.Name, // Gemini doesn't provide ID but we use name
 				Tool: part.FunctionCall.Name,
 				Args: part.FunctionCall.Args,
-			})
+			}
+			sig := part.ThoughtSignature
+			if sig == "" {
+				sig, pendingSig = pendingSig, ""
+			}
+			if m.settings.storeReasoning && sig != "" {
+				tc.Reasoning = []jpf.OpaqueReasoningBlock{{FormatFamily: m.formatFamily(), Sig: sig}}
+			}
+			toolCalls = append(toolCalls, tc)
+		} else if part.ThoughtSignature != "" && m.settings.storeReasoning {
+			pendingSig = part.ThoughtSignature
 		}
 	}
-	return jpf.ModelResponse{
-		Message: jpf.AssistantMessage{Content: text.String(), ToolCalls: toolCalls},
-		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
-	}, nil
+	if m.settings.storeReasoning && pendingSig != "" {
+		turnReasoning = append(turnReasoning, jpf.OpaqueReasoningBlock{FormatFamily: m.formatFamily(), Sig: pendingSig})
+	}
+	return text.String(), toolCalls, turnReasoning
 }
 
 func (m *apiGeminiModel) parseStaticResponse(ctx context.Context, respBody io.ReadCloser) (geminiStaticResponse, []byte, error) {
@@ -117,6 +177,10 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 	var currentFunctionCall *geminiResponseFunctionCall
 	responseContent := &strings.Builder{}
 	functionCalls := make([]geminiResponseFunctionCall, 0)
+	// Thought signatures, one slot per function call plus a trailing turn-level
+	// slot. Best-effort: signatures are matched to calls by arrival order.
+	functionCallSigs := make([]string, 0)
+	var pendingSig string
 	var inputTokens, outputTokens int
 
 	streamer.OnMessageBegin()
@@ -141,9 +205,12 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 
 		if len(chunk.Candidates) > 0 && len(chunk.Candidates[0].Content.Parts) > 0 {
 			for _, p := range chunk.Candidates[0].Content.Parts {
-				if p.Text != "" {
+				if p.Text != "" && !p.Thought {
 					responseContent.WriteString(p.Text)
 					streamer.OnMessageText(p.Text)
+				}
+				if p.ThoughtSignature != "" {
+					pendingSig = p.ThoughtSignature
 				}
 				if p.FunctionCall != nil {
 					if currentFunctionCall == nil {
@@ -155,6 +222,8 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 						maps.Copy(currentFunctionCall.Args, p.FunctionCall.Args)
 					} else {
 						functionCalls = append(functionCalls, *currentFunctionCall)
+						functionCallSigs = append(functionCallSigs, pendingSig)
+						pendingSig = ""
 						currentFunctionCall = p.FunctionCall
 					}
 				}
@@ -177,6 +246,8 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 
 	if currentFunctionCall != nil {
 		functionCalls = append(functionCalls, *currentFunctionCall)
+		functionCallSigs = append(functionCallSigs, pendingSig)
+		pendingSig = ""
 	}
 
 	// Build a static-style response
@@ -187,15 +258,18 @@ func (m *apiGeminiModel) parseStreamResponse(ctx context.Context, respBody io.Re
 			} `json:"content"`
 		}, 1),
 	}
-	parts := []geminiResponsePart{
-		{
-			Text: responseContent.String(),
-		},
+	textPart := geminiResponsePart{Text: responseContent.String()}
+	if len(functionCalls) == 0 {
+		// No calls to hang a trailing signature on; keep it turn-level.
+		textPart.ThoughtSignature = pendingSig
 	}
-	for _, fn := range functionCalls {
-		parts = append(parts, geminiResponsePart{
-			FunctionCall: &fn,
-		})
+	parts := []geminiResponsePart{textPart}
+	for i := range functionCalls {
+		part := geminiResponsePart{FunctionCall: &functionCalls[i]}
+		if i < len(functionCallSigs) {
+			part.ThoughtSignature = functionCallSigs[i]
+		}
+		parts = append(parts, part)
 	}
 	resp.Candidates[0].Content.Parts = parts
 	resp.UsageMetadata.InputTokens = inputTokens
@@ -297,6 +371,7 @@ func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 	var content string
 	var imageAttachments []jpf.ImageAttachment
 	var toolCallParts []map[string]any
+	var turnThoughtSignature string
 	switch msg := msg.(type) {
 	case jpf.UserMessage:
 		content = msg.Content
@@ -304,15 +379,24 @@ func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 	case jpf.AssistantMessage:
 		if len(msg.ToolCalls) > 0 {
 			for _, tc := range msg.ToolCalls {
-				toolCallParts = append(toolCallParts, map[string]any{
+				part := map[string]any{
 					"functionCall": map[string]any{
 						"name": tc.Tool,
 						"args": tc.Args,
 					},
-				})
+				}
+				if rs := replayableReasoning(tc.Reasoning, m.formatFamily()); len(rs) > 0 && rs[0].Sig != "" {
+					part["thoughtSignature"] = rs[0].Sig
+				}
+				toolCallParts = append(toolCallParts, part)
 			}
 		}
 		content = msg.Content
+		// Turn-level thought signatures (no associated call) ride on the leading
+		// text part.
+		if rs := replayableReasoning(msg.Reasoning, m.formatFamily()); len(rs) > 0 && rs[0].Sig != "" {
+			turnThoughtSignature = rs[0].Sig
+		}
 	case jpf.ToolResultMessage:
 		return []map[string]any{
 			{
@@ -329,6 +413,9 @@ func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 	}
 	textPart := map[string]any{
 		"text": content,
+	}
+	if turnThoughtSignature != "" {
+		textPart["thoughtSignature"] = turnThoughtSignature
 	}
 	allParts := []map[string]any{textPart}
 
@@ -395,6 +482,12 @@ func (m *apiGeminiModel) body(systemMessage string, toolSchemas []jpf.ToolSchema
 		gen["responseMimeType"] = "application/json"
 		gen["responseSchema"] = schema
 	}
+	if thinkingCfg := m.thinkingConfig(); thinkingCfg != nil {
+		if body["generationConfig"] == nil {
+			body["generationConfig"] = map[string]any{}
+		}
+		body["generationConfig"].(map[string]any)["thinkingConfig"] = thinkingCfg
+	}
 	if len(toolSchemas) > 0 {
 		body["tools"] = m.tools(toolSchemas)
 	}
@@ -453,8 +546,8 @@ func (m *apiGeminiModel) tools(toolSchemas []jpf.ToolSchema) []any {
 }
 
 func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
-	if m.settings.reasoning != nil {
-		return errUnsupportedSetting("reasoning", m.settings.reasoning)
+	if m.settings.storeReasoning && m.settings.reasoning != nil && *m.settings.reasoning == NoneReasoning {
+		return fmt.Errorf("WithStoreReasoning cannot be combined with NoneReasoning effort - there would be no reasoning to store")
 	}
 	if m.settings.verbosity != nil {
 		return errUnsupportedSetting("verbosity", m.settings.verbosity)
@@ -539,8 +632,10 @@ type geminiResponseFunctionCall struct {
 }
 
 type geminiResponsePart struct {
-	Text         string                      `json:"text"`
-	FunctionCall *geminiResponseFunctionCall `json:"functionCall"`
+	Text             string                      `json:"text"`
+	FunctionCall     *geminiResponseFunctionCall `json:"functionCall"`
+	Thought          bool                        `json:"thought,omitempty"`
+	ThoughtSignature string                      `json:"thoughtSignature,omitempty"`
 }
 
 type geminiStaticResponse struct {

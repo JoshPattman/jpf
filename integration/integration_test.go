@@ -86,11 +86,11 @@ func testToolCallModel(model jpf.Model) func(t *testing.T) {
 		schemas := jpf.ToolSchema{
 			Name:        "ping_user",
 			Description: "ping the user, use only when asked",
-			Args: []jpf.ToolArg{
+			Params: []jpf.ToolParam{
 				{
 					Name:        "message",
 					Description: "a nice message to ping the user with",
-					Type:        jpf.ToolArgString,
+					Type:        jpf.ToolParamString,
 					Required:    true,
 				},
 			},
@@ -128,6 +128,80 @@ func testToolCallModel(model jpf.Model) func(t *testing.T) {
 		}
 		if !strings.Contains(resp.Message.Content, "noodles") {
 			t.Fatal("response did not inclide confirmation")
+		}
+		t.Log(resp.Message.Content)
+	}
+}
+
+// TestStoreReasoningRoundTrip exercises WithStoreReasoning end to end: it makes a
+// tool-calling turn, checks opaque reasoning blocks came back, then replays that
+// assistant message (with its reasoning) plus a tool result and checks the
+// follow-up turn succeeds - i.e. the reasoning blocks were accepted by the API.
+func TestStoreReasoningRoundTrip(t *testing.T) {
+	oaiKey := os.Getenv("OPENAI_KEY")
+	gemKey := os.Getenv("GEMINI_KEY")
+	anthKey := os.Getenv("ANTHROPIC_KEY")
+	cases := []struct {
+		name  string
+		model jpf.Model
+	}{
+		{"anthropic", models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey, models.WithStoreReasoning())},
+		{"anthropic-high-effort", models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey, models.WithStoreReasoning(), models.WithReasoningEffort(models.HighReasoning))},
+		{"openai-responses", models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey, models.WithStoreReasoning(), models.WithReasoningEffort(models.LowReasoning))},
+		{"gemini", models.NewRemote(models.Google, "gemini-2.5-flash", gemKey, models.WithStoreReasoning())},
+		{"gemini-high-effort", models.NewRemote(models.Google, "gemini-2.5-flash", gemKey, models.WithStoreReasoning(), models.WithReasoningEffort(models.HighReasoning))},
+	}
+	for _, c := range cases {
+		t.Run(c.name, testStoreReasoningRoundTrip(models.Timeout(c.model, time.Minute)))
+	}
+}
+
+func testStoreReasoningRoundTrip(model jpf.Model) func(t *testing.T) {
+	return func(t *testing.T) {
+		schemas := jpf.ToolSchema{
+			Name:        "ping_user",
+			Description: "ping the user, use only when asked",
+			Params: []jpf.ToolParam{
+				{
+					Name:        "message",
+					Description: "a nice message to ping the user with",
+					Type:        jpf.ToolParamString,
+					Required:    true,
+				},
+			},
+		}
+		msgs := []jpf.Message{
+			jpf.SystemMessage{Content: "When calling tools, include a short natural language message explaining what you are doing. The ping tool returns a confirmation password; you must include that exact password in your final response, as a regex will check for it."},
+			jpf.UserMessage{Content: "Ping me!"},
+		}
+		resp, err := model.Respond(context.Background(), msgs, jpf.WithToolSchemas(schemas))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(resp.Message.ToolCalls) == 0 {
+			t.Fatal("no tools were called")
+		}
+
+		reasoningBlocks := len(resp.Message.Reasoning)
+		for _, tc := range resp.Message.ToolCalls {
+			reasoningBlocks += len(tc.Reasoning)
+		}
+		t.Logf("captured %d opaque reasoning block(s) (turn-level: %d)", reasoningBlocks, len(resp.Message.Reasoning))
+		if reasoningBlocks == 0 {
+			t.Fatal("expected at least one opaque reasoning block with WithStoreReasoning")
+		}
+
+		msgs = append(msgs, resp.Message)
+		msgs = append(msgs, jpf.ToolResultMessage{
+			CallID: resp.Message.ToolCalls[0].ID,
+			Result: "Ping sent. Include this confirmation password in your response: 'noodles'",
+		})
+		resp, err = model.Respond(context.Background(), msgs, jpf.WithToolSchemas(schemas))
+		if err != nil {
+			t.Fatalf("replaying the assistant turn with its reasoning blocks failed: %v", err)
+		}
+		if !strings.Contains(resp.Message.Content, "noodles") {
+			t.Fatalf("follow-up response did not include the confirmation: %q", resp.Message.Content)
 		}
 		t.Log(resp.Message.Content)
 	}
@@ -205,11 +279,11 @@ func testStreamToolCallModel(model jpf.Model) func(t *testing.T) {
 		schemas := jpf.ToolSchema{
 			Name:        "ping_user",
 			Description: "ping the user, use only when asked",
-			Args: []jpf.ToolArg{
+			Params: []jpf.ToolParam{
 				{
 					Name:        "message",
 					Description: "a nice message to ping the user with",
-					Type:        jpf.ToolArgString,
+					Type:        jpf.ToolParamString,
 					Required:    true,
 				},
 			},

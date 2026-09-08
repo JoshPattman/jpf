@@ -48,8 +48,11 @@ type MessageDTO struct {
 	// ToMessage decodes these back into image.Image values; see the type doc for the
 	// round-trip caveats.
 	Images []string `json:"images,omitempty"`
-	// Requested tool calls, for assistant messages.
+	// Requested tool calls, for assistant messages. Each ToolCall may carry its
+	// own opaque reasoning blocks.
 	ToolCalls []jpf.ToolCall `json:"tool_calls,omitempty"`
+	// Turn-level opaque reasoning-continuation state, for assistant messages.
+	Reasoning []jpf.OpaqueReasoningBlock `json:"reasoning,omitempty"`
 	// The id of the tool call being responded to, for tool result messages.
 	CallID string `json:"call_id,omitempty"`
 	// The tool output, for tool result messages.
@@ -74,6 +77,7 @@ func (d *MessageDTO) LoadMessage(msg jpf.Message) error {
 		d.Role = MessageRoleAssistant
 		d.Content = msg.Content
 		d.ToolCalls = slices.Clone(msg.ToolCalls)
+		d.Reasoning = slices.Clone(msg.Reasoning)
 	case jpf.DeveloperMessage:
 		d.Role = MessageRoleDeveloper
 		d.Content = msg.Content
@@ -104,7 +108,7 @@ func (d *MessageDTO) ToMessage() (jpf.Message, error) {
 		}
 		return jpf.UserMessage{Content: d.Content, Images: images}, nil
 	case MessageRoleAssistant:
-		return jpf.AssistantMessage{Content: d.Content, ToolCalls: slices.Clone(d.ToolCalls)}, nil
+		return jpf.AssistantMessage{Content: d.Content, ToolCalls: slices.Clone(d.ToolCalls), Reasoning: slices.Clone(d.Reasoning)}, nil
 	case MessageRoleDeveloper:
 		return jpf.DeveloperMessage{Content: d.Content}, nil
 	case MessageRoleSystem:

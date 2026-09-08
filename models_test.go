@@ -81,7 +81,7 @@ func TestUserMessageStringAndEq(t *testing.T) {
 
 func TestAssistantMessageStringAndEq(t *testing.T) {
 	m := AssistantMessage{Content: "hi", ToolCalls: []ToolCall{{ID: "c1", Tool: "search"}}}
-	if m.String() != `AssistantMessage{Content: "hi", ToolCalls: 1}` {
+	if m.String() != `AssistantMessage{Content: "hi", ToolCalls: 1, Reasoning: 0}` {
 		t.Fatalf("got %s", m.String())
 	}
 	if !m.Eq(AssistantMessage{Content: "hi", ToolCalls: []ToolCall{{ID: "c1", Tool: "search"}}}) {
@@ -89,6 +89,9 @@ func TestAssistantMessageStringAndEq(t *testing.T) {
 	}
 	if m.Eq(AssistantMessage{Content: "hi"}) {
 		t.Fatal("expected different tool calls to not be Eq")
+	}
+	if m.Eq(AssistantMessage{Content: "hi", ToolCalls: []ToolCall{{ID: "c1", Tool: "search"}}, Reasoning: []OpaqueReasoningBlock{{FormatFamily: "anthropic/x"}}}) {
+		t.Fatal("expected different reasoning to not be Eq")
 	}
 	if m.Eq(UserMessage{Content: "hi"}) {
 		t.Fatal("expected different types to not be Eq")
