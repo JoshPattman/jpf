@@ -11,13 +11,15 @@ import (
 	"github.com/JoshPattman/jpf/internal/utils"
 )
 
-func NewReAct(model jpf.Model) jpf.Agent {
+func NewReAct(model jpf.Model, opts ...ReActOpt) jpf.Agent {
 	a := &reactAgent{
-		jpf.DefaultAgentSession(),
-		nil,
-		nil,
-		20,
-		model,
+		session:            jpf.DefaultAgentSession(),
+		maxIterations:      20,
+		model:              model,
+		headStatePlacement: DeveloperBeforeConversation,
+	}
+	for _, opt := range opts {
+		opt(a)
 	}
 	a.SetSkillCatalogue(nil)
 	a.SetToolCatalogue(nil)
@@ -25,11 +27,12 @@ func NewReAct(model jpf.Model) jpf.Agent {
 }
 
 type reactAgent struct {
-	session        jpf.AgentSession
-	toolCatalogue  []jpf.Tool
-	skillCatalogue []jpf.Skill
-	maxIterations  int
-	model          jpf.Model
+	session            jpf.AgentSession
+	toolCatalogue      []jpf.Tool
+	skillCatalogue     []jpf.Skill
+	maxIterations      int
+	model              jpf.Model
+	headStatePlacement HeadStatePlacement
 }
 
 func (a *reactAgent) Session() jpf.AgentSession {
@@ -308,15 +311,32 @@ func (a *reactAgent) toolSchemas() []jpf.ToolSchema {
 
 func (a *reactAgent) getMessagesForLLM() []jpf.Message {
 	llmMessages := []jpf.Message{}
+
 	systemMessage := a.systemMessage()
+	headState := a.headStateMessage()
+
+	// EmbedAfterSystem folds the head state into the system prompt, so there is
+	// no standalone head state message to place.
+	if headState != nil && a.headStatePlacement == EmbedAfterSystem {
+		sys, _ := systemMessage.(jpf.SystemMessage)
+		dev := headState.(jpf.DeveloperMessage)
+		systemMessage = jpf.SystemMessage{Content: sys.Content + "\n\n" + dev.Content}
+		headState = nil
+	}
+
 	if systemMessage != nil {
 		llmMessages = append(llmMessages, systemMessage)
 	}
-	headState := a.headStateMessage()
-	if headState != nil {
+	if headState != nil && a.headStatePlacement == DeveloperBeforeConversation {
 		llmMessages = append(llmMessages, headState)
 	}
+
 	llmMessages = append(llmMessages, a.session.CoreMessages...)
+
+	if headState != nil && a.headStatePlacement == DeveloperAfterConversation {
+		llmMessages = append(llmMessages, headState)
+	}
+
 	return llmMessages
 }
 

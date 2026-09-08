@@ -538,6 +538,97 @@ func TestAgentDeferredCallCanSetPromptFragment(t *testing.T) {
 	}
 }
 
+func TestAgentHeadStatePlacementDefaultsToDeveloperBeforeConversation(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+	agent := NewReAct(model)
+	agent.SetSkillCatalogue([]jpf.Skill{{Name: "golang", Description: "go help", Content: "use gofmt"}})
+
+	if err := agent.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	sent := model.calls[0].Messages
+	if len(sent) != 3 {
+		t.Fatalf("expected system, head state, user; got %d: %v", len(sent), sent)
+	}
+	if _, ok := sent[0].(jpf.SystemMessage); !ok {
+		t.Fatalf("expected first message to be a SystemMessage, got %T", sent[0])
+	}
+	if dev, ok := sent[1].(jpf.DeveloperMessage); !ok || !strings.Contains(dev.Content, "golang") {
+		t.Fatalf("expected head state DeveloperMessage before the conversation, got %+v", sent[1])
+	}
+	if _, ok := sent[2].(jpf.UserMessage); !ok {
+		t.Fatalf("expected the user message last, got %T", sent[2])
+	}
+}
+
+func TestAgentHeadStatePlacementEmbedAfterSystem(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+	agent := NewReAct(model, WithHeadStatePlacement(EmbedAfterSystem))
+	agent.SetSkillCatalogue([]jpf.Skill{{Name: "golang", Description: "go help", Content: "use gofmt"}})
+
+	if err := agent.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	sent := model.calls[0].Messages
+	if len(sent) != 2 {
+		t.Fatalf("expected system and user only; got %d: %v", len(sent), sent)
+	}
+	sys, ok := sent[0].(jpf.SystemMessage)
+	if !ok {
+		t.Fatalf("expected first message to be a SystemMessage, got %T", sent[0])
+	}
+	if !strings.Contains(sys.Content, "# Task") || !strings.Contains(sys.Content, "golang") {
+		t.Fatalf("expected head state embedded in the system prompt, got %q", sys.Content)
+	}
+	if _, ok := headStateContent(t, sent); ok {
+		t.Fatalf("expected no standalone DeveloperMessage, got %v", sent)
+	}
+	if _, ok := sent[1].(jpf.UserMessage); !ok {
+		t.Fatalf("expected the user message second, got %T", sent[1])
+	}
+}
+
+func TestAgentHeadStatePlacementDeveloperAfterConversation(t *testing.T) {
+	model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+	agent := NewReAct(model, WithHeadStatePlacement(DeveloperAfterConversation))
+	agent.SetSkillCatalogue([]jpf.Skill{{Name: "golang", Description: "go help", Content: "use gofmt"}})
+
+	if err := agent.Run(context.Background(), "hi"); err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	sent := model.calls[0].Messages
+	if len(sent) != 3 {
+		t.Fatalf("expected system, user, head state; got %d: %v", len(sent), sent)
+	}
+	if _, ok := sent[0].(jpf.SystemMessage); !ok {
+		t.Fatalf("expected first message to be a SystemMessage, got %T", sent[0])
+	}
+	if _, ok := sent[1].(jpf.UserMessage); !ok {
+		t.Fatalf("expected the user message before the head state, got %T", sent[1])
+	}
+	if dev, ok := sent[2].(jpf.DeveloperMessage); !ok || !strings.Contains(dev.Content, "golang") {
+		t.Fatalf("expected head state DeveloperMessage after the conversation, got %+v", sent[2])
+	}
+}
+
+func TestAgentHeadStatePlacementIsInertWhenHeadStateIsEmpty(t *testing.T) {
+	for _, placement := range []HeadStatePlacement{EmbedAfterSystem, DeveloperBeforeConversation, DeveloperAfterConversation} {
+		model := &fakeModel{turns: []fakeModelTurn{assistantTurn("ok")}}
+		agent := NewReAct(model, WithHeadStatePlacement(placement))
+
+		if err := agent.Run(context.Background(), "hi"); err != nil {
+			t.Fatalf("placement %d: Run: %v", placement, err)
+		}
+		sent := model.calls[0].Messages
+		if len(sent) != 2 {
+			t.Fatalf("placement %d: expected system and user only, got %d: %v", placement, len(sent), sent)
+		}
+		if _, ok := headStateContent(t, sent); ok {
+			t.Fatalf("placement %d: expected no head state message, got %v", placement, sent)
+		}
+	}
+}
+
 func TestRequiredAndOptionalArg(t *testing.T) {
 	args := jpf.ToolArgs{"name": "josh"}
 	if got := args.RequiredString("name"); got != "josh" {
