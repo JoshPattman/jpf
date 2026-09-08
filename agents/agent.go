@@ -3,6 +3,7 @@ package agents
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 
@@ -88,10 +89,9 @@ func (a *reactAgent) Resume(ctx context.Context, callResults []jpf.DeferredCallR
 		}
 	}
 	// Replace placeholder calls
-	sess := a.Session()
 	for _, result := range callResults {
-		for i := len(sess.CoreMessages) - 1; i >= 0; i-- {
-			resp, ok := sess.CoreMessages[i].(jpf.ToolResultMessage)
+		for i := len(a.session.CoreMessages) - 1; i >= 0; i-- {
+			resp, ok := a.session.CoreMessages[i].(jpf.ToolResultMessage)
 			if !ok {
 				continue
 			}
@@ -102,24 +102,26 @@ func (a *reactAgent) Resume(ctx context.Context, callResults []jpf.DeferredCallR
 				resp.Result = fmt.Sprintf("The tool call failed with error: %s", result.Err.Error())
 			} else {
 				resp.Result = result.Content
+				// See the note in executeToolCalls: fragments from deferred calls
+				// are applied after those from direct calls, not in tool-call order.
+				a.applyFragments(result.PromptFragments)
 			}
-			sess.CoreMessages[i] = resp
+			a.session.CoreMessages[i] = resp
 			break
 		}
 	}
 	// Run callback
-	for i, msg := range slices.Backward(sess.CoreMessages) {
+	for i, msg := range slices.Backward(a.session.CoreMessages) {
 		_, ok := msg.(jpf.ToolResultMessage)
 		if !ok {
-			for j := i + 1; j < len(sess.CoreMessages); j++ {
-				kwargs.Streamer.OnMessageComplete(sess.CoreMessages[j])
+			for j := i + 1; j < len(a.session.CoreMessages); j++ {
+				kwargs.Streamer.OnMessageComplete(a.session.CoreMessages[j])
 			}
 			break
 		}
 	}
 
-	sess.CurrentDeferredToolCalls = nil
-	a.SetSession(sess)
+	a.session.CurrentDeferredToolCalls = nil
 	return a.runOrResumeHelper(ctx, kwargs)
 }
 
@@ -265,6 +267,11 @@ func (a *reactAgent) executeToolCalls(ctx context.Context, messageCallback func(
 				msg.Result = fmt.Sprintf("The tool call failed with error: %s", err.Error())
 			} else {
 				msg.Result = result.Content
+				// NOTE: Fragments are not applied in tool-call order. Fragments
+				// from directly-run tools are applied first, then those from
+				// deferred calls when they resume. This is expected to be a rare
+				// edge case, so the extra code needed to fix it is not worth it.
+				a.applyFragments(result.PromptFragments)
 			}
 		}
 		a.session.CoreMessages = append(a.session.CoreMessages, msg)
@@ -335,21 +342,42 @@ func (a *reactAgent) lookupSkill(name string) (jpf.Skill, error) {
 }
 
 func (a *reactAgent) headStateMessage() jpf.Message {
-	if len(a.skillCatalogue) == 0 {
-		return nil
+	// Safety guard: the rendering and fragment logic below assumes a non-nil map.
+	if a.session.PromptFragments == nil {
+		a.session.PromptFragments = make(map[string]string)
 	}
-	activeSkills := a.getActiveSkills()
+
 	headState := &strings.Builder{}
-	headState.WriteString("# Skills\nBelow are the activated and non-activated skills. These are up to date - activating / deactivating a skill will change it in this message. If you need a new skill, activate it. On the other hand, if you no longer need a skill, deactivate it to save context.\n## Active Skills\n")
-	for _, s := range activeSkills {
-		fmt.Fprintf(headState, "Skill '%s'\n%s\n\n", s.Name, s.Content)
-	}
-	headState.WriteString("# Available Skills\nBelow is a list of every skill that is avaiable for you to activate.\n")
-	for _, s := range a.skillCatalogue {
-		if slices.Contains(a.session.ActiveSkillNames, s.Name) {
-			continue
+
+	if len(a.skillCatalogue) > 0 {
+		activeSkills := a.getActiveSkills()
+		headState.WriteString("# Skills\nBelow are the activated and non-activated skills. These are up to date - activating / deactivating a skill will change it in this message. If you need a new skill, activate it. On the other hand, if you no longer need a skill, deactivate it to save context.\n## Active Skills\n")
+		for _, s := range activeSkills {
+			fmt.Fprintf(headState, "Skill '%s'\n%s\n\n", s.Name, s.Content)
 		}
-		fmt.Fprintf(headState, "Skill '%s', activate when: %s\n", s.Name, s.Description)
+		headState.WriteString("# Available Skills\nBelow is a list of every skill that is avaiable for you to activate.\n")
+		for _, s := range a.skillCatalogue {
+			if slices.Contains(a.session.ActiveSkillNames, s.Name) {
+				continue
+			}
+			fmt.Fprintf(headState, "Skill '%s', activate when: %s\n", s.Name, s.Description)
+		}
+	}
+
+	keysOrdered := slices.Collect(maps.Keys(a.session.PromptFragments))
+	slices.Sort(keysOrdered)
+	if len(keysOrdered) > 0 {
+		if headState.Len() > 0 {
+			headState.WriteString("\n\n")
+		}
+		headState.WriteString("# Extra context")
+		for _, key := range keysOrdered {
+			fmt.Fprintf(headState, "\n\n> Below is extra context with key `%s`\n\n%s", key, a.session.PromptFragments[key])
+		}
+	}
+
+	if headState.Len() == 0 {
+		return nil
 	}
 	return jpf.DeveloperMessage{Content: headState.String()}
 }
@@ -357,4 +385,20 @@ func (a *reactAgent) headStateMessage() jpf.Message {
 func (a *reactAgent) systemMessage() jpf.Message {
 	prompt := fmt.Sprintf("# Instructions\n%s\n\n# Personality\n%s\n\n# Task\n%s", a.session.AgentPrompt, a.session.PersonalityPrompt, a.session.TaskPrompt)
 	return jpf.SystemMessage{Content: prompt}
+}
+
+func (a *reactAgent) applyFragments(frags map[string]string) {
+	if a.session.PromptFragments == nil {
+		a.session.PromptFragments = make(map[string]string)
+	}
+	if frags == nil {
+		return
+	}
+	for k, v := range frags {
+		if v == "" {
+			delete(a.session.PromptFragments, k)
+		} else {
+			a.session.PromptFragments[k] = v
+		}
+	}
 }

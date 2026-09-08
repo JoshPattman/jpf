@@ -24,6 +24,7 @@ func TestAgentSessionDTORoundTrip(t *testing.T) {
 			{ToolName: "read_file", CallID: "c2", Args: map[string]any{"path": "/tmp"}},
 		},
 		ActiveSkillNames: []string{"skill-a", "skill-b"},
+		PromptFragments:  map[string]string{"todo": "- buy milk", "plan": "step 1"},
 	}
 
 	var dto AgentSessionDTO
@@ -66,6 +67,9 @@ func TestAgentSessionDTORoundTrip(t *testing.T) {
 	if len(got.ActiveSkillNames) != 2 || got.ActiveSkillNames[0] != "skill-a" || got.ActiveSkillNames[1] != "skill-b" {
 		t.Fatalf("active skill names did not round-trip: %+v", got.ActiveSkillNames)
 	}
+	if len(got.PromptFragments) != 2 || got.PromptFragments["todo"] != "- buy milk" || got.PromptFragments["plan"] != "step 1" {
+		t.Fatalf("prompt fragments did not round-trip: %+v", got.PromptFragments)
+	}
 }
 
 func TestAgentSessionDTOEmptyRoundTrip(t *testing.T) {
@@ -95,11 +99,11 @@ func TestAgentSessionDTOEmptyRoundTrip(t *testing.T) {
 }
 
 func TestAgentSessionDTOLoadSessionResetsState(t *testing.T) {
-	dto := AgentSessionDTO{ActiveSkillNames: []string{"stale"}, CoreMessages: []MessageDTO{{Role: MessageRoleUser}}}
+	dto := AgentSessionDTO{ActiveSkillNames: []string{"stale"}, CoreMessages: []MessageDTO{{Role: MessageRoleUser}}, PromptFragments: map[string]string{"stale": "x"}}
 	if err := dto.LoadSession(jpf.DefaultAgentSession()); err != nil {
 		t.Fatalf("LoadSession: %v", err)
 	}
-	if dto.ActiveSkillNames != nil || dto.CoreMessages != nil {
+	if dto.ActiveSkillNames != nil || dto.CoreMessages != nil || len(dto.PromptFragments) != 0 {
 		t.Fatalf("expected slices to be cleared, got %+v", dto)
 	}
 }
