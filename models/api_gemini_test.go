@@ -225,8 +225,8 @@ func TestGeminiValidateNoUnusableArgs(t *testing.T) {
 	}
 
 	re := HighReasoning
-	if err := (&apiGeminiModel{settings: apiModelSettings{reasoning: &re}}).validateNoUnusableArgs(jpf.ModelResponseKwargs{}); err == nil {
-		t.Fatal("expected an error for an unsupported reasoning setting")
+	if err := (&apiGeminiModel{settings: apiModelSettings{reasoning: &re}}).validateNoUnusableArgs(jpf.ModelResponseKwargs{}); err != nil {
+		t.Fatalf("reasoning effort is supported, got %v", err)
 	}
 
 	vb := HighVerbosity

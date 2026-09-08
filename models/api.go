@@ -52,6 +52,11 @@ type APIModelOpt func(*apiModelSettings)
 func WithTemperature(temp float64) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.temperature = &temp }
 }
+
+// WithReasoningEffort sets how hard the model reasons before answering. OpenAI
+// (both formats) takes it as a categorical effort; Anthropic and Gemini map it
+// onto an extended-thinking token budget. NoneReasoning disables reasoning and
+// cannot be combined with WithStoreReasoning.
 func WithReasoningEffort(re ReasoningEffort) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.reasoning = &re }
 }
@@ -80,6 +85,10 @@ func WithMaxOutput(n int) APIModelOpt {
 // portable form: Anthropic extended thinking blocks, OpenAI Responses
 // reasoning items with encrypted_content, or Gemini thought signatures. Without
 // this option no reasoning is parsed out, even from a reasoning model.
+//
+// For Anthropic and Gemini it also turns thinking on (at the medium tier unless
+// WithReasoningEffort says otherwise), since thinking must be enabled for there
+// to be anything to store.
 //
 // It is not supported by the OpenAI Chat Completions API, which returns no
 // reusable reasoning - a model built with that format and this option errors on

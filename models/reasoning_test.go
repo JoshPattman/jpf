@@ -129,10 +129,11 @@ func TestAnthropicBodyEnablesThinking(t *testing.T) {
 	body := m.body("", nil, false, nil)
 
 	think, ok := body["thinking"].(map[string]any)
-	if !ok || think["type"] != "enabled" || think["budget_tokens"] != anthropicThinkingBudgetTokens {
+	// storeReasoning without an explicit effort uses the medium tier.
+	if !ok || think["type"] != "enabled" || think["budget_tokens"] != anthropicThinkingBudgetMedium {
 		t.Fatalf("got %+v", body["thinking"])
 	}
-	if body["max_tokens"].(int) <= anthropicThinkingBudgetTokens {
+	if body["max_tokens"].(int) < anthropicThinkingBudgetMedium+anthropicDefaultMaxTokens {
 		t.Fatalf("expected max_tokens to leave room for an answer, got %v", body["max_tokens"])
 	}
 	if _, ok := body["temperature"]; ok {
@@ -140,6 +141,47 @@ func TestAnthropicBodyEnablesThinking(t *testing.T) {
 	}
 	if _, ok := body["top_p"]; ok {
 		t.Fatalf("top_p must be omitted with thinking on: %+v", body)
+	}
+}
+
+func TestAnthropicThinkingBudgetFromReasoningEffort(t *testing.T) {
+	cases := []struct {
+		effort ReasoningEffort
+		want   int
+	}{
+		{LowReasoning, anthropicThinkingBudgetLow},
+		{MediumReasoning, anthropicThinkingBudgetMedium},
+		{HighReasoning, anthropicThinkingBudgetHigh},
+		{XHighReasoning, anthropicThinkingBudgetXHigh},
+	}
+	for _, c := range cases {
+		eff := c.effort
+		m := &apiAnthropicModel{name: "claude-x", settings: apiModelSettings{reasoning: &eff}}
+		body := m.body("", nil, false, nil)
+		think, ok := body["thinking"].(map[string]any)
+		if !ok || think["budget_tokens"] != c.want {
+			t.Fatalf("effort %d: got %+v", c.effort, body["thinking"])
+		}
+		if body["max_tokens"].(int) < c.want+anthropicDefaultMaxTokens {
+			t.Fatalf("effort %d: max_tokens too small: %v", c.effort, body["max_tokens"])
+		}
+	}
+}
+
+func TestAnthropicNoneReasoningLeavesThinkingOff(t *testing.T) {
+	eff := NoneReasoning
+	m := &apiAnthropicModel{name: "claude-x", settings: apiModelSettings{reasoning: &eff}}
+	body := m.body("", nil, false, nil)
+	if _, ok := body["thinking"]; ok {
+		t.Fatalf("did not expect thinking: %+v", body)
+	}
+}
+
+func TestAnthropicStoreReasoningWithNoneReasoningErrors(t *testing.T) {
+	eff := NoneReasoning
+	m := &apiAnthropicModel{settings: apiModelSettings{storeReasoning: true, reasoning: &eff}}
+	if err := m.validateNoUnusableArgs(jpf.ModelResponseKwargs{}); err == nil {
+		t.Fatal("expected an error combining storeReasoning with NoneReasoning")
 	}
 }
 
@@ -218,6 +260,39 @@ func TestGeminiBodyEnablesThinkingConfig(t *testing.T) {
 	tc, ok := gen["thinkingConfig"].(map[string]any)
 	if !ok || tc["includeThoughts"] != true {
 		t.Fatalf("got %+v", gen["thinkingConfig"])
+	}
+	if _, ok := tc["thinkingBudget"]; ok {
+		t.Fatalf("did not expect a budget without WithReasoningEffort: %+v", tc)
+	}
+}
+
+func TestGeminiThinkingBudgetFromReasoningEffort(t *testing.T) {
+	eff := HighReasoning
+	m := &apiGeminiModel{name: "gemini-2.5-flash", settings: apiModelSettings{reasoning: &eff}}
+	body, err := m.body("", nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tc := body["generationConfig"].(map[string]any)["thinkingConfig"].(map[string]any)
+	if tc["thinkingBudget"] != geminiThinkingBudget(HighReasoning) {
+		t.Fatalf("got %+v", tc)
+	}
+	if _, ok := tc["includeThoughts"]; ok {
+		t.Fatalf("did not expect includeThoughts without storeReasoning: %+v", tc)
+	}
+}
+
+func TestGeminiNoneReasoningLeavesThinkingConfigUnset(t *testing.T) {
+	eff := NoneReasoning
+	m := &apiGeminiModel{name: "gemini-2.5-flash", settings: apiModelSettings{reasoning: &eff}}
+	body, err := m.body("", nil, nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if body["generationConfig"] != nil {
+		if _, ok := body["generationConfig"].(map[string]any)["thinkingConfig"]; ok {
+			t.Fatalf("did not expect thinkingConfig: %+v", body["generationConfig"])
+		}
 	}
 }
 

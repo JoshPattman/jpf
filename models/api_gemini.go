@@ -78,6 +78,41 @@ func (m *apiGeminiModel) formatFamily() string {
 	return formatFamily(Google, m.name)
 }
 
+// geminiThinkingBudget maps a ReasoningEffort onto a thinkingBudget token count.
+// The values sit inside the range every Gemini 2.5 model accepts; Gemini clamps
+// anything out of range for the specific model.
+func geminiThinkingBudget(re ReasoningEffort) int {
+	switch re {
+	case LowReasoning:
+		return 2048
+	case MediumReasoning:
+		return 8192
+	case HighReasoning:
+		return 16384
+	case XHighReasoning:
+		return 24576
+	default:
+		return 0
+	}
+}
+
+// thinkingConfig builds the generationConfig.thinkingConfig block, or nil when
+// nothing needs to be set. WithReasoningEffort sets an explicit thinkingBudget;
+// WithStoreReasoning asks for thought parts so signatures come back.
+func (m *apiGeminiModel) thinkingConfig() map[string]any {
+	cfg := map[string]any{}
+	if m.settings.storeReasoning {
+		cfg["includeThoughts"] = true
+	}
+	if m.settings.reasoning != nil && *m.settings.reasoning != NoneReasoning {
+		cfg["thinkingBudget"] = geminiThinkingBudget(*m.settings.reasoning)
+	}
+	if len(cfg) == 0 {
+		return nil
+	}
+	return cfg
+}
+
 func (m *apiGeminiModel) extractOutput(parts []geminiResponsePart) (string, []jpf.ToolCall, []jpf.OpaqueReasoningBlock) {
 	toolCalls := []jpf.ToolCall{}
 	var text strings.Builder
@@ -447,13 +482,11 @@ func (m *apiGeminiModel) body(systemMessage string, toolSchemas []jpf.ToolSchema
 		gen["responseMimeType"] = "application/json"
 		gen["responseSchema"] = schema
 	}
-	if m.settings.storeReasoning {
+	if thinkingCfg := m.thinkingConfig(); thinkingCfg != nil {
 		if body["generationConfig"] == nil {
 			body["generationConfig"] = map[string]any{}
 		}
-		body["generationConfig"].(map[string]any)["thinkingConfig"] = map[string]any{
-			"includeThoughts": true,
-		}
+		body["generationConfig"].(map[string]any)["thinkingConfig"] = thinkingCfg
 	}
 	if len(toolSchemas) > 0 {
 		body["tools"] = m.tools(toolSchemas)
@@ -513,8 +546,8 @@ func (m *apiGeminiModel) tools(toolSchemas []jpf.ToolSchema) []any {
 }
 
 func (m *apiGeminiModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
-	if m.settings.reasoning != nil {
-		return errUnsupportedSetting("reasoning", m.settings.reasoning)
+	if m.settings.storeReasoning && m.settings.reasoning != nil && *m.settings.reasoning == NoneReasoning {
+		return fmt.Errorf("WithStoreReasoning cannot be combined with NoneReasoning effort - there would be no reasoning to store")
 	}
 	if m.settings.verbosity != nil {
 		return errUnsupportedSetting("verbosity", m.settings.verbosity)

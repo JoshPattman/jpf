@@ -146,8 +146,10 @@ func TestStoreReasoningRoundTrip(t *testing.T) {
 		model jpf.Model
 	}{
 		{"anthropic", models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey, models.WithStoreReasoning())},
+		{"anthropic-high-effort", models.NewRemote(models.Anthropic, "claude-haiku-4-5", anthKey, models.WithStoreReasoning(), models.WithReasoningEffort(models.HighReasoning))},
 		{"openai-responses", models.NewRemote(models.OpenAIResponses, "gpt-5", oaiKey, models.WithStoreReasoning(), models.WithReasoningEffort(models.LowReasoning))},
 		{"gemini", models.NewRemote(models.Google, "gemini-2.5-flash", gemKey, models.WithStoreReasoning())},
+		{"gemini-high-effort", models.NewRemote(models.Google, "gemini-2.5-flash", gemKey, models.WithStoreReasoning(), models.WithReasoningEffort(models.HighReasoning))},
 	}
 	for _, c := range cases {
 		t.Run(c.name, testStoreReasoningRoundTrip(models.Timeout(c.model, time.Minute)))

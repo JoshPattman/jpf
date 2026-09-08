@@ -193,7 +193,6 @@ func TestAnthropicValidateNoUnusableArgs(t *testing.T) {
 		settings apiModelSettings
 		kwargs   jpf.ModelResponseKwargs
 	}{
-		{"reasoning", apiModelSettings{reasoning: reasoningPtr(HighReasoning)}, jpf.ModelResponseKwargs{}},
 		{"verbosity", apiModelSettings{verbosity: verbosityPtr(HighVerbosity)}, jpf.ModelResponseKwargs{}},
 		{"presencePenalty", apiModelSettings{presencePenalty: floatPtr(0.5)}, jpf.ModelResponseKwargs{}},
 		{"prediction", apiModelSettings{prediction: stringPtr("pred")}, jpf.ModelResponseKwargs{}},
@@ -211,7 +210,7 @@ func TestAnthropicValidateNoUnusableArgs(t *testing.T) {
 func TestAnthropicValidateNoUnusableArgsAllowsSupportedSettings(t *testing.T) {
 	temp := 0.5
 	topP := 1
-	m := &apiAnthropicModel{settings: apiModelSettings{temperature: &temp, topP: &topP}}
+	m := &apiAnthropicModel{settings: apiModelSettings{temperature: &temp, topP: &topP, reasoning: reasoningPtr(HighReasoning)}}
 	if err := m.validateNoUnusableArgs(jpf.ModelResponseKwargs{OutputFormat: struct{}{}}); err != nil {
 		t.Fatalf("did not expect an error, got %v", err)
 	}

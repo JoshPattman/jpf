@@ -24,10 +24,17 @@ const anthropicAPIVersion = "2023-06-01"
 // Anthropic (unlike OpenAI/Gemini) requires `max_tokens` on every request.
 const anthropicDefaultMaxTokens = 4096
 
-// anthropicThinkingBudgetTokens is the extended-thinking budget requested when a
-// model is built WithStoreReasoning. The Anthropic minimum is 1024; max_tokens
-// is raised if needed so there is still room for a real answer after thinking.
-const anthropicThinkingBudgetTokens = 2048
+// Extended-thinking budgets (in tokens) mapped from ReasoningEffort. The
+// Anthropic minimum is 1024, and budget_tokens must be less than max_tokens, so
+// body() raises max_tokens when needed to leave room for a real answer. The
+// high tiers are kept modest enough that the resulting max_tokens stays under
+// the ~21k threshold above which Anthropic requires streaming.
+const (
+	anthropicThinkingBudgetLow    = 1024
+	anthropicThinkingBudgetMedium = 4096
+	anthropicThinkingBudgetHigh   = 10240
+	anthropicThinkingBudgetXHigh  = 16384
+)
 
 // anthropicInterleavedThinkingBeta enables thinking between tool calls, which a
 // ReAct-style agent needs to keep its chain of thought across steps. Sent as an
@@ -100,6 +107,34 @@ func (m *apiAnthropicModel) Respond(ctx context.Context, msgs []jpf.Message, opt
 
 func (m *apiAnthropicModel) formatFamily() string {
 	return formatFamily(Anthropic, m.name)
+}
+
+// thinkingBudget returns the extended-thinking budget in tokens, or 0 when
+// thinking is off. WithReasoningEffort picks the tier; WithStoreReasoning turns
+// thinking on at the medium tier when no effort is given (it needs thinking
+// enabled to have blocks to store).
+func (m *apiAnthropicModel) thinkingBudget() int {
+	effort := m.settings.reasoning
+	if effort == nil {
+		if m.settings.storeReasoning {
+			return anthropicThinkingBudgetMedium
+		}
+		return 0
+	}
+	switch *effort {
+	case NoneReasoning:
+		return 0
+	case LowReasoning:
+		return anthropicThinkingBudgetLow
+	case MediumReasoning:
+		return anthropicThinkingBudgetMedium
+	case HighReasoning:
+		return anthropicThinkingBudgetHigh
+	case XHighReasoning:
+		return anthropicThinkingBudgetXHigh
+	default:
+		return 0
+	}
 }
 
 func (m *apiAnthropicModel) extractOutput(blocks []anthropicContentBlock) (string, []jpf.ToolCall, []jpf.OpaqueReasoningBlock, error) {
@@ -481,10 +516,14 @@ func (m *apiAnthropicModel) body(system string, msgs []anthropicMessage, isStrea
 	if m.settings.maxOutput != nil {
 		maxTokens = *m.settings.maxOutput
 	}
-	if m.settings.storeReasoning && maxTokens <= anthropicThinkingBudgetTokens {
-		// max_tokens must leave room for both the thinking budget and an answer.
-		maxTokens = anthropicThinkingBudgetTokens + anthropicDefaultMaxTokens
+
+	thinkingBudget := m.thinkingBudget()
+	if thinkingBudget > 0 && maxTokens < thinkingBudget+anthropicDefaultMaxTokens {
+		// budget_tokens must be < max_tokens; leave a full answer allowance on
+		// top of the thinking budget (raising an explicit WithMaxOutput if so).
+		maxTokens = thinkingBudget + anthropicDefaultMaxTokens
 	}
+
 	bodyMap := map[string]any{
 		"model":      m.name,
 		"max_tokens": maxTokens,
@@ -493,17 +532,17 @@ func (m *apiAnthropicModel) body(system string, msgs []anthropicMessage, isStrea
 	if system != "" {
 		bodyMap["system"] = system
 	}
-	if m.settings.storeReasoning {
+	if thinkingBudget > 0 {
 		bodyMap["thinking"] = map[string]any{
 			"type":          "enabled",
-			"budget_tokens": anthropicThinkingBudgetTokens,
+			"budget_tokens": thinkingBudget,
 		}
 	}
 	// Anthropic rejects temperature and top_p when extended thinking is on.
-	if m.settings.temperature != nil && !m.settings.storeReasoning {
+	if m.settings.temperature != nil && thinkingBudget == 0 {
 		bodyMap["temperature"] = *m.settings.temperature
 	}
-	if m.settings.topP != nil && !m.settings.storeReasoning {
+	if m.settings.topP != nil && thinkingBudget == 0 {
 		bodyMap["top_p"] = *m.settings.topP
 	}
 	if isStreamed {
@@ -564,8 +603,8 @@ func (m *apiAnthropicModel) tools(toolSchemas []jpf.ToolSchema) []any {
 }
 
 func (m *apiAnthropicModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
-	if m.settings.reasoning != nil {
-		return errUnsupportedSetting("reasoning", *m.settings.reasoning)
+	if m.settings.storeReasoning && m.settings.reasoning != nil && *m.settings.reasoning == NoneReasoning {
+		return fmt.Errorf("WithStoreReasoning cannot be combined with NoneReasoning effort - there would be no reasoning to store")
 	}
 	if m.settings.verbosity != nil {
 		return errUnsupportedSetting("verbosity", *m.settings.verbosity)
