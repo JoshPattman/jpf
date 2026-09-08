@@ -376,7 +376,7 @@ func TestAnthropicParseStaticResponseInvalidJSON(t *testing.T) {
 
 func TestAnthropicExtractOutput(t *testing.T) {
 	m := &apiAnthropicModel{}
-	content, toolCalls, err := m.extractOutput([]anthropicContentBlock{
+	content, toolCalls, reasoning, err := m.extractOutput([]anthropicContentBlock{
 		{Type: "text", Text: "hi "},
 		{Type: "text", Text: "there"},
 		{Type: "tool_use", ID: "c1", Name: "search", Input: json.RawMessage(`{"q":"cats"}`)},
@@ -390,11 +390,35 @@ func TestAnthropicExtractOutput(t *testing.T) {
 	if len(toolCalls) != 1 || toolCalls[0].ID != "c1" || toolCalls[0].Tool != "search" || toolCalls[0].Args["q"] != "cats" {
 		t.Fatalf("got %+v", toolCalls)
 	}
+	if len(reasoning) != 0 {
+		t.Fatalf("did not expect reasoning without storeReasoning: %+v", reasoning)
+	}
+}
+
+func TestAnthropicExtractOutputReasoning(t *testing.T) {
+	m := &apiAnthropicModel{name: "claude-x", settings: apiModelSettings{storeReasoning: true}}
+	_, _, reasoning, err := m.extractOutput([]anthropicContentBlock{
+		{Type: "thinking", Thinking: "let me think", Signature: "sig-1"},
+		{Type: "redacted_thinking", Data: "enc-blob"},
+		{Type: "text", Text: "answer"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(reasoning) != 2 {
+		t.Fatalf("got %+v", reasoning)
+	}
+	if reasoning[0].FormatFamily != "anthropic/claude-x" || reasoning[0].Sig != "sig-1" || reasoning[0].Payload != "let me think" {
+		t.Fatalf("got %+v", reasoning[0])
+	}
+	if reasoning[1].Sig != "" || reasoning[1].Payload != "enc-blob" {
+		t.Fatalf("got %+v", reasoning[1])
+	}
 }
 
 func TestAnthropicExtractOutputToolUseWithoutInput(t *testing.T) {
 	m := &apiAnthropicModel{}
-	_, toolCalls, err := m.extractOutput([]anthropicContentBlock{{Type: "tool_use", ID: "c1", Name: "search"}})
+	_, toolCalls, _, err := m.extractOutput([]anthropicContentBlock{{Type: "tool_use", ID: "c1", Name: "search"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -405,7 +429,7 @@ func TestAnthropicExtractOutputToolUseWithoutInput(t *testing.T) {
 
 func TestAnthropicExtractOutputInvalidArguments(t *testing.T) {
 	m := &apiAnthropicModel{}
-	_, _, err := m.extractOutput([]anthropicContentBlock{{Type: "tool_use", Name: "search", Input: json.RawMessage("not json")}})
+	_, _, _, err := m.extractOutput([]anthropicContentBlock{{Type: "tool_use", Name: "search", Input: json.RawMessage("not json")}})
 	if err == nil {
 		t.Fatal("expected an error for invalid tool arguments")
 	}

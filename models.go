@@ -143,7 +143,11 @@ func (m UserMessage) Eq(other Message) bool {
 
 // AssistantMessage represents a message from the model to the user.
 type AssistantMessage struct {
-	Content   string
+	Content string
+	// Turn-level opaque reasoning-continuation state. When the message is
+	// replayed to the model, these blocks are emitted before Content and before
+	// any tool calls. See OpaqueReasoningBlock.
+	Reasoning []OpaqueReasoningBlock
 	ToolCalls []ToolCall
 }
 
@@ -151,16 +155,48 @@ type ToolCall struct {
 	ID   string
 	Tool string
 	Args ToolArgs
+	// Opaque reasoning-continuation state tied to this specific call. When the
+	// message is replayed to the model, these blocks are emitted immediately
+	// before this call. See OpaqueReasoningBlock.
+	Reasoning []OpaqueReasoningBlock `json:"reasoning,omitempty"`
+}
+
+// OpaqueReasoningBlock is opaque, provider-specific reasoning-continuation state
+// that a model backend emits and needs handed back to that same backend on the
+// next turn, so a tool-calling agent keeps the model's chain of thought across
+// steps (Anthropic extended thinking, OpenAI Responses reasoning items, Gemini
+// thought signatures).
+//
+// It is never interpreted by client code. Only the model backend whose
+// FormatFamily matches assigns meaning to the fields; any other backend drops
+// the block when replaying the conversation. Blocks are only produced by a
+// backend that was built WithStoreReasoning.
+type OpaqueReasoningBlock struct {
+	// Stable identifier of the wire format and model that produced this block,
+	// e.g. "anthropic/claude-sonnet-4-20250514" or "openai-responses/gpt-5". A
+	// block is only replayed to a backend reporting exactly this FormatFamily.
+	FormatFamily string `json:"format_family"`
+	// Provider correlation id (OpenAI Responses "rs_..."), or "".
+	ID string `json:"id,omitempty"`
+	// Provider integrity token (Anthropic thinking signature, Gemini
+	// thoughtSignature), or "".
+	Sig string `json:"sig,omitempty"`
+	// The block body, handed back verbatim: Anthropic signed thinking text or
+	// redacted data, OpenAI Responses encrypted_content, or "". Never
+	// transformed - provider signatures are computed over it.
+	Payload string `json:"payload,omitempty"`
 }
 
 func (m AssistantMessage) String() string {
-	return fmt.Sprintf("AssistantMessage{Content: \"%s\", ToolCalls: %d}", m.Content, len(m.ToolCalls))
+	return fmt.Sprintf("AssistantMessage{Content: \"%s\", ToolCalls: %d, Reasoning: %d}", m.Content, len(m.ToolCalls), len(m.Reasoning))
 }
 
 func (m AssistantMessage) Eq(other Message) bool {
 	switch other := other.(type) {
 	case AssistantMessage:
-		return m.Content == other.Content && reflect.DeepEqual(m.ToolCalls, other.ToolCalls)
+		return m.Content == other.Content &&
+			reflect.DeepEqual(m.ToolCalls, other.ToolCalls) &&
+			reflect.DeepEqual(m.Reasoning, other.Reasoning)
 	default:
 		return false
 	}

@@ -450,6 +450,9 @@ func (m *apiOpenAIModel) tools(toolSchemas []jpf.ToolSchema) []any {
 }
 
 func (m *apiOpenAIModel) validateNoUnusableArgs(kwargs jpf.ModelResponseKwargs) error {
+	if m.settings.storeReasoning {
+		return fmt.Errorf("WithStoreReasoning is not supported for the OpenAI Chat Completions API, which returns no reusable reasoning; use the OpenAI Responses format instead")
+	}
 	return nil
 }
 

@@ -24,6 +24,16 @@ const anthropicAPIVersion = "2023-06-01"
 // Anthropic (unlike OpenAI/Gemini) requires `max_tokens` on every request.
 const anthropicDefaultMaxTokens = 4096
 
+// anthropicThinkingBudgetTokens is the extended-thinking budget requested when a
+// model is built WithStoreReasoning. The Anthropic minimum is 1024; max_tokens
+// is raised if needed so there is still room for a real answer after thinking.
+const anthropicThinkingBudgetTokens = 2048
+
+// anthropicInterleavedThinkingBeta enables thinking between tool calls, which a
+// ReAct-style agent needs to keep its chain of thought across steps. Sent as an
+// anthropic-beta header only when a model is built WithStoreReasoning.
+const anthropicInterleavedThinkingBeta = "interleaved-thinking-2025-05-14"
+
 // apiAnthropicModel talks to Anthropic's Messages API (https://api.anthropic.com/v1/messages).
 type apiAnthropicModel struct {
 	name     string
@@ -77,29 +87,51 @@ func (m *apiAnthropicModel) Respond(ctx context.Context, msgs []jpf.Message, opt
 		}
 	}
 
-	content, toolCalls, err := m.extractOutput(respTyped.Content)
+	content, toolCalls, reasoning, err := m.extractOutput(respTyped.Content)
 	if err != nil {
 		return failedResponseAfter(usage), utils.Wrap(err, "could not extract output: %s", string(rawRespBytes))
 	}
 
 	return jpf.ModelResponse{
-		Message: jpf.AssistantMessage{Content: content, ToolCalls: toolCalls},
+		Message: jpf.AssistantMessage{Content: content, ToolCalls: toolCalls, Reasoning: reasoning},
 		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
 
-func (m *apiAnthropicModel) extractOutput(blocks []anthropicContentBlock) (string, []jpf.ToolCall, error) {
+func (m *apiAnthropicModel) formatFamily() string {
+	return formatFamily(Anthropic, m.name)
+}
+
+func (m *apiAnthropicModel) extractOutput(blocks []anthropicContentBlock) (string, []jpf.ToolCall, []jpf.OpaqueReasoningBlock, error) {
 	var content strings.Builder
 	toolCalls := make([]jpf.ToolCall, 0)
+	// Anthropic emits thinking blocks at the front of the turn, ahead of text
+	// and tool_use, so all reasoning here is turn-level.
+	var reasoning []jpf.OpaqueReasoningBlock
 	for _, block := range blocks {
 		switch block.Type {
 		case "text":
 			content.WriteString(block.Text)
+		case "thinking":
+			if m.settings.storeReasoning {
+				reasoning = append(reasoning, jpf.OpaqueReasoningBlock{
+					FormatFamily: m.formatFamily(),
+					Sig:          block.Signature,
+					Payload:      block.Thinking,
+				})
+			}
+		case "redacted_thinking":
+			if m.settings.storeReasoning {
+				reasoning = append(reasoning, jpf.OpaqueReasoningBlock{
+					FormatFamily: m.formatFamily(),
+					Payload:      block.Data,
+				})
+			}
 		case "tool_use":
 			args := make(map[string]any)
 			if len(block.Input) > 0 {
 				if err := json.Unmarshal(block.Input, &args); err != nil {
-					return "", nil, utils.Wrap(err, "could not decode tool arguments")
+					return "", nil, nil, utils.Wrap(err, "could not decode tool arguments")
 				}
 			}
 			toolCalls = append(toolCalls, jpf.ToolCall{
@@ -109,7 +141,7 @@ func (m *apiAnthropicModel) extractOutput(blocks []anthropicContentBlock) (strin
 			})
 		}
 	}
-	return content.String(), toolCalls, nil
+	return content.String(), toolCalls, reasoning, nil
 }
 
 func (m *apiAnthropicModel) parseStaticResponse(ctx context.Context, respBody io.ReadCloser) (anthropicStaticResponse, []byte, error) {
@@ -166,6 +198,9 @@ func (m *apiAnthropicModel) parseStreamResponse(ctx context.Context, respBody io
 			if event.ContentBlock != nil {
 				acc := &anthropicStreamedBlock{Type: event.ContentBlock.Type, ID: event.ContentBlock.ID, Name: event.ContentBlock.Name}
 				acc.Text.WriteString(event.ContentBlock.Text)
+				acc.Thinking.WriteString(event.ContentBlock.Thinking)
+				acc.Signature = event.ContentBlock.Signature
+				acc.Data = event.ContentBlock.Data
 				blocks[event.Index] = acc
 				order = append(order, event.Index)
 			}
@@ -183,6 +218,10 @@ func (m *apiAnthropicModel) parseStreamResponse(ctx context.Context, respBody io
 					streamer.OnMessageText(event.Delta.Text)
 				case "input_json_delta":
 					acc.Input.WriteString(event.Delta.PartialJSON)
+				case "thinking_delta":
+					acc.Thinking.WriteString(event.Delta.Thinking)
+				case "signature_delta":
+					acc.Signature += event.Delta.Signature
 				}
 			}
 		case "message_delta":
@@ -203,7 +242,15 @@ func (m *apiAnthropicModel) parseStreamResponse(ctx context.Context, respBody io
 	content := make([]anthropicContentBlock, 0, len(order))
 	for _, idx := range order {
 		acc := blocks[idx]
-		block := anthropicContentBlock{Type: acc.Type, Text: acc.Text.String(), ID: acc.ID, Name: acc.Name}
+		block := anthropicContentBlock{
+			Type:      acc.Type,
+			Text:      acc.Text.String(),
+			ID:        acc.ID,
+			Name:      acc.Name,
+			Thinking:  acc.Thinking.String(),
+			Signature: acc.Signature,
+			Data:      acc.Data,
+		}
 		if acc.Input.Len() > 0 {
 			block.Input = json.RawMessage(acc.Input.String())
 		}
@@ -236,6 +283,9 @@ func (m *apiAnthropicModel) createRequest(ctx context.Context, body io.Reader) (
 	req.Header.Add("x-api-key", m.key)
 	req.Header.Add("anthropic-version", anthropicAPIVersion)
 	req.Header.Add("Content-Type", "application/json")
+	if m.settings.storeReasoning {
+		req.Header.Add("anthropic-beta", anthropicInterleavedThinkingBeta)
+	}
 	for k, v := range m.settings.headers {
 		req.Header.Add(k, v)
 	}
@@ -396,7 +446,12 @@ func (m *apiAnthropicModel) imageBlock(img jpf.ImageAttachment) (map[string]any,
 }
 
 func (m *apiAnthropicModel) assistantContent(msg jpf.AssistantMessage) []map[string]any {
-	blocks := make([]map[string]any, 0, 1+len(msg.ToolCalls))
+	blocks := make([]map[string]any, 0, 1+len(msg.Reasoning)+len(msg.ToolCalls))
+	// Thinking blocks must lead the content array, and Anthropic only produces
+	// turn-level reasoning, so emit msg.Reasoning first.
+	for _, rb := range replayableReasoning(msg.Reasoning, m.formatFamily()) {
+		blocks = append(blocks, anthropicThinkingBlock(rb))
+	}
 	if msg.Content != "" {
 		blocks = append(blocks, map[string]any{"type": "text", "text": msg.Content})
 	}
@@ -411,10 +466,24 @@ func (m *apiAnthropicModel) assistantContent(msg jpf.AssistantMessage) []map[str
 	return blocks
 }
 
+// anthropicThinkingBlock renders a stored reasoning block back into the content
+// block Anthropic expects: a signed `thinking` block, or a `redacted_thinking`
+// block when there is no signature.
+func anthropicThinkingBlock(rb jpf.OpaqueReasoningBlock) map[string]any {
+	if rb.Sig != "" {
+		return map[string]any{"type": "thinking", "thinking": rb.Payload, "signature": rb.Sig}
+	}
+	return map[string]any{"type": "redacted_thinking", "data": rb.Payload}
+}
+
 func (m *apiAnthropicModel) body(system string, msgs []anthropicMessage, isStreamed bool, toolSchemas []jpf.ToolSchema) map[string]any {
 	maxTokens := anthropicDefaultMaxTokens
 	if m.settings.maxOutput != nil {
 		maxTokens = *m.settings.maxOutput
+	}
+	if m.settings.storeReasoning && maxTokens <= anthropicThinkingBudgetTokens {
+		// max_tokens must leave room for both the thinking budget and an answer.
+		maxTokens = anthropicThinkingBudgetTokens + anthropicDefaultMaxTokens
 	}
 	bodyMap := map[string]any{
 		"model":      m.name,
@@ -424,10 +493,17 @@ func (m *apiAnthropicModel) body(system string, msgs []anthropicMessage, isStrea
 	if system != "" {
 		bodyMap["system"] = system
 	}
-	if m.settings.temperature != nil {
+	if m.settings.storeReasoning {
+		bodyMap["thinking"] = map[string]any{
+			"type":          "enabled",
+			"budget_tokens": anthropicThinkingBudgetTokens,
+		}
+	}
+	// Anthropic rejects temperature and top_p when extended thinking is on.
+	if m.settings.temperature != nil && !m.settings.storeReasoning {
 		bodyMap["temperature"] = *m.settings.temperature
 	}
-	if m.settings.topP != nil {
+	if m.settings.topP != nil && !m.settings.storeReasoning {
 		bodyMap["top_p"] = *m.settings.topP
 	}
 	if isStreamed {
@@ -514,21 +590,27 @@ type anthropicUsage struct {
 }
 
 type anthropicContentBlock struct {
-	Type  string          `json:"type"`
-	Text  string          `json:"text,omitempty"`
-	ID    string          `json:"id,omitempty"`
-	Name  string          `json:"name,omitempty"`
-	Input json.RawMessage `json:"input,omitempty"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text,omitempty"`
+	ID        string          `json:"id,omitempty"`
+	Name      string          `json:"name,omitempty"`
+	Input     json.RawMessage `json:"input,omitempty"`
+	Thinking  string          `json:"thinking,omitempty"`
+	Signature string          `json:"signature,omitempty"`
+	Data      string          `json:"data,omitempty"`
 }
 
 // anthropicStreamedBlock accumulates a single content block's deltas while
 // parsing a streamed response.
 type anthropicStreamedBlock struct {
-	Type  string
-	Text  strings.Builder
-	ID    string
-	Name  string
-	Input strings.Builder
+	Type      string
+	Text      strings.Builder
+	ID        string
+	Name      string
+	Input     strings.Builder
+	Thinking  strings.Builder
+	Signature string
+	Data      string
 }
 
 type anthropicStaticResponse struct {
@@ -552,6 +634,8 @@ type anthropicStreamEvent struct {
 		Type        string `json:"type"`
 		Text        string `json:"text"`
 		PartialJSON string `json:"partial_json"`
+		Thinking    string `json:"thinking"`
+		Signature   string `json:"signature"`
 	} `json:"delta"`
 	Usage *anthropicUsage `json:"usage"`
 	Error *struct {

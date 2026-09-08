@@ -70,22 +70,38 @@ func (m *apiOpenAIResponsesModel) Respond(ctx context.Context, msgs []jpf.Messag
 		}
 	}
 
-	content, toolCalls, err := m.extractOutput(respTyped.Output)
+	content, toolCalls, reasoning, err := m.extractOutput(respTyped.Output)
 	if err != nil {
 		return failedResponseAfter(usage), utils.Wrap(err, "could not extract output: %s", string(rawRespBytes))
 	}
 
 	return jpf.ModelResponse{
-		Message: jpf.AssistantMessage{Content: content, ToolCalls: toolCalls},
+		Message: jpf.AssistantMessage{Content: content, ToolCalls: toolCalls, Reasoning: reasoning},
 		Usage:   usage.Add(jpf.Usage{SuccessfulCalls: 1}),
 	}, nil
 }
 
-func (m *apiOpenAIResponsesModel) extractOutput(output []openAIResponsesOutputItem) (string, []jpf.ToolCall, error) {
+func (m *apiOpenAIResponsesModel) formatFamily() string {
+	return formatFamily(OpenAIResponses, m.name)
+}
+
+func (m *apiOpenAIResponsesModel) extractOutput(output []openAIResponsesOutputItem) (string, []jpf.ToolCall, []jpf.OpaqueReasoningBlock, error) {
 	var content string
 	toolCalls := make([]jpf.ToolCall, 0)
+	var turnReasoning []jpf.OpaqueReasoningBlock
+	// Reasoning items precede the function_call (or final message) they belong
+	// to, so buffer them until we see what comes next.
+	var pending []jpf.OpaqueReasoningBlock
 	for _, item := range output {
 		switch item.Type {
+		case "reasoning":
+			if m.settings.storeReasoning {
+				pending = append(pending, jpf.OpaqueReasoningBlock{
+					FormatFamily: m.formatFamily(),
+					ID:           item.ID,
+					Payload:      item.EncryptedContent,
+				})
+			}
 		case "message":
 			for _, part := range item.Content {
 				switch part.Type {
@@ -95,22 +111,30 @@ func (m *apiOpenAIResponsesModel) extractOutput(output []openAIResponsesOutputIt
 					content += part.Refusal
 				}
 			}
+			turnReasoning = append(turnReasoning, pending...)
+			pending = nil
 		case "function_call":
 			args := make(map[string]any)
 			if item.Arguments != "" {
 				err := json.NewDecoder(bytes.NewBufferString(item.Arguments)).Decode(&args)
 				if err != nil {
-					return "", nil, utils.Wrap(err, "could not decode tool arguments")
+					return "", nil, nil, utils.Wrap(err, "could not decode tool arguments")
 				}
 			}
-			toolCalls = append(toolCalls, jpf.ToolCall{
+			tc := jpf.ToolCall{
 				ID:   item.CallID,
 				Tool: item.Name,
 				Args: args,
-			})
+			}
+			if len(pending) > 0 {
+				tc.Reasoning = pending
+				pending = nil
+			}
+			toolCalls = append(toolCalls, tc)
 		}
 	}
-	return content, toolCalls, nil
+	turnReasoning = append(turnReasoning, pending...)
+	return content, toolCalls, turnReasoning, nil
 }
 
 func (m *apiOpenAIResponsesModel) parseStaticResponse(ctx context.Context, respBody io.ReadCloser) (openAIResponsesStaticResponse, []byte, error) {
@@ -243,6 +267,9 @@ func (m *apiOpenAIResponsesModel) input(msgs []jpf.Message) ([]any, error) {
 				"content": msg.Content,
 			})
 		case jpf.AssistantMessage:
+			for _, rb := range replayableReasoning(msg.Reasoning, m.formatFamily()) {
+				items = append(items, reasoningInputItem(rb))
+			}
 			if msg.Content != "" {
 				items = append(items, map[string]any{
 					"role":    "assistant",
@@ -250,6 +277,9 @@ func (m *apiOpenAIResponsesModel) input(msgs []jpf.Message) ([]any, error) {
 				})
 			}
 			for _, tc := range msg.ToolCalls {
+				for _, rb := range replayableReasoning(tc.Reasoning, m.formatFamily()) {
+					items = append(items, reasoningInputItem(rb))
+				}
 				args := bytes.NewBuffer(nil)
 				if err := json.NewEncoder(args).Encode(tc.Args); err != nil {
 					return nil, err
@@ -272,6 +302,20 @@ func (m *apiOpenAIResponsesModel) input(msgs []jpf.Message) ([]any, error) {
 		}
 	}
 	return items, nil
+}
+
+// reasoningInputItem renders a stored reasoning block back into a Responses
+// `reasoning` input item. summary is always sent empty - only id and
+// encrypted_content are needed to restore the reasoning state.
+func reasoningInputItem(rb jpf.OpaqueReasoningBlock) map[string]any {
+	item := map[string]any{"type": "reasoning", "summary": []any{}}
+	if rb.ID != "" {
+		item["id"] = rb.ID
+	}
+	if rb.Payload != "" {
+		item["encrypted_content"] = rb.Payload
+	}
+	return item
 }
 
 func (m *apiOpenAIResponsesModel) userContent(msg jpf.UserMessage) any {
@@ -310,6 +354,11 @@ func (m *apiOpenAIResponsesModel) body(input []any, isStreamed bool, outputForma
 	}
 	if m.settings.reasoning != nil {
 		bodyMap["reasoning"] = map[string]any{"effort": m.reasoningEffort(*m.settings.reasoning)}
+	}
+	if m.settings.storeReasoning {
+		// store is false, so reasoning is not persisted server-side; ask for the
+		// encrypted payload inline so it can be replayed statelessly.
+		bodyMap["include"] = []string{"reasoning.encrypted_content"}
 	}
 	if m.settings.topP != nil {
 		bodyMap["top_p"] = *m.settings.topP
@@ -472,6 +521,11 @@ type openAIResponsesOutputItem struct {
 	CallID    string                       `json:"call_id,omitempty"`
 	Name      string                       `json:"name,omitempty"`
 	Arguments string                       `json:"arguments,omitempty"`
+	// Reasoning items (item type "reasoning"): the "rs_..." id and the opaque
+	// encrypted reasoning, present when the request asked to include
+	// reasoning.encrypted_content.
+	ID               string `json:"id,omitempty"`
+	EncryptedContent string `json:"encrypted_content,omitempty"`
 }
 
 type openAIResponsesStaticResponse struct {

@@ -25,6 +25,20 @@ func TestMessageDTORoundTrip(t *testing.T) {
 				{ID: "c1", Tool: "search", Args: map[string]any{"q": "cats", "n": float64(3)}},
 			},
 		}},
+		{"assistant with reasoning", jpf.AssistantMessage{
+			Content: "calling",
+			Reasoning: []jpf.OpaqueReasoningBlock{
+				{FormatFamily: "anthropic/claude-x", Sig: "sig-1", Payload: "thinking text"},
+			},
+			ToolCalls: []jpf.ToolCall{
+				{
+					ID: "c1", Tool: "search", Args: map[string]any{"q": "cats"},
+					Reasoning: []jpf.OpaqueReasoningBlock{
+						{FormatFamily: "openai-responses/gpt-5", ID: "rs_1", Payload: "enc"},
+					},
+				},
+			},
+		}},
 		{"developer", jpf.DeveloperMessage{Content: "be nice"}},
 		{"system", jpf.SystemMessage{Content: "you are a bot"}},
 		{"tool result", jpf.ToolResultMessage{CallID: "c1", Result: "done"}},

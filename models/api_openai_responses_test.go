@@ -299,7 +299,7 @@ func TestOpenAIResponsesParseStaticResponseInvalidJSON(t *testing.T) {
 
 func TestOpenAIResponsesExtractOutput(t *testing.T) {
 	m := &apiOpenAIResponsesModel{}
-	content, toolCalls, err := m.extractOutput([]openAIResponsesOutputItem{
+	content, toolCalls, reasoning, err := m.extractOutput([]openAIResponsesOutputItem{
 		{Type: "message", Content: []openAIResponsesContentPart{{Type: "output_text", Text: "hi "}, {Type: "refusal", Refusal: "no"}}},
 		{Type: "function_call", CallID: "c1", Name: "search", Arguments: `{"q":"cats"}`},
 	})
@@ -312,11 +312,36 @@ func TestOpenAIResponsesExtractOutput(t *testing.T) {
 	if len(toolCalls) != 1 || toolCalls[0].ID != "c1" || toolCalls[0].Tool != "search" || toolCalls[0].Args["q"] != "cats" {
 		t.Fatalf("got %+v", toolCalls)
 	}
+	if len(reasoning) != 0 {
+		t.Fatalf("did not expect reasoning without storeReasoning: %+v", reasoning)
+	}
+}
+
+func TestOpenAIResponsesExtractOutputReasoning(t *testing.T) {
+	m := &apiOpenAIResponsesModel{name: "gpt-5", settings: apiModelSettings{storeReasoning: true}}
+	_, toolCalls, turnReasoning, err := m.extractOutput([]openAIResponsesOutputItem{
+		{Type: "reasoning", ID: "rs_1", EncryptedContent: "enc-1"},
+		{Type: "function_call", CallID: "c1", Name: "search", Arguments: `{"q":"cats"}`},
+		{Type: "reasoning", ID: "rs_2", EncryptedContent: "enc-2"},
+		{Type: "message", Content: []openAIResponsesContentPart{{Type: "output_text", Text: "done"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(toolCalls) != 1 || len(toolCalls[0].Reasoning) != 1 {
+		t.Fatalf("expected reasoning bound to the call: %+v", toolCalls)
+	}
+	if got := toolCalls[0].Reasoning[0]; got.ID != "rs_1" || got.Payload != "enc-1" || got.FormatFamily != "openai-responses/gpt-5" {
+		t.Fatalf("got %+v", got)
+	}
+	if len(turnReasoning) != 1 || turnReasoning[0].ID != "rs_2" {
+		t.Fatalf("expected the trailing reasoning item at turn level: %+v", turnReasoning)
+	}
 }
 
 func TestOpenAIResponsesExtractOutputInvalidArguments(t *testing.T) {
 	m := &apiOpenAIResponsesModel{}
-	_, _, err := m.extractOutput([]openAIResponsesOutputItem{
+	_, _, _, err := m.extractOutput([]openAIResponsesOutputItem{
 		{Type: "function_call", Name: "search", Arguments: "not json"},
 	})
 	if err == nil {
