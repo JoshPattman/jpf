@@ -123,7 +123,7 @@ func TestOpenAIResponsesInputReplaysReasoning(t *testing.T) {
 func TestAnthropicBodyEnablesThinking(t *testing.T) {
 	m := &apiAnthropicModel{name: "claude-x", settings: apiModelSettings{storeReasoning: true}}
 	temp := 0.7
-	topP := 1
+	topP := 0.9
 	m.settings.temperature = &temp
 	m.settings.topP = &topP
 	body := m.body("", nil, false, nil)
@@ -282,17 +282,19 @@ func TestGeminiThinkingBudgetFromReasoningEffort(t *testing.T) {
 	}
 }
 
-func TestGeminiNoneReasoningLeavesThinkingConfigUnset(t *testing.T) {
+func TestGeminiNoneReasoningDisablesThinking(t *testing.T) {
 	eff := NoneReasoning
 	m := &apiGeminiModel{name: "gemini-2.5-flash", settings: apiModelSettings{reasoning: &eff}}
 	body, err := m.body("", nil, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if body["generationConfig"] != nil {
-		if _, ok := body["generationConfig"].(map[string]any)["thinkingConfig"]; ok {
-			t.Fatalf("did not expect thinkingConfig: %+v", body["generationConfig"])
-		}
+	tc, ok := body["generationConfig"].(map[string]any)["thinkingConfig"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected a thinkingConfig: %+v", body["generationConfig"])
+	}
+	if tc["thinkingBudget"] != 0 {
+		t.Fatalf("expected a zero thinking budget, got %+v", tc)
 	}
 }
 

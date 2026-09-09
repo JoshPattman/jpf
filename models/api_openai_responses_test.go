@@ -99,7 +99,7 @@ func TestOpenAIResponsesUserContentWithImages(t *testing.T) {
 func TestOpenAIResponsesBody(t *testing.T) {
 	temp := 0.5
 	reasoning := HighReasoning
-	topP := 5
+	topP := 0.9
 	maxOut := 100
 	verbosity := HighVerbosity
 	m := &apiOpenAIResponsesModel{

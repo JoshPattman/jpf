@@ -104,7 +104,7 @@ func TestOpenAIBody(t *testing.T) {
 	temp := 0.5
 	reasoning := HighReasoning
 	verbosity := HighVerbosity
-	topP := 5
+	topP := 0.9
 	presence := 0.2
 	prediction := "pred"
 	maxOut := 100

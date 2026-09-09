@@ -18,8 +18,8 @@ func TestAPIModelOpts(t *testing.T) {
 		t.Fatalf("got %+v", settings)
 	}
 
-	WithTopP(5)(&settings)
-	if settings.topP == nil || *settings.topP != 5 {
+	WithTopP(0.9)(&settings)
+	if settings.topP == nil || *settings.topP != 0.9 {
 		t.Fatalf("got %+v", settings)
 	}
 

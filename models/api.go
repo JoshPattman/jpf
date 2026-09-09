@@ -40,7 +40,7 @@ type apiModelSettings struct {
 	temperature     *float64
 	reasoning       *ReasoningEffort
 	verbosity       *Verbosity
-	topP            *int
+	topP            *float64
 	presencePenalty *float64
 	prediction      *string
 	maxOutput       *int
@@ -64,7 +64,8 @@ func WithVerbosity(vb Verbosity) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.verbosity = &vb }
 }
 
-func WithTopP(tp int) APIModelOpt {
+// WithTopP sets nucleus-sampling top_p. It is a probability in the range 0-1.
+func WithTopP(tp float64) APIModelOpt {
 	return func(kw *apiModelSettings) { kw.topP = &tp }
 }
 func WithPresencePenalty(p float64) APIModelOpt {

@@ -39,6 +39,50 @@ func TestGeminiMessages(t *testing.T) {
 	}
 }
 
+func TestGeminiMessagesMergesAdjacentSameRole(t *testing.T) {
+	m := &apiGeminiModel{}
+	_, parts, err := m.messages([]jpf.Message{
+		jpf.UserMessage{Content: "hi"},
+		jpf.AssistantMessage{ToolCalls: []jpf.ToolCall{
+			{ID: "a", Tool: "a"},
+			{ID: "b", Tool: "b"},
+		}},
+		jpf.ToolResultMessage{CallID: "a", Result: "ra"},
+		jpf.ToolResultMessage{CallID: "b", Result: "rb"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// user / model / user (the two tool results merged into one user turn).
+	if len(parts) != 3 {
+		t.Fatalf("expected 3 merged contents, got %+v", parts)
+	}
+	last := parts[2].(map[string]any)
+	if last["role"] != "user" {
+		t.Fatalf("got %+v", last)
+	}
+	if got := len(last["parts"].([]map[string]any)); got != 2 {
+		t.Fatalf("expected both tool results in one turn, got %d parts", got)
+	}
+}
+
+func TestGeminiMessagesToolCallTurnHasNoEmptyTextPart(t *testing.T) {
+	m := &apiGeminiModel{}
+	_, parts, err := m.messages([]jpf.Message{
+		jpf.AssistantMessage{ToolCalls: []jpf.ToolCall{{ID: "a", Tool: "search"}}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := parts[0].(map[string]any)["parts"].([]map[string]any)
+	if len(got) != 1 {
+		t.Fatalf("expected only the functionCall part, got %+v", got)
+	}
+	if _, ok := got[0]["functionCall"]; !ok {
+		t.Fatalf("expected a functionCall part, got %+v", got[0])
+	}
+}
+
 func TestGeminiMessagesSystemMessageMustBeFirst(t *testing.T) {
 	m := &apiGeminiModel{}
 	_, _, err := m.messages([]jpf.Message{
@@ -129,6 +173,10 @@ func TestGeminiMessageContentWithImages(t *testing.T) {
 	if inline["mime_type"] != "image/png" {
 		t.Fatalf("got %+v", inline)
 	}
+	// data must be raw base64, not a "data:...;base64," URI.
+	if data := inline["data"].(string); strings.HasPrefix(data, "data:") || strings.Contains(data, ",") {
+		t.Fatalf("expected raw base64, got %q", data)
+	}
 }
 
 func TestGeminiMessageContentUnsupported(t *testing.T) {
@@ -140,7 +188,7 @@ func TestGeminiMessageContentUnsupported(t *testing.T) {
 
 func TestGeminiBody(t *testing.T) {
 	temp := 0.5
-	topP := 5
+	topP := 0.9
 	maxOut := 100
 	m := &apiGeminiModel{settings: apiModelSettings{temperature: &temp, topP: &topP, maxOutput: &maxOut}}
 	body, err := m.body("be nice", []jpf.ToolSchema{{Name: "search"}}, struct{ A int }{}, []any{"content"})

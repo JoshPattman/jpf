@@ -106,7 +106,7 @@ func TestAnthropicAssistantContentWithoutContentOmitsTextBlock(t *testing.T) {
 
 func TestAnthropicBody(t *testing.T) {
 	temp := 0.5
-	topP := 1
+	topP := 0.9
 	maxOut := 100
 	m := &apiAnthropicModel{
 		name: "claude-test",
@@ -121,7 +121,7 @@ func TestAnthropicBody(t *testing.T) {
 	if body["model"] != "claude-test" || body["max_tokens"] != 100 || body["system"] != "be nice" {
 		t.Fatalf("got %+v", body)
 	}
-	if body["temperature"] != 0.5 || body["top_p"] != 1 {
+	if body["temperature"] != 0.5 || body["top_p"] != 0.9 {
 		t.Fatalf("got %+v", body)
 	}
 	if body["stream"] != true {
@@ -209,7 +209,7 @@ func TestAnthropicValidateNoUnusableArgs(t *testing.T) {
 
 func TestAnthropicValidateNoUnusableArgsAllowsSupportedSettings(t *testing.T) {
 	temp := 0.5
-	topP := 1
+	topP := 0.9
 	m := &apiAnthropicModel{settings: apiModelSettings{temperature: &temp, topP: &topP, reasoning: reasoningPtr(HighReasoning)}}
 	if err := m.validateNoUnusableArgs(jpf.ModelResponseKwargs{OutputFormat: struct{}{}}); err != nil {
 		t.Fatalf("did not expect an error, got %v", err)
