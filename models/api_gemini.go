@@ -104,8 +104,14 @@ func (m *apiGeminiModel) thinkingConfig() map[string]any {
 	if m.settings.storeReasoning {
 		cfg["includeThoughts"] = true
 	}
-	if m.settings.reasoning != nil && *m.settings.reasoning != NoneReasoning {
-		cfg["thinkingBudget"] = geminiThinkingBudget(*m.settings.reasoning)
+	if m.settings.reasoning != nil {
+		if *m.settings.reasoning == NoneReasoning {
+			// Thinking-capable models think by default, so NoneReasoning must
+			// send an explicit zero budget to actually turn it off.
+			cfg["thinkingBudget"] = 0
+		} else {
+			cfg["thinkingBudget"] = geminiThinkingBudget(*m.settings.reasoning)
+		}
 	}
 	if len(cfg) == 0 {
 		return nil
@@ -327,29 +333,40 @@ func (m *apiGeminiModel) createBodyData(msgs []jpf.Message, toolSchemas []jpf.To
 }
 
 func (m *apiGeminiModel) messages(msgs []jpf.Message) (string, []any, error) {
-	parts := make([]any, 0)
+	contents := make([]map[string]any, 0, len(msgs))
 	systemMessage := ""
 	for i, msg := range msgs {
-		switch msg := msg.(type) {
-		case jpf.SystemMessage:
+		if sys, ok := msg.(jpf.SystemMessage); ok {
 			if i != 0 {
 				return "", nil, errors.New("gemini only supports at most one system message at the start of the conversation")
 			}
-			systemMessage = msg.Content
-		default:
-			role, err := m.messageRole(msg)
-			if err != nil {
-				return "", nil, err
-			}
-			content, err := m.messageContent(msg)
-			if err != nil {
-				return "", nil, err
-			}
-			parts = append(parts, map[string]any{
-				"role":  role,
-				"parts": content,
-			})
+			systemMessage = sys.Content
+			continue
 		}
+		role, err := m.messageRole(msg)
+		if err != nil {
+			return "", nil, err
+		}
+		content, err := m.messageContent(msg)
+		if err != nil {
+			return "", nil, err
+		}
+		newParts, ok := content.([]map[string]any)
+		if !ok {
+			return "", nil, fmt.Errorf("unexpected gemini content type %T", content)
+		}
+		// Gemini expects contents to alternate user/model, so adjacent
+		// same-role messages (e.g. several parallel tool results) are merged
+		// into a single entry with all their parts.
+		if n := len(contents); n > 0 && contents[n-1]["role"] == role {
+			contents[n-1]["parts"] = append(contents[n-1]["parts"].([]map[string]any), newParts...)
+			continue
+		}
+		contents = append(contents, map[string]any{"role": role, "parts": newParts})
+	}
+	parts := make([]any, len(contents))
+	for i, c := range contents {
+		parts[i] = c
 	}
 	return systemMessage, parts, nil
 }
@@ -411,18 +428,26 @@ func (m *apiGeminiModel) messageContent(msg jpf.Message) (any, error) {
 	default:
 		return nil, fmt.Errorf("cannot get content for %T", msg)
 	}
-	textPart := map[string]any{
-		"text": content,
+	allParts := make([]map[string]any, 0, 1+len(imageAttachments)+len(toolCallParts))
+	// Gemini rejects empty text parts, so only emit one when there is text (or a
+	// turn-level thought signature that needs a part to ride on).
+	if content != "" || turnThoughtSignature != "" {
+		textPart := map[string]any{"text": content}
+		if turnThoughtSignature != "" {
+			textPart["thoughtSignature"] = turnThoughtSignature
+		}
+		allParts = append(allParts, textPart)
 	}
-	if turnThoughtSignature != "" {
-		textPart["thoughtSignature"] = turnThoughtSignature
-	}
-	allParts := []map[string]any{textPart}
 
 	for _, img := range imageAttachments {
-		b64, err := img.ToBase64Encoded(false)
+		dataURI, err := img.ToBase64Encoded(false)
 		if err != nil {
 			return nil, errors.Join(errors.New("failed to encode image to base64"), err)
+		}
+		// inline_data.data must be raw base64, not a "data:...;base64," URI.
+		b64 := dataURI
+		if idx := strings.Index(dataURI, ","); idx != -1 {
+			b64 = dataURI[idx+1:]
 		}
 		allParts = append(allParts, map[string]any{
 			"inline_data": map[string]any{
