@@ -27,12 +27,14 @@ func NewReAct(model jpf.Model, opts ...ReActOpt) jpf.Agent {
 }
 
 type reactAgent struct {
-	session            jpf.AgentSession
-	toolCatalogue      []jpf.Tool
-	skillCatalogue     []jpf.Skill
-	maxIterations      int
-	model              jpf.Model
-	headStatePlacement HeadStatePlacement
+	session               jpf.AgentSession
+	toolCatalogue         []jpf.Tool
+	skillCatalogue        []jpf.Skill
+	maxIterations         int
+	model                 jpf.Model
+	headStatePlacement    HeadStatePlacement
+	headStateCallbacks    []func(jpf.AgentSession) map[string]string
+	headStateCallbackMode HeadStateCallbackMode
 }
 
 func (a *reactAgent) Session() jpf.AgentSession {
@@ -53,6 +55,10 @@ func (a *reactAgent) SetToolCatalogue(tools []jpf.Tool) {
 
 func (a *reactAgent) SetSkillCatalogue(skills []jpf.Skill) {
 	a.skillCatalogue = slices.Clone(skills)
+}
+
+func (a *reactAgent) SetHeadStateCallbacks(cbs []func(jpf.AgentSession) map[string]string) {
+	a.headStateCallbacks = slices.Clone(cbs)
 }
 
 // Run the agent from a new message to add into the conversation.
@@ -130,7 +136,13 @@ func (a *reactAgent) Resume(ctx context.Context, callResults []jpf.DeferredCallR
 
 func (a *reactAgent) runOrResumeHelper(ctx context.Context, kwargs jpf.AgentResponseKwargs) error {
 	a.deactivateMissingActiveSkills()
+	if a.headStateCallbackMode == BeforeEachTurn {
+		a.applyFragmentsFromCallbacks()
+	}
 	for range a.maxIterations {
+		if a.headStateCallbackMode == BeforeEachToolCall {
+			a.applyFragmentsFromCallbacks()
+		}
 		nextAction, err := a.determineNextAction(ctx, kwargs.Streamer.OnMessageComplete)
 		if err != nil {
 			return utils.Wrap(err, "failed to determine next action")
@@ -405,6 +417,13 @@ func (a *reactAgent) headStateMessage() jpf.Message {
 func (a *reactAgent) systemMessage() jpf.Message {
 	prompt := fmt.Sprintf("# Instructions\n%s\n\n# Personality\n%s\n\n# Task\n%s", a.session.AgentPrompt, a.session.PersonalityPrompt, a.session.TaskPrompt)
 	return jpf.SystemMessage{Content: prompt}
+}
+
+func (a *reactAgent) applyFragmentsFromCallbacks() {
+	for _, cb := range a.headStateCallbacks {
+		res := cb(a.Session())
+		a.applyFragments(res)
+	}
 }
 
 func (a *reactAgent) applyFragments(frags map[string]string) {

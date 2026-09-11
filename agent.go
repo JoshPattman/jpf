@@ -7,12 +7,21 @@ import (
 )
 
 type Agent interface {
+	// Get a copy of the agents session. You can safely modify this without affecting the agent.
 	Session() AgentSession
+	// Set the agent's session, overriding the entire session as it was before.
 	SetSession(AgentSession)
+	// Set the agent's max iterations.
 	SetMaxIterations(int)
+	// Set the agent's tool catalogue, overriding what was there previously.
 	SetToolCatalogue([]Tool)
+	// Set the agent's skill catalogue, overriding what was there previously.
 	SetSkillCatalogue([]Skill)
+	// Set the agent's head state callbacks, overriding what was there previously.
+	SetHeadStateCallbacks([]func(AgentSession) map[string]string)
+	// Run the agent from a new user message.
 	Run(context.Context, string, ...AgentResponseOpt) error
+	// Run the agent from a deferred state.
 	Resume(context.Context, []DeferredCallResult, ...AgentResponseOpt) error
 }
 
