@@ -580,9 +580,7 @@ func (m *apiAnthropicModel) tools(toolSchemas []jpf.ToolSchema) []any {
 				"description": arg.Description,
 			}
 
-			if arg.Required {
-				required = append(required, arg.Name)
-			}
+			required = append(required, arg.Name)
 		}
 
 		inputSchema := map[string]any{

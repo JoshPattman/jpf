@@ -160,7 +160,7 @@ func TestOpenAIResponsesTools(t *testing.T) {
 		{
 			Name: "search",
 			Params: []jpf.ToolParam{
-				{Name: "q", Type: jpf.ToolParamString, Required: true},
+				{Name: "q", Type: jpf.ToolParamString},
 			},
 		},
 	})

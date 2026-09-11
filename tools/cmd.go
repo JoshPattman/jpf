@@ -23,7 +23,6 @@ func NewRunBashCommandTool(workspaceRoot string) jpf.Tool {
 					Name:        "command",
 					Description: "the command to run, as a single string passed to 'bash -c'",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},

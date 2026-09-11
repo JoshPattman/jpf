@@ -91,7 +91,6 @@ func testToolCallModel(model jpf.Model) func(t *testing.T) {
 					Name:        "message",
 					Description: "a nice message to ping the user with",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		}
@@ -166,7 +165,6 @@ func testStoreReasoningRoundTrip(model jpf.Model) func(t *testing.T) {
 					Name:        "message",
 					Description: "a nice message to ping the user with",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		}
@@ -284,7 +282,6 @@ func testStreamToolCallModel(model jpf.Model) func(t *testing.T) {
 					Name:        "message",
 					Description: "a nice message to ping the user with",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		}

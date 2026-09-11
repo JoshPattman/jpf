@@ -23,12 +23,15 @@ const (
 	ToolParamString
 )
 
-// ToolParam describes a parameter that an agent may pass to a tool.
+// ToolParam describes a parameter that an agent may pass to a tool. All
+// params are required: the LLM must always supply a value for every one, so
+// any "default" behaviour (e.g. an offset of 0, or a limit of 0 meaning
+// unlimited) must be expressed as a sentinel value within the param's type
+// rather than by omitting it.
 type ToolParam struct {
 	Name        string
 	Description string
 	Type        ToolParamType
-	Required    bool
 }
 
 // ToolArgs are the arguments an LLM has tried to call a tool with.
@@ -82,9 +85,7 @@ func (args ToolArgs) AlignWithSchema(schema ToolSchema) error {
 	for _, schemaArg := range schema.Params {
 		val, ok := args[schemaArg.Name]
 		if !ok {
-			if schemaArg.Required {
-				errs = append(errs, fmt.Errorf("argument '%s' is required but was not provided", schemaArg.Name))
-			}
+			errs = append(errs, fmt.Errorf("argument '%s' is required but was not provided", schemaArg.Name))
 			continue
 		}
 		switch schemaArg.Type {

@@ -24,13 +24,11 @@ func BuildWorkingMemoryUtils() ([]jpf.Tool, []func(jpf.AgentSession) map[string]
 					Name:        "old_text",
 					Description: "the exact existing text to replace. Must match exactly once in the memory. Pass an empty string to fill empty memory.",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 				{
 					Name:        "new_text",
 					Description: "the text to replace the old text with",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
