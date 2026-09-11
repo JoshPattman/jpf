@@ -23,11 +23,7 @@ const (
 	ToolParamString
 )
 
-// ToolParam describes a parameter that an agent may pass to a tool. All
-// params are required: the LLM must always supply a value for every one, so
-// any "default" behaviour (e.g. an offset of 0, or a limit of 0 meaning
-// unlimited) must be expressed as a sentinel value within the param's type
-// rather than by omitting it.
+// ToolParam describes a parameter that an agent may pass to a tool. All params are required.
 type ToolParam struct {
 	Name        string
 	Description string
@@ -121,50 +117,18 @@ func (args ToolArgs) Clone() ToolArgs {
 	return maps.Clone(args)
 }
 
-func (args ToolArgs) RequiredString(key string) string {
+func (args ToolArgs) String(key string) string {
 	return args[key].(string)
 }
 
-func (args ToolArgs) RequiredInt(key string) int {
+func (args ToolArgs) Int(key string) int {
 	return args[key].(int)
 }
 
-func (args ToolArgs) RequiredFloat(key string) float64 {
+func (args ToolArgs) Float(key string) float64 {
 	return args[key].(float64)
 }
 
-func (args ToolArgs) RequiredBool(key string) bool {
+func (args ToolArgs) Bool(key string) bool {
 	return args[key].(bool)
-}
-
-func (args ToolArgs) OptionalString(key string, defaultVal string) (string, bool) {
-	val, ok := args[key]
-	if !ok {
-		return defaultVal, false
-	}
-	return val.(string), true
-}
-
-func (args ToolArgs) OptionalInt(key string, defaultVal int) (int, bool) {
-	val, ok := args[key]
-	if !ok {
-		return defaultVal, false
-	}
-	return val.(int), true
-}
-
-func (args ToolArgs) OptionalFloat(key string, defaultVal float64) (float64, bool) {
-	val, ok := args[key]
-	if !ok {
-		return defaultVal, false
-	}
-	return val.(float64), true
-}
-
-func (args ToolArgs) OptionalBool(key string, defaultVal bool) (bool, bool) {
-	val, ok := args[key]
-	if !ok {
-		return defaultVal, false
-	}
-	return val.(bool), true
 }

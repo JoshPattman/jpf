@@ -33,8 +33,8 @@ func BuildWorkingMemoryUtils() ([]jpf.Tool, []func(jpf.AgentSession) map[string]
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			oldText := ta.RequiredString("old_text")
-			newText := ta.RequiredString("new_text")
+			oldText := ta.String("old_text")
+			newText := ta.String("new_text")
 
 			var updated string
 			if oldText == "" {

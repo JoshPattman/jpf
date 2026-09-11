@@ -137,15 +137,15 @@ func newFileReadTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
-			offset := ta.RequiredInt("offset")
+			offset := ta.Int("offset")
 			if offset < 0 {
 				return jpf.ToolResult{}, fmt.Errorf("offset must not be negative")
 			}
-			count := ta.RequiredInt("count")
+			count := ta.Int("count")
 			if count < 0 {
 				return jpf.ToolResult{}, fmt.Errorf("count must not be negative")
 			}
@@ -197,7 +197,7 @@ func newDirReadTool(workspaceRoot string, numLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -237,7 +237,7 @@ func newFileCreateTool(workspaceRoot string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -269,7 +269,7 @@ func newFileDeleteTool(workspaceRoot string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -314,12 +314,12 @@ func newFileModifyTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
-			oldText := ta.RequiredString("old_text")
-			newText := ta.RequiredString("new_text")
+			oldText := ta.String("old_text")
+			newText := ta.String("new_text")
 
 			contents, err := readFileCapped(path, sizeLimit)
 			if err != nil {
@@ -375,7 +375,7 @@ func newDirCreateTool(workspaceRoot string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -403,7 +403,7 @@ func newDirDeleteTool(workspaceRoot string) jpf.Tool {
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}

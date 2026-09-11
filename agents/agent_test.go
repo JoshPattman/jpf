@@ -77,7 +77,7 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 		{
 			Schema: jpf.ToolSchema{Name: "echo", Params: []jpf.ToolParam{{Name: "msg", Type: jpf.ToolParamString}}},
 			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
-				return jpf.ToolResult{Content: "echoed: " + m.RequiredString("msg")}, nil
+				return jpf.ToolResult{Content: "echoed: " + m.String("msg")}, nil
 			},
 		},
 	})
@@ -629,16 +629,10 @@ func TestAgentHeadStatePlacementIsInertWhenHeadStateIsEmpty(t *testing.T) {
 	}
 }
 
-func TestRequiredAndOptionalArg(t *testing.T) {
+func TestRequiredArg(t *testing.T) {
 	args := jpf.ToolArgs{"name": "josh"}
-	if got := args.RequiredString("name"); got != "josh" {
+	if got := args.String("name"); got != "josh" {
 		t.Fatalf("RequiredArg: got %q", got)
-	}
-	if got, ok := args.OptionalString("name", ""); !ok || got != "josh" {
-		t.Fatalf("OptionalArg present: got %q, %v", got, ok)
-	}
-	if got, ok := args.OptionalString("missing", ""); ok || got != "" {
-		t.Fatalf("OptionalArg missing: got %q, %v", got, ok)
 	}
 }
 
