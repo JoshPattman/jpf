@@ -72,6 +72,9 @@ func (a *reactAgent) Run(ctx context.Context, query string, opts ...jpf.AgentRes
 	msg := jpf.UserMessage{Content: query}
 	a.session.CoreMessages = append(a.session.CoreMessages, msg)
 	kwargs.Streamer.OnMessageComplete(msg)
+	if a.headStateCallbackMode == BeforeEachTurn {
+		a.applyFragmentsFromCallbacks()
+	}
 	return a.runOrResumeHelper(ctx, kwargs)
 }
 
@@ -136,11 +139,8 @@ func (a *reactAgent) Resume(ctx context.Context, callResults []jpf.DeferredCallR
 
 func (a *reactAgent) runOrResumeHelper(ctx context.Context, kwargs jpf.AgentResponseKwargs) error {
 	a.deactivateMissingActiveSkills()
-	if a.headStateCallbackMode == BeforeEachTurn {
-		a.applyFragmentsFromCallbacks()
-	}
 	for range a.maxIterations {
-		if a.headStateCallbackMode == BeforeEachToolCall {
+		if a.headStateCallbackMode == BeforeEachToolIteration {
 			a.applyFragmentsFromCallbacks()
 		}
 		nextAction, err := a.determineNextAction(ctx, kwargs.Streamer.OnMessageComplete)
