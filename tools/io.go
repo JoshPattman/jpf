@@ -92,17 +92,50 @@ func readFileCapped(path string, limit int) ([]byte, error) {
 	return buf[:n], nil
 }
 
+// readFileWindow reads up to length bytes starting at byte offset from the
+// file at path, without ever holding more than length bytes in memory. If the
+// file is shorter than offset+length, it returns whatever bytes remain past
+// offset (possibly none) rather than an error.
+func readFileWindow(path string, offset, length int64) ([]byte, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	if _, err := f.Seek(offset, io.SeekStart); err != nil {
+		return nil, err
+	}
+	buf := make([]byte, length)
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, err
+	}
+	return buf[:n], nil
+}
+
 func newFileReadTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_file",
-			Description: "read the contents of a file on disk, dumping the result in your context.",
+			Description: "read the contents of a file on disk, dumping the result in your context. By default reads the whole file (up to the size limit); pass offset and/or count to read a specific byte-position window instead, which lets you read parts of a file larger than the size limit.",
 			Params: []jpf.ToolParam{
 				{
 					Name:        "path",
 					Description: "the path of the file to read",
 					Type:        jpf.ToolParamString,
 					Required:    true,
+				},
+				{
+					Name:        "offset",
+					Description: "the byte position to start reading from. Defaults to 0.",
+					Type:        jpf.ToolParamInt,
+					Required:    false,
+				},
+				{
+					Name:        "count",
+					Description: "the maximum number of bytes to read starting at offset. Defaults to reading to the end of the file.",
+					Type:        jpf.ToolParamInt,
+					Required:    false,
 				},
 			},
 		},
@@ -111,7 +144,37 @@ func newFileReadTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
-			contents, err := readFileCapped(path, sizeLimit)
+			offset, _ := ta.OptionalInt("offset", 0)
+			if offset < 0 {
+				return jpf.ToolResult{}, fmt.Errorf("offset must not be negative")
+			}
+			count, hasCount := ta.OptionalInt("count", 0)
+			if hasCount && count < 0 {
+				return jpf.ToolResult{}, fmt.Errorf("count must not be negative")
+			}
+
+			info, err := os.Stat(path)
+			if err != nil {
+				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to read that file"), err)
+			}
+			size := info.Size()
+
+			start := int64(offset)
+			if start > size {
+				start = size
+			}
+			end := size
+			if hasCount {
+				if requestedEnd := start + int64(count); requestedEnd < end {
+					end = requestedEnd
+				}
+			}
+			length := end - start
+			if length > int64(sizeLimit) {
+				return jpf.ToolResult{}, fmt.Errorf("that read would return more than the maximum size limit of %d bytes, request a smaller window with offset/count", sizeLimit)
+			}
+
+			contents, err := readFileWindow(path, start, length)
 			if err != nil {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to read that file"), err)
 			}
@@ -236,7 +299,7 @@ func newFileModifyTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "modify_file",
-			Description: "modify an existing file on disk by replacing a snippet of its text. The old text must appear exactly once in the file, otherwise this fails. To fill an empty file, pass an empty string as the old text.",
+			Description: "modify an existing file on disk by replacing a snippet of its text. The old text must appear exactly once in the file, otherwise this fails. To fill an empty file, pass an empty string as the old text. Returns the byte position range (start-end, end exclusive) that the new text now occupies in the file.",
 			Params: []jpf.ToolParam{
 				{
 					Name:        "path",
@@ -272,18 +335,22 @@ func newFileModifyTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 			}
 
 			var updated string
+			var start int
 			if oldText == "" {
 				if len(contents) != 0 {
 					return jpf.ToolResult{}, fmt.Errorf("old text is empty but that file is not empty, so there is nothing to fill")
 				}
 				updated = newText
+				start = 0
 			} else {
 				count := strings.Count(string(contents), oldText)
 				if count != 1 {
 					return jpf.ToolResult{}, fmt.Errorf("old text must appear exactly once in that file, but it appears %d times", count)
 				}
+				start = strings.Index(string(contents), oldText)
 				updated = strings.Replace(string(contents), oldText, newText, 1)
 			}
+			end := start + len(newText)
 			if len(updated) > sizeLimit {
 				return jpf.ToolResult{}, fmt.Errorf("the modified file would be larger than the maximum size limit of %d bytes", sizeLimit)
 			}
@@ -296,7 +363,7 @@ func newFileModifyTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 				return jpf.ToolResult{}, errors.Join(fmt.Errorf("failed to modify that file"), err)
 			}
 			return jpf.ToolResult{
-				Content: fmt.Sprintf("modified file %s", path),
+				Content: fmt.Sprintf("modified file %s (touched byte positions %d-%d)", path, start, end),
 			}, nil
 		},
 	}

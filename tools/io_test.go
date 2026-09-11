@@ -2,10 +2,14 @@ package tools
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
+
+	"github.com/JoshPattman/jpf"
 )
 
 func TestResolveAndCheckPath(t *testing.T) {
@@ -142,5 +146,196 @@ func TestReadFileCapped(t *testing.T) {
 func TestReadFileCappedMissingFile(t *testing.T) {
 	if _, err := readFileCapped(filepath.Join(t.TempDir(), "nope"), 100); err == nil {
 		t.Fatal("expected an error for a missing file")
+	}
+}
+
+func callReadFile(t *testing.T, tool jpf.Tool, args jpf.ToolArgs) (string, error) {
+	t.Helper()
+	res, err := tool.Call(context.Background(), args)
+	return res.Content, err
+}
+
+func TestReadFileToolDefaultReadsWholeFile(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "hello world" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadFileToolOffsetAndCount(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 6, "count": 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "world" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadFileToolOffsetOnlyReadsToEnd(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 6})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "world" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadFileToolCountOnlyReadsFromStart(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello world"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "count": 5})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "hello" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadFileToolOffsetBeyondEndReturnsEmpty(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 1000})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestReadFileToolCountClampedToEndOfFile(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 2, "count": 1000})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "llo" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+// The size limit should cap what is returned per call, not the whole file, so
+// a window into an oversized file should still succeed.
+func TestReadFileToolWindowBypassesWholeFileSizeLimit(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "big.txt"), bytes.Repeat([]byte("x"), 1000), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 10)
+
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt", "offset": 500, "count": 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != string(bytes.Repeat([]byte("x"), 10)) {
+		t.Fatalf("got %d bytes, want 10", len(got))
+	}
+}
+
+func TestReadFileToolWindowLargerThanSizeLimitErrors(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "big.txt"), bytes.Repeat([]byte("x"), 1000), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 10)
+
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt", "count": 11}); err == nil {
+		t.Fatal("expected an error requesting more than the size limit")
+	}
+	// Defaulting to "read to end" on an oversized file should also error.
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt"}); err == nil {
+		t.Fatal("expected an error reading a whole oversized file with no count")
+	}
+}
+
+func TestReadFileToolNegativeOffsetOrCountErrors(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileReadTool(root, 1000)
+
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": -1}); err == nil {
+		t.Fatal("expected an error for negative offset")
+	}
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "count": -1}); err == nil {
+		t.Fatal("expected an error for negative count")
+	}
+}
+
+func TestModifyFileToolReturnsTouchedByteRange(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), []byte("the cat sat"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileModifyTool(root, 1000)
+
+	res, err := tool.Call(context.Background(), jpf.ToolArgs{"path": "f.txt", "old_text": "cat", "new_text": "dog"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// "cat" starts at byte 4; "dog" is also 3 bytes, so it occupies [4, 7).
+	if !strings.Contains(res.Content, "4-7") {
+		t.Fatalf("expected touched range 4-7 in result, got %q", res.Content)
+	}
+	got, err := os.ReadFile(filepath.Join(root, "f.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "the dog sat" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestModifyFileToolReturnsTouchedByteRangeWhenFillingEmptyFile(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "f.txt"), nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	tool := newFileModifyTool(root, 1000)
+
+	res, err := tool.Call(context.Background(), jpf.ToolArgs{"path": "f.txt", "old_text": "", "new_text": "hello"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(res.Content, "0-5") {
+		t.Fatalf("expected touched range 0-5 in result, got %q", res.Content)
 	}
 }
