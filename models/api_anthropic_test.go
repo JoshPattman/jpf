@@ -157,7 +157,7 @@ func TestAnthropicTools(t *testing.T) {
 			Name:        "search",
 			Description: "search the web",
 			Params: []jpf.ToolParam{
-				{Name: "q", Type: jpf.ToolParamString, Description: "query", Required: true},
+				{Name: "q", Type: jpf.ToolParamString, Description: "query"},
 				{Name: "n", Type: jpf.ToolParamInt, Description: "count"},
 				{Name: "f", Type: jpf.ToolParamFloat, Description: "factor"},
 			},
@@ -182,7 +182,7 @@ func TestAnthropicTools(t *testing.T) {
 		t.Fatalf("got %+v", props["f"])
 	}
 	required := schema["required"].([]string)
-	if len(required) != 1 || required[0] != "q" {
+	if len(required) != 3 || required[0] != "q" || required[1] != "n" || required[2] != "f" {
 		t.Fatalf("got %+v", required)
 	}
 }

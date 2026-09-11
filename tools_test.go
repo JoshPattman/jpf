@@ -15,7 +15,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "valid string arg",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "s", Type: ToolParamString, Required: true},
+				{Name: "s", Type: ToolParamString},
 			}},
 			args:     map[string]any{"s": "hello"},
 			wantErr:  false,
@@ -24,7 +24,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "valid float arg",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "f", Type: ToolParamFloat, Required: true},
+				{Name: "f", Type: ToolParamFloat},
 			}},
 			args:     map[string]any{"f": 1.5},
 			wantErr:  false,
@@ -33,7 +33,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "valid int arg is converted from float64",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "i", Type: ToolParamInt, Required: true},
+				{Name: "i", Type: ToolParamInt},
 			}},
 			args:     map[string]any{"i": float64(3)},
 			wantErr:  false,
@@ -42,7 +42,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "int arg supplied as native int passes",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "i", Type: ToolParamInt, Required: true},
+				{Name: "i", Type: ToolParamInt},
 			}},
 			args:     map[string]any{"i": int(3)},
 			wantErr:  false,
@@ -51,32 +51,23 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "int arg with fractional float64 errors",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "i", Type: ToolParamInt, Required: true},
+				{Name: "i", Type: ToolParamInt},
 			}},
 			args:    map[string]any{"i": 3.5},
 			wantErr: true,
 		},
 		{
-			name: "missing required arg errors",
+			name: "missing arg errors",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "s", Type: ToolParamString, Required: true},
+				{Name: "s", Type: ToolParamString},
 			}},
 			args:    map[string]any{},
 			wantErr: true,
 		},
 		{
-			name: "missing optional arg is fine",
-			schema: ToolSchema{Params: []ToolParam{
-				{Name: "s", Type: ToolParamString, Required: false},
-			}},
-			args:     map[string]any{},
-			wantErr:  false,
-			wantArgs: map[string]any{},
-		},
-		{
 			name: "wrong type string errors",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "s", Type: ToolParamString, Required: true},
+				{Name: "s", Type: ToolParamString},
 			}},
 			args:    map[string]any{"s": 5.0},
 			wantErr: true,
@@ -84,7 +75,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "wrong type float errors",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "f", Type: ToolParamFloat, Required: true},
+				{Name: "f", Type: ToolParamFloat},
 			}},
 			args:    map[string]any{"f": "not a float"},
 			wantErr: true,
@@ -92,7 +83,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "wrong type int errors",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "i", Type: ToolParamInt, Required: true},
+				{Name: "i", Type: ToolParamInt},
 			}},
 			args:    map[string]any{"i": "not an int"},
 			wantErr: true,
@@ -100,8 +91,8 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "multiple errors are joined",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "s", Type: ToolParamString, Required: true},
-				{Name: "i", Type: ToolParamInt, Required: true},
+				{Name: "s", Type: ToolParamString},
+				{Name: "i", Type: ToolParamInt},
 			}},
 			args:    map[string]any{"s": 5.0, "i": "not an int"},
 			wantErr: true,
@@ -109,7 +100,7 @@ func TestValidateAndFixArgsForSchema(t *testing.T) {
 		{
 			name: "extra unrecognised args are ignored",
 			schema: ToolSchema{Params: []ToolParam{
-				{Name: "s", Type: ToolParamString, Required: true},
+				{Name: "s", Type: ToolParamString},
 			}},
 			args:     map[string]any{"s": "hello", "extra": "ignored"},
 			wantErr:  false,

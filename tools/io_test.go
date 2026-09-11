@@ -162,7 +162,7 @@ func TestReadFileToolDefaultReadsWholeFile(t *testing.T) {
 	}
 	tool := newFileReadTool(root, 1000)
 
-	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt"})
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 0, "count": 0})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -194,7 +194,7 @@ func TestReadFileToolOffsetOnlyReadsToEnd(t *testing.T) {
 	}
 	tool := newFileReadTool(root, 1000)
 
-	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 6})
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 6, "count": 0})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestReadFileToolCountOnlyReadsFromStart(t *testing.T) {
 	}
 	tool := newFileReadTool(root, 1000)
 
-	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "count": 5})
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 0, "count": 5})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -226,7 +226,7 @@ func TestReadFileToolOffsetBeyondEndReturnsEmpty(t *testing.T) {
 	}
 	tool := newFileReadTool(root, 1000)
 
-	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 1000})
+	got, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 1000, "count": 0})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -276,12 +276,12 @@ func TestReadFileToolWindowLargerThanSizeLimitErrors(t *testing.T) {
 	}
 	tool := newFileReadTool(root, 10)
 
-	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt", "count": 11}); err == nil {
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt", "offset": 0, "count": 11}); err == nil {
 		t.Fatal("expected an error requesting more than the size limit")
 	}
-	// Defaulting to "read to end" on an oversized file should also error.
-	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt"}); err == nil {
-		t.Fatal("expected an error reading a whole oversized file with no count")
+	// A count of 0 ("read to end") on an oversized file should also error.
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "big.txt", "offset": 0, "count": 0}); err == nil {
+		t.Fatal("expected an error reading a whole oversized file with count 0")
 	}
 }
 
@@ -292,10 +292,10 @@ func TestReadFileToolNegativeOffsetOrCountErrors(t *testing.T) {
 	}
 	tool := newFileReadTool(root, 1000)
 
-	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": -1}); err == nil {
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": -1, "count": 0}); err == nil {
 		t.Fatal("expected an error for negative offset")
 	}
-	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "count": -1}); err == nil {
+	if _, err := callReadFile(t, tool, jpf.ToolArgs{"path": "f.txt", "offset": 0, "count": -1}); err == nil {
 		t.Fatal("expected an error for negative count")
 	}
 }

@@ -183,12 +183,11 @@ func (a *reactAgent) getBuiltinTools() []jpf.Tool {
 					Name:        "skill_name",
 					Description: "the name of the skill to activate",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
-			name := m.RequiredString("skill_name")
+			name := m.String("skill_name")
 			if slices.Contains(a.session.ActiveSkillNames, name) {
 				return jpf.ToolResult{}, fmt.Errorf("skill '%s' is already active", name)
 			}
@@ -210,12 +209,11 @@ func (a *reactAgent) getBuiltinTools() []jpf.Tool {
 					Name:        "skill_name",
 					Description: "the name of the skill to deactivate",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
-			name := m.RequiredString("skill_name")
+			name := m.String("skill_name")
 			if !slices.Contains(a.session.ActiveSkillNames, name) {
 				return jpf.ToolResult{}, fmt.Errorf("skill '%s' is not currently active", name)
 			}

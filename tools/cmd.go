@@ -23,12 +23,11 @@ func NewRunBashCommandTool(workspaceRoot string) jpf.Tool {
 					Name:        "command",
 					Description: "the command to run, as a single string passed to 'bash -c'",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			command := ta.RequiredString("command")
+			command := ta.String("command")
 			cmd := exec.CommandContext(ctx, "bash", "-c", command)
 			cmd.Dir = workspaceRoot
 			output, err := cmd.CombinedOutput()

@@ -117,41 +117,39 @@ func newFileReadTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 	return jpf.Tool{
 		Schema: jpf.ToolSchema{
 			Name:        "read_file",
-			Description: "read the contents of a file on disk, dumping the result in your context. By default reads the whole file (up to the size limit); pass offset and/or count to read a specific byte-position window instead, which lets you read parts of a file larger than the size limit.",
+			Description: "read the contents of a file on disk, dumping the result in your context. Pass offset 0 and count 0 to read the whole file (up to the size limit); pass a non-zero offset and/or count to read a specific byte-position window instead, which lets you read parts of a file larger than the size limit.",
 			Params: []jpf.ToolParam{
 				{
 					Name:        "path",
 					Description: "the path of the file to read",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 				{
 					Name:        "offset",
-					Description: "the byte position to start reading from. Defaults to 0.",
+					Description: "the byte position to start reading from. Pass 0 to start at the beginning of the file.",
 					Type:        jpf.ToolParamInt,
-					Required:    false,
 				},
 				{
 					Name:        "count",
-					Description: "the maximum number of bytes to read starting at offset. Defaults to reading to the end of the file.",
+					Description: "the maximum number of bytes to read starting at offset. Pass 0 to read to the end of the file.",
 					Type:        jpf.ToolParamInt,
-					Required:    false,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
-			offset, _ := ta.OptionalInt("offset", 0)
+			offset := ta.Int("offset")
 			if offset < 0 {
 				return jpf.ToolResult{}, fmt.Errorf("offset must not be negative")
 			}
-			count, hasCount := ta.OptionalInt("count", 0)
-			if hasCount && count < 0 {
+			count := ta.Int("count")
+			if count < 0 {
 				return jpf.ToolResult{}, fmt.Errorf("count must not be negative")
 			}
+			hasCount := count > 0
 
 			info, err := os.Stat(path)
 			if err != nil {
@@ -195,12 +193,11 @@ func newDirReadTool(workspaceRoot string, numLimit int) jpf.Tool {
 					Name:        "path",
 					Description: "the path of the directory to read",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -236,12 +233,11 @@ func newFileCreateTool(workspaceRoot string) jpf.Tool {
 					Name:        "path",
 					Description: "the path of the file to create",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -269,12 +265,11 @@ func newFileDeleteTool(workspaceRoot string) jpf.Tool {
 					Name:        "path",
 					Description: "the path of the file to delete",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -305,29 +300,26 @@ func newFileModifyTool(workspaceRoot string, sizeLimit int) jpf.Tool {
 					Name:        "path",
 					Description: "the path of the file to modify",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 				{
 					Name:        "old_text",
 					Description: "the exact existing text to replace. Must match exactly once in the file. Pass an empty string to fill an empty file.",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 				{
 					Name:        "new_text",
 					Description: "the text to replace the old text with",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
-			oldText := ta.RequiredString("old_text")
-			newText := ta.RequiredString("new_text")
+			oldText := ta.String("old_text")
+			newText := ta.String("new_text")
 
 			contents, err := readFileCapped(path, sizeLimit)
 			if err != nil {
@@ -379,12 +371,11 @@ func newDirCreateTool(workspaceRoot string) jpf.Tool {
 					Name:        "path",
 					Description: "the path of the directory to create",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}
@@ -408,12 +399,11 @@ func newDirDeleteTool(workspaceRoot string) jpf.Tool {
 					Name:        "path",
 					Description: "the path of the directory to delete",
 					Type:        jpf.ToolParamString,
-					Required:    true,
 				},
 			},
 		},
 		Call: func(ctx context.Context, ta jpf.ToolArgs) (jpf.ToolResult, error) {
-			path, err := resolveAndCheckPath(workspaceRoot, ta.RequiredString("path"))
+			path, err := resolveAndCheckPath(workspaceRoot, ta.String("path"))
 			if err != nil {
 				return jpf.ToolResult{}, err
 			}

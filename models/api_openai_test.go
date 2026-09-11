@@ -182,7 +182,7 @@ func TestOpenAITools(t *testing.T) {
 			Name:        "search",
 			Description: "search the web",
 			Params: []jpf.ToolParam{
-				{Name: "q", Type: jpf.ToolParamString, Required: true, Description: "query"},
+				{Name: "q", Type: jpf.ToolParamString, Description: "query"},
 				{Name: "n", Type: jpf.ToolParamInt},
 				{Name: "score", Type: jpf.ToolParamFloat},
 			},
@@ -208,7 +208,7 @@ func TestOpenAITools(t *testing.T) {
 		t.Fatalf("got %+v", props["score"])
 	}
 	required := params["required"].([]string)
-	if len(required) != 1 || required[0] != "q" {
+	if len(required) != 3 || required[0] != "q" || required[1] != "n" || required[2] != "score" {
 		t.Fatalf("got %+v", required)
 	}
 }

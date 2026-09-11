@@ -75,9 +75,9 @@ func TestAgentRunExecutesToolThenFinishes(t *testing.T) {
 	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
-			Schema: jpf.ToolSchema{Name: "echo", Params: []jpf.ToolParam{{Name: "msg", Type: jpf.ToolParamString, Required: true}}},
+			Schema: jpf.ToolSchema{Name: "echo", Params: []jpf.ToolParam{{Name: "msg", Type: jpf.ToolParamString}}},
 			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
-				return jpf.ToolResult{Content: "echoed: " + m.RequiredString("msg")}, nil
+				return jpf.ToolResult{Content: "echoed: " + m.String("msg")}, nil
 			},
 		},
 	})
@@ -119,7 +119,7 @@ func TestAgentDeferredToolCallPausesAndCanBeResumed(t *testing.T) {
 	}}
 	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
-		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString, Required: true}}}},
+		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString}}}},
 	})
 
 	runRec := &recordingStreamer{}
@@ -204,7 +204,7 @@ func TestAgentDeferredCallArgsAreValidatedAndCoerced(t *testing.T) {
 	}}
 	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
-		{Schema: jpf.ToolSchema{Name: "count", Params: []jpf.ToolParam{{Name: "n", Type: jpf.ToolParamInt, Required: true}}}},
+		{Schema: jpf.ToolSchema{Name: "count", Params: []jpf.ToolParam{{Name: "n", Type: jpf.ToolParamInt}}}},
 	})
 
 	if err := agent.Run(context.Background(), "count to 5"); err != nil {
@@ -244,7 +244,7 @@ func TestAgentInvalidArgsProducesErrorResult(t *testing.T) {
 	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
 		{
-			Schema: jpf.ToolSchema{Name: "greet", Params: []jpf.ToolParam{{Name: "name", Type: jpf.ToolParamString, Required: true}}},
+			Schema: jpf.ToolSchema{Name: "greet", Params: []jpf.ToolParam{{Name: "name", Type: jpf.ToolParamString}}},
 			Call: func(_ context.Context, m jpf.ToolArgs) (jpf.ToolResult, error) {
 				t.Fatalf("Call should not run when required args are missing")
 				return jpf.ToolResult{}, nil
@@ -515,7 +515,7 @@ func TestAgentDeferredCallCanSetPromptFragment(t *testing.T) {
 	}}
 	agent := NewReAct(model)
 	agent.SetToolCatalogue([]jpf.Tool{
-		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString, Required: true}}}},
+		{Schema: jpf.ToolSchema{Name: "fetch", Params: []jpf.ToolParam{{Name: "url", Type: jpf.ToolParamString}}}},
 	})
 
 	if err := agent.Run(context.Background(), "go fetch"); err != nil {
@@ -629,16 +629,10 @@ func TestAgentHeadStatePlacementIsInertWhenHeadStateIsEmpty(t *testing.T) {
 	}
 }
 
-func TestRequiredAndOptionalArg(t *testing.T) {
+func TestRequiredArg(t *testing.T) {
 	args := jpf.ToolArgs{"name": "josh"}
-	if got := args.RequiredString("name"); got != "josh" {
+	if got := args.String("name"); got != "josh" {
 		t.Fatalf("RequiredArg: got %q", got)
-	}
-	if got, ok := args.OptionalString("name", ""); !ok || got != "josh" {
-		t.Fatalf("OptionalArg present: got %q, %v", got, ok)
-	}
-	if got, ok := args.OptionalString("missing", ""); ok || got != "" {
-		t.Fatalf("OptionalArg missing: got %q, %v", got, ok)
 	}
 }
 

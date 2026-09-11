@@ -542,9 +542,7 @@ func (m *apiGeminiModel) tools(toolSchemas []jpf.ToolSchema) []any {
 				"description": arg.Description,
 			}
 
-			if arg.Required {
-				required = append(required, arg.Name)
-			}
+			required = append(required, arg.Name)
 		}
 
 		params := map[string]any{
