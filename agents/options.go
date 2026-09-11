@@ -31,12 +31,12 @@ func WithHeadStatePlacement(placement HeadStatePlacement) ReActOpt {
 type HeadStateCallbackMode uint8
 
 const (
-	BeforeEachToolCall HeadStateCallbackMode = iota
+	BeforeEachToolIteration HeadStateCallbackMode = iota
 	BeforeEachTurn
 )
 
 // WithHeadStateCallbackMode sets when the head state callbacks run.
-// BeforeEachToolCall is the default.
+// BeforeEachToolIteration is the default.
 func WithHeadStateCallbackMode(mode HeadStateCallbackMode) ReActOpt {
 	return func(a *reactAgent) {
 		a.headStateCallbackMode = mode
